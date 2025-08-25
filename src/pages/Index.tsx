@@ -228,7 +228,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/20">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background/95 to-accent/20">
       {/* Header */}
       <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 sm:py-6">
@@ -250,7 +250,7 @@ const Index = () => {
       <SafetyWarning />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 sm:py-8">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
           
           {/* Introduction */}
@@ -309,6 +309,11 @@ const Index = () => {
           )}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-muted/20 text-center text-xs sm:text-sm text-muted-foreground py-4">
+        Desenvolvido por AIX8C - @lorenzavolponi
+      </footer>
     </div>
   );
 };

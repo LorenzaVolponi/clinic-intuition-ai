@@ -199,30 +199,50 @@ export const CLINICAL_SCALES = {
   }
 };
 
-export function findMatchingConditions(symptoms: string, age: number, gender: string, duration: string): MedicalCondition[] {
-  const symptomsLower = symptoms.toLowerCase();
-  const ageGroup = age < 18 ? 'crianca' : age < 65 ? 'adulto' : 'idoso';
-  
-  return MEDICAL_CONDITIONS.filter(condition => {
-    // Check symptom match
-    const symptomMatch = condition.commonSymptoms.some(symptom => 
-      symptomsLower.includes(symptom.toLowerCase())
-    );
-    
-    // Check age group
+export function findMatchingConditions(
+  symptoms: string,
+  age: number,
+  gender: string,
+  duration: string
+): MedicalCondition[] {
+  const symptomList = symptoms
+    .toLowerCase()
+    .split(/,|;| e /i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const ageGroup = age < 18 ? "crianca" : age < 65 ? "adulto" : "idoso";
+
+  return MEDICAL_CONDITIONS.map((condition) => {
+    // Score by number of symptom matches
+    const matchScore = condition.commonSymptoms.reduce((score, symptom) => {
+      return score + (symptomList.includes(symptom.toLowerCase()) ? 1 : 0);
+    }, 0);
+
     const ageMatch = condition.ageGroups.includes(ageGroup);
-    
-    // Check gender preference
-    const genderMatch = !condition.genderPreference || 
-      condition.genderPreference === gender || 
-      condition.genderPreference === 'both';
-    
-    return symptomMatch && ageMatch && genderMatch;
-  }).sort((a, b) => {
-    // Sort by urgency level (emergency first)
-    const urgencyOrder = { 'emergencia': 0, 'alta': 1, 'moderada': 2, 'baixa': 3 };
-    return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
-  });
+    const genderMatch =
+      !condition.genderPreference ||
+      condition.genderPreference === gender ||
+      condition.genderPreference === "both";
+
+    return { condition, matchScore, ageMatch, genderMatch };
+  })
+    .filter((item) => item.matchScore > 0 && item.ageMatch && item.genderMatch)
+    .sort((a, b) => {
+      if (b.matchScore !== a.matchScore) {
+        return b.matchScore - a.matchScore;
+      }
+      const urgencyOrder = {
+        emergencia: 0,
+        alta: 1,
+        moderada: 2,
+        baixa: 3,
+      } as const;
+      return (
+        urgencyOrder[a.condition.urgencyLevel] -
+        urgencyOrder[b.condition.urgencyLevel]
+      );
+    })
+    .map((item) => item.condition);
 }
 
 export function generateClinicalPrompt(patientData: PatientInput): string {

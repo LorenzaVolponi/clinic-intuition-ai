@@ -4,7 +4,11 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { findMatchingConditions, generateClinicalPrompt } from "@/lib/medicalKnowledge";
+import {
+  MEDICAL_CONDITIONS,
+  findMatchingConditions,
+  generateClinicalPrompt,
+} from "@/lib/medicalKnowledge";
 import { generateMainPrompt } from "@/lib/mainPrompt";
 
 interface PatientData {
@@ -43,8 +47,9 @@ const Index = () => {
     try {
       const prompt = generateClinicalPrompt(data);
       const aiDiagnosis = await analyzeWithAI(prompt);
-      const missing = validateSymptomCoverage(data.symptoms, aiDiagnosis);
-      setDiagnosis({ ...aiDiagnosis, unexplainedSymptoms: missing });
+      const ordered = prioritizeBySymptomMatch(data.symptoms, aiDiagnosis);
+      const missing = validateSymptomCoverage(data.symptoms, ordered);
+      setDiagnosis({ ...ordered, unexplainedSymptoms: missing });
 
       try {
         const mainPrompt = generateMainPrompt(data);
@@ -71,8 +76,8 @@ const Index = () => {
       throw new Error("Chave da API HuggingFace não configurada");
     }
     const controller = new AbortController();
-    // modelos grandes podem demorar para responder
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    // evitar espera indefinida em modelos grandes
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch(
         `https://api-inference.huggingface.co/models/${HF_MODEL}`,
@@ -128,18 +133,51 @@ const Index = () => {
     return fetchFromHF(prompt);
   };
 
-  const validateSymptomCoverage = (symptoms: string, data: DiagnosisData): string[] => {
+  const prioritizeBySymptomMatch = (
+    symptoms: string,
+    data: DiagnosisData
+  ): DiagnosisData => {
     const list = symptoms
       .split(/,|;| e /i)
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean);
-    return list.filter((symptom) =>
-      !data.hypotheses.some((h) =>
+    const scored = data.hypotheses
+      .map((h) => {
+        const text = `${h.name} ${h.explanation} ${h.differentials.join(" ")}`.toLowerCase();
+        const score = list.reduce(
+          (acc, symptom) => acc + (text.includes(symptom) ? 1 : 0),
+          0
+        );
+        return { score, ...h };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(({ score, ...rest }) => rest);
+    return { ...data, hypotheses: scored };
+  };
+
+  const validateSymptomCoverage = (
+    symptoms: string,
+    data: DiagnosisData
+  ): string[] => {
+    const list = symptoms
+      .split(/,|;| e /i)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return list.filter((symptom) => {
+      const inDiagnosis = data.hypotheses.some((h) =>
         `${h.name} ${h.explanation} ${h.differentials.join(" ")}`
           .toLowerCase()
           .includes(symptom)
-      )
-    );
+      );
+      if (inDiagnosis) return false;
+      return !MEDICAL_CONDITIONS.some(
+        (c) =>
+          c.commonSymptoms.some((s) => s.toLowerCase() === symptom) &&
+          data.hypotheses.some(
+            (h) => h.name.toLowerCase() === c.name.toLowerCase()
+          )
+      );
+    });
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
@@ -189,11 +227,12 @@ const Index = () => {
 
     const diagnosis: DiagnosisData = {
       hypotheses,
-      emergencyWarning
+      emergencyWarning,
     };
 
-    const missing = validateSymptomCoverage(data.symptoms, diagnosis);
-    return { ...diagnosis, unexplainedSymptoms: missing };
+    const ordered = prioritizeBySymptomMatch(data.symptoms, diagnosis);
+    const missing = validateSymptomCoverage(data.symptoms, ordered);
+    return { ...ordered, unexplainedSymptoms: missing };
   };
 
   const handleReset = () => {

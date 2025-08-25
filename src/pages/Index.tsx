@@ -43,68 +43,56 @@ const Index = () => {
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
-    const symptoms = data.symptoms.toLowerCase();
+    // Import medical knowledge
+    const { findMatchingConditions, generateClinicalPrompt } = require('@/lib/medicalKnowledge');
     
-    if (symptoms.includes("dor no peito") || symptoms.includes("dor torácica")) {
+    const matchingConditions = findMatchingConditions(
+      data.symptoms, 
+      data.age, 
+      data.gender, 
+      data.duration
+    );
+
+    if (matchingConditions.length === 0) {
       return {
         hypotheses: [
           {
-            name: "Síndrome Coronariana Aguda",
-            probability: "Alta",
-            treatment: "Antiagregação plaquetária, anticoagulação (exemplos educacionais)",
-            explanation: "Dor torácica em paciente com fatores de risco pode indicar isquemia miocárdica.",
-            differentials: ["Pericardite", "Embolia pulmonar", "Dissecção aórtica"]
-          }
-        ],
-        emergencyWarning: "Este quadro pode representar uma emergência médica. Encaminhe para atendimento imediato."
-      };
-    }
-    
-    if (symptoms.includes("dor abdominal") || symptoms.includes("dor na barriga")) {
-      return {
-        hypotheses: [
-          {
-            name: "Apendicite Aguda",
-            probability: "Moderada",
-            treatment: "Antibióticos (ceftriaxona), analgesia (dipirona) - exemplos educacionais",
-            explanation: "Dor abdominal em paciente jovem, especialmente se migratória para fossa ilíaca direita.",
-            differentials: ["Gastroenterite", "Doença inflamatória pélvica", "Litíase urinária"]
-          },
-          {
-            name: "Gastroenterite Aguda",
-            probability: "Moderada",
-            treatment: "Hidratação, probióticos, dieta - exemplos educacionais",
-            explanation: "Quadro gastroentérico viral ou bacteriano comum.",
-            differentials: ["Intoxicação alimentar", "Doença de Crohn", "Colite"]
+            name: "Quadro Clínico Inespecífico",
+            probability: "Baixa",
+            treatment: "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
+            explanation: "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
+            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"]
           }
         ]
       };
     }
 
-    if (symptoms.includes("tosse") || symptoms.includes("febre")) {
-      return {
-        hypotheses: [
-          {
-            name: "Infecção Respiratória Viral",
-            probability: "Alta",
-            treatment: "Sintomáticos, hidratação, repouso - exemplos educacionais",
-            explanation: "Quadro viral típico com tosse e febre de início recente.",
-            differentials: ["Pneumonia bacteriana", "COVID-19", "Bronquite aguda"]
-          }
-        ]
+    const hypotheses = matchingConditions.slice(0, 3).map((condition, index) => {
+      const probabilityMap = {
+        'emergencia': 'Alta',
+        'alta': 'Alta', 
+        'moderada': 'Moderada',
+        'baixa': 'Baixa'
       };
-    }
+
+      return {
+        name: condition.name,
+        probability: probabilityMap[condition.urgencyLevel],
+        treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
+        explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
+        differentials: condition.differentials.slice(0, 4)
+      };
+    });
+
+    // Check for emergency conditions
+    const hasEmergency = matchingConditions.some(c => c.urgencyLevel === 'emergencia');
+    const emergencyWarning = hasEmergency ? 
+      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." : 
+      undefined;
 
     return {
-      hypotheses: [
-        {
-          name: "Quadro Inespecífico",
-          probability: "Baixa",
-          treatment: "Observação clínica, sintomáticos - exemplos educacionais",
-          explanation: "Sintomas pouco específicos requerem avaliação clínica mais detalhada.",
-          differentials: ["Diversas patologias possíveis", "Necessária anamnese expandida"]
-        }
-      ]
+      hypotheses,
+      emergencyWarning
     };
   };
 
@@ -114,17 +102,19 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-accent">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/20">
       {/* Header */}
-      <header className="bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto px-4 py-6">
+      <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4 sm:py-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-lg">
-              <Stethoscope className="h-8 w-8" />
+            <div className="p-2 sm:p-3 bg-white/15 rounded-xl backdrop-blur-sm">
+              <Stethoscope className="h-6 w-6 sm:h-8 sm:w-8" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">Dr. IA</h1>
-              <p className="text-primary-foreground/90">Simulador de Diagnóstico Interativo</p>
+              <h1 className="text-2xl sm:text-3xl font-bold">Dr. IA</h1>
+              <p className="text-primary-foreground/90 text-sm sm:text-base">
+                Simulador de Diagnóstico Interativo
+              </p>
             </div>
           </div>
         </div>
@@ -134,28 +124,42 @@ const Index = () => {
       <SafetyWarning />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+      <main className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
           
           {/* Introduction */}
           {!patientData && (
-            <Card className="p-8 bg-gradient-to-r from-card to-accent border-l-4 border-l-primary">
+            <Card className="p-6 sm:p-8 bg-gradient-to-r from-card to-accent border-l-4 border-l-primary">
               <div className="text-center space-y-4">
                 <div className="flex justify-center gap-4 mb-6">
                   <div className="p-3 bg-primary/10 rounded-full">
-                    <Brain className="h-8 w-8 text-primary" />
+                    <Brain className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                   </div>
                   <div className="p-3 bg-success/10 rounded-full">
-                    <BookOpen className="h-8 w-8 text-success" />
+                    <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-success" />
                   </div>
                 </div>
-                <h2 className="text-2xl font-bold text-foreground">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
                   Bem-vindo ao Dr. IA
                 </h2>
-                <p className="text-muted-foreground text-lg max-w-2xl">
-                  Ferramenta educacional para estudantes de medicina praticarem raciocínio clínico 
-                  através de casos simulados com inteligência artificial.
+                <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+                  Sistema educacional avançado para estudantes de medicina praticarem raciocínio clínico 
+                  através de casos simulados baseados em conhecimento médico atualizado e guidelines internacionais.
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 text-sm">
+                  <div className="bg-primary/5 p-3 rounded-lg">
+                    <div className="font-medium text-primary">📚 Base Científica</div>
+                    <div className="text-muted-foreground">Algoritmos diagnósticos atualizados</div>
+                  </div>
+                  <div className="bg-success/5 p-3 rounded-lg">
+                    <div className="font-medium text-success">🎯 Casos Reais</div>
+                    <div className="text-muted-foreground">Simulações baseadas em evidências</div>
+                  </div>
+                  <div className="bg-warning/5 p-3 rounded-lg">
+                    <div className="font-medium text-warning">⚡ Triagem Inteligente</div>
+                    <div className="text-muted-foreground">Identificação de emergências</div>
+                  </div>
+                </div>
               </div>
             </Card>
           )}

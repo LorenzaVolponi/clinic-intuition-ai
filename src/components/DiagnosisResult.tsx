@@ -36,10 +36,11 @@ interface DiagnosisData {
 interface DiagnosisResultProps {
   diagnosis: DiagnosisData;
   patientData: PatientData;
+  mainResponse?: string;
   onReset: () => void;
 }
 
-export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
+export const DiagnosisResult = ({ diagnosis, patientData, onReset, mainResponse }: DiagnosisResultProps) => {
   const getProbabilityColor = (probability: string) => {
     switch (probability.toLowerCase()) {
       case "alta":
@@ -124,6 +125,14 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           </div>
         </CardContent>
       </Card>
+
+      {mainResponse && (
+        <Card className="border-primary/20 shadow-lg">
+          <CardContent className="p-4 sm:p-6 whitespace-pre-line text-sm sm:text-base">
+            {mainResponse}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Emergency Warning */}
       {diagnosis.emergencyWarning && (

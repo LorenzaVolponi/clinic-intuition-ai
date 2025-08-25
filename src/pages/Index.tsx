@@ -5,6 +5,7 @@ import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { findMatchingConditions, generateClinicalPrompt } from "@/lib/medicalKnowledge";
+import { generateMainPrompt } from "@/lib/mainPrompt";
 
 interface PatientData {
   name: string;
@@ -30,6 +31,8 @@ const Index = () => {
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  const [mainResponse, setMainResponse] = useState<string | null>(null);
+
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
@@ -38,11 +41,16 @@ const Index = () => {
       const prompt = generateClinicalPrompt(data);
       const aiDiagnosis = await analyzeWithAI(prompt);
       setDiagnosis(aiDiagnosis);
+
+      const mainPrompt = generateMainPrompt(data);
+      const aiText = await runMainPrompt(mainPrompt);
+      setMainResponse(aiText);
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
       // Fallback local em caso de falha na IA
       const mockDiagnosis = generateMockDiagnosis(data);
       setDiagnosis(mockDiagnosis);
+      setMainResponse(null);
     } finally {
       setIsAnalyzing(false);
     }
@@ -85,6 +93,33 @@ const Index = () => {
     } catch (err) {
       throw new Error("JSON inválido retornado pela IA");
     }
+  };
+
+  const runMainPrompt = async (prompt: string): Promise<string> => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Chave da API OpenAI não configurada");
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        temperature: 0.2,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      throw new Error("Resposta vazia da IA");
+    }
+    return content;
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
@@ -220,6 +255,7 @@ const Index = () => {
             <DiagnosisResult 
               diagnosis={diagnosis}
               patientData={patientData}
+              mainResponse={mainResponse ?? undefined}
               onReset={handleReset}
             />
           )}

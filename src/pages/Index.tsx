@@ -47,8 +47,14 @@ const Index = () => {
       const prompt = generateClinicalPrompt(data);
       const aiDiagnosis = await analyzeWithAI(prompt);
       const ordered = prioritizeBySymptomMatch(data.symptoms, aiDiagnosis);
-      const missing = validateSymptomCoverage(data.symptoms, ordered);
-      setDiagnosis({ ...ordered, unexplainedSymptoms: missing });
+      const normalized = normalizeHypotheses(ordered);
+      const missing = validateSymptomCoverage(data.symptoms, normalized);
+      const emergencyWarning = determineEmergencyWarning(data.symptoms);
+      setDiagnosis({
+        ...normalized,
+        emergencyWarning,
+        unexplainedSymptoms: missing,
+      });
 
       try {
         const mainPrompt = generateMainPrompt(data);
@@ -61,8 +67,19 @@ const Index = () => {
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
       // Fallback local em caso de falha na IA
-      const mockDiagnosis = generateMockDiagnosis(data);
-      setDiagnosis(mockDiagnosis);
+      const mockDiagnosisRaw = generateMockDiagnosis(data);
+      const orderedMock = prioritizeBySymptomMatch(
+        data.symptoms,
+        mockDiagnosisRaw
+      );
+      const mockDiagnosis = normalizeHypotheses(orderedMock);
+      const emergencyWarning = determineEmergencyWarning(data.symptoms);
+      const missing = validateSymptomCoverage(data.symptoms, mockDiagnosis);
+      setDiagnosis({
+        ...mockDiagnosis,
+        emergencyWarning,
+        unexplainedSymptoms: missing,
+      });
       setMainResponse(null);
     } finally {
       setIsAnalyzing(false);
@@ -140,6 +157,40 @@ const Index = () => {
     });
   };
 
+  const normalizeHypotheses = (data: DiagnosisData): DiagnosisData => {
+    const defaults = ["Alta", "Moderada", "Baixa"] as const;
+    const normalized = data.hypotheses.slice(0, 3);
+    while (normalized.length < 3) {
+      normalized.push({
+        name: "Hipótese não fornecida",
+        probability: "Baixa",
+        treatment: "—",
+        explanation: "—",
+        differentials: [],
+      });
+    }
+    return {
+      ...data,
+      hypotheses: normalized.map((h, i) => ({ ...h, probability: defaults[i] })),
+    };
+  };
+
+  const determineEmergencyWarning = (
+    symptoms: string
+  ): string | undefined => {
+    const list = symptoms
+      .toLowerCase()
+      .split(/,|;| e /i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const emergencyFlags = MEDICAL_CONDITIONS.filter(
+      (c) => c.urgencyLevel === "emergencia"
+    ).flatMap((c) => c.redFlags.map((r) => r.toLowerCase()));
+    return emergencyFlags.some((flag) => list.includes(flag))
+      ? "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)."
+      : undefined;
+  };
+
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
     const matchingConditions = findMatchingConditions(
       data.symptoms,
@@ -179,20 +230,7 @@ const Index = () => {
       };
     });
 
-    // Check for emergency conditions
-    const hasEmergency = matchingConditions.some(c => c.urgencyLevel === 'emergencia');
-    const emergencyWarning = hasEmergency ?
-      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." :
-      undefined;
-
-    const diagnosis: DiagnosisData = {
-      hypotheses,
-      emergencyWarning,
-    };
-
-    const ordered = prioritizeBySymptomMatch(data.symptoms, diagnosis);
-    const missing = validateSymptomCoverage(data.symptoms, ordered);
-    return { ...ordered, unexplainedSymptoms: missing };
+    return { hypotheses };
   };
 
   const handleReset = () => {

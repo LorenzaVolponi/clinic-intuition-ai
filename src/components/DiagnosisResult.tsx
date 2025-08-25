@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Stethoscope, 
   Pill, 
@@ -129,8 +130,12 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset, mainResponse 
 
       {mainResponse && (
         <Card className="border-primary/20 shadow-lg">
-          <CardContent className="p-4 sm:p-6 whitespace-pre-line text-sm sm:text-base">
-            {mainResponse}
+          <CardContent className="p-4 sm:p-6">
+            <Textarea
+              readOnly
+              value={mainResponse}
+              className="min-h-[150px] whitespace-pre-wrap text-sm sm:text-base"
+            />
           </CardContent>
         </Card>
       )}

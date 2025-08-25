@@ -4,6 +4,7 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { findMatchingConditions } from "@/lib/medicalKnowledge";
 
 interface PatientData {
   name: string;
@@ -32,24 +33,26 @@ const Index = () => {
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
-    
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock diagnosis based on symptoms
-    const mockDiagnosis = generateMockDiagnosis(data);
-    setDiagnosis(mockDiagnosis);
-    setIsAnalyzing(false);
+
+    try {
+      // Simulate AI analysis
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Mock diagnosis based on symptoms
+      const mockDiagnosis = generateMockDiagnosis(data);
+      setDiagnosis(mockDiagnosis);
+    } catch (error) {
+      console.error("Erro ao gerar diagnóstico:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
-    // Import medical knowledge
-    const { findMatchingConditions, generateClinicalPrompt } = require('@/lib/medicalKnowledge');
-    
     const matchingConditions = findMatchingConditions(
-      data.symptoms, 
-      data.age, 
-      data.gender, 
+      data.symptoms,
+      data.age,
+      data.gender,
       data.duration
     );
 

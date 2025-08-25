@@ -32,6 +32,7 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [mainResponse, setMainResponse] = useState<string | null>(null);
+  const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2";
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
@@ -56,70 +57,53 @@ const Index = () => {
     }
   };
 
-  const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const fetchFromHF = async (payload: string): Promise<string> => {
+    const apiKey = import.meta.env.VITE_HF_API_KEY || process.env.HF_API_KEY;
     if (!apiKey) {
-      throw new Error("Chave da API OpenAI não configurada");
+      throw new Error("Chave da API HuggingFace não configurada");
     }
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você é um médico experiente. Responda APENAS em JSON no formato {hypotheses: [{name, probability, treatment, explanation, differentials: []}], emergencyWarning?}",
-          },
-          { role: "user", content: prompt },
-        ],
-      }),
-    });
-
-    const json = await response.json();
-    const content = json.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      throw new Error("Resposta vazia da IA");
-    }
-
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
-      return JSON.parse(content) as DiagnosisData;
-    } catch (err) {
+      const response = await fetch(
+        `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            inputs: payload,
+            parameters: { temperature: 0.2, max_new_tokens: 800 },
+          }),
+          signal: controller.signal,
+        }
+      );
+      const result = await response.json();
+      const text = result?.[0]?.generated_text?.trim();
+      if (!text) {
+        throw new Error("Resposta vazia da IA");
+      }
+      return text;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
+    const instruction =
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[]}],\"emergencyWarning\":\"\"}.";
+    const text = await fetchFromHF(`${instruction}\n\n${prompt}`);
+    try {
+      return JSON.parse(text) as DiagnosisData;
+    } catch {
       throw new Error("JSON inválido retornado pela IA");
     }
   };
 
   const runMainPrompt = async (prompt: string): Promise<string> => {
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error("Chave da API OpenAI não configurada");
-    }
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        temperature: 0.2,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const json = await response.json();
-    const content = json.choices?.[0]?.message?.content?.trim();
-    if (!content) {
-      throw new Error("Resposta vazia da IA");
-    }
-    return content;
+    return fetchFromHF(prompt);
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {

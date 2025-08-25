@@ -136,6 +136,35 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     clinicalPearls: ["Janela terapêutica", "TC crânio urgente", "Scale NIHSS/ABCD2"]
   },
 
+  // FUNCIONAL/PSICOLÓGICO
+  {
+    name: "Ansiedade Aguda",
+    icd10: "F41.0",
+    category: "funcional",
+    commonSymptoms: [
+      "palpitações",
+      "tremores",
+      "boca seca",
+      "dor de cabeça",
+      "náusea",
+    ],
+    riskFactors: ["estresse", "transtorno de ansiedade prévio", "cafeína"],
+    ageGroups: ["adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Respiração guiada",
+      "Apoio psicológico",
+      "Técnicas de relaxamento",
+    ],
+    differentials: ["Hipoglicemia", "Hipertireoidismo", "Uso de estimulantes"],
+    redFlags: ["dispneia intensa", "dor torácica", "síncope"],
+    clinicalPearls: [
+      "Avaliar com escalas de ansiedade",
+      "Descartar causas orgânicas",
+      "Considerar terapia cognitivo-comportamental",
+    ],
+  },
+
   // GENITOURINÁRIO
   {
     name: "Infecção do Trato Urinário",
@@ -211,6 +240,7 @@ export function findMatchingConditions(
     .map((s) => s.trim())
     .filter(Boolean);
   const ageGroup = age < 18 ? "crianca" : age < 65 ? "adulto" : "idoso";
+  const requiredScore = symptomList.length > 1 ? 2 : 1;
 
   return MEDICAL_CONDITIONS.map((condition) => {
     // Score by number of symptom matches
@@ -226,7 +256,10 @@ export function findMatchingConditions(
 
     return { condition, matchScore, ageMatch, genderMatch };
   })
-    .filter((item) => item.matchScore > 0 && item.ageMatch && item.genderMatch)
+    .filter(
+      (item) =>
+        item.matchScore >= requiredScore && item.ageMatch && item.genderMatch
+    )
     .sort((a, b) => {
       if (b.matchScore !== a.matchScore) {
         return b.matchScore - a.matchScore;

@@ -32,7 +32,8 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [mainResponse, setMainResponse] = useState<string | null>(null);
-  const HF_MODEL = "mistralai/Mistral-7B-Instruct-v0.2";
+  // Modelo open source de alto desempenho
+  const HF_MODEL = "meta-llama/Meta-Llama-3-70B-Instruct";
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
@@ -68,7 +69,8 @@ const Index = () => {
       throw new Error("Chave da API HuggingFace não configurada");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    // modelos grandes podem demorar para responder
+    const timeout = setTimeout(() => controller.abort(), 60000);
     try {
       const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`,
         {

@@ -88,7 +88,9 @@ const Index = () => {
   };
 
   const runMainPrompt = async (prompt: string): Promise<string> => {
-    return callGroq([{ role: "user", content: prompt }]);
+    const raw = await callGroq([{ role: "user", content: prompt }]);
+    const start = raw.indexOf("🩺");
+    return start !== -1 ? raw.slice(start).trim() : raw.trim();
   };
 
   const prioritizeBySymptomMatch = (

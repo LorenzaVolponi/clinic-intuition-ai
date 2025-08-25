@@ -43,9 +43,14 @@ const Index = () => {
       const aiDiagnosis = await analyzeWithAI(prompt);
       setDiagnosis(aiDiagnosis);
 
-      const mainPrompt = generateMainPrompt(data);
-      const aiText = await runMainPrompt(mainPrompt);
-      setMainResponse(aiText);
+      try {
+        const mainPrompt = generateMainPrompt(data);
+        const aiText = await runMainPrompt(mainPrompt);
+        setMainResponse(aiText);
+      } catch (error) {
+        console.error("Erro no prompt principal:", error);
+        setMainResponse(null);
+      }
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
       // Fallback local em caso de falha na IA
@@ -63,10 +68,9 @@ const Index = () => {
       throw new Error("Chave da API HuggingFace não configurada");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(
-        `https://api-inference.huggingface.co/models/${HF_MODEL}`,
+      const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`,
         {
           method: "POST",
           headers: {
@@ -80,6 +84,10 @@ const Index = () => {
           signal: controller.signal,
         }
       );
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Erro da API HF: ${response.status} ${message}`);
+      }
       const result = await response.json();
       const text = result?.[0]?.generated_text?.trim();
       if (!text) {

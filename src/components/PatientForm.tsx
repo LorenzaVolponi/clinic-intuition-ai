@@ -17,7 +17,7 @@ interface PatientData {
 }
 
 interface PatientFormProps {
-  onSubmit: (data: PatientData) => void;
+  onSubmit: (data: PatientData) => Promise<void>;
   isAnalyzing: boolean;
   patientData: PatientData | null;
 }
@@ -93,10 +93,10 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      await onSubmit(formData);
     }
   };
 

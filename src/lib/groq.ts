@@ -7,8 +7,7 @@ const GROQ_MODEL = "llama3-70b-8192";
 
 export async function callGroq(messages: GroqMessage[]): Promise<string> {
   const apiKey =
-    import.meta.env.VITE_GROQ_API_KEY ||
-    process.env.GROQ_API_KEY ||
+    import.meta.env.VITE_GROQ_API_KEY ??
     "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";
 
   if (!apiKey) {
@@ -19,23 +18,21 @@ export async function callGroq(messages: GroqMessage[]): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 20000);
 
   try {
-    const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          messages,
-          temperature: 0.2,
-          max_tokens: 800,
-        }),
-        signal: controller.signal,
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages,
+        temperature: 0.2,
+        max_tokens: 800,
+      }),
+      signal: controller.signal,
+      mode: "cors",
+    });
 
     if (!response.ok) {
       const message = await response.text();

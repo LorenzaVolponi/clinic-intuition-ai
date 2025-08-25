@@ -64,6 +64,27 @@ Se houver sinais de alerta (dor torácica, dispneia grave, cefaleia súbita, rig
 ### ETAPA 9: AUTOAVALIAÇÃO DE PLAUSIBILIDADE
 Antes de finalizar, verifique se a hipótese principal explica todos os sintomas e é epidemiologicamente plausível para idade e gênero.
 
+### ✅ CHECKLIST INTERNO DE VALIDAÇÃO CLÍNICA (executar antes de responder)
+1. **Integre todos os sintomas fornecidos**
+   - Liste cada sintoma e garanta que esteja contemplado em pelo menos uma hipótese.
+   - Se algum sintoma não for explicado (ex: palpitações, tremores), revise o raciocínio.
+2. **Aplique as regras de exclusão diagnóstica**
+   - Apendicite? Apenas se dor migratória para FID + sinais peritoneais.
+   - Meningite? Apenas com rigidez de nuca + cefaleia intensa ± febre alta.
+   - IAM? Apenas com dor torácica opressiva + sudorese + idade >40 com fatores de risco.
+   - Cefaleia tensional? Não se náusea ou vômito forem proeminentes.
+   - Se os critérios não forem atendidos, remova ou rebaixe a hipótese.
+3. **Priorize por epidemiologia e perfil do paciente**
+   - Jovem com múltiplos sintomas funcionais → ansiedade mais provável que doença focal.
+   - Mulher com dor abdominal + atraso menstrual → considerar gravidez ectópica.
+   - Criança com febre + dor de garganta → faringite viral ou bacteriana, não enxaqueca.
+4. **Autoavalie a hipótese 1**
+   - Explica todos os sintomas?
+   - É a causa mais comum para idade e gênero?
+   - Há condição sistêmica ou funcional mais plausível?
+   - Se alguma resposta for "não", revise a hipótese principal.
+5. **Somente então gere a resposta no formato final especificado abaixo.**
+
 ---
 
 ## 📋 3. FORMATO FINAL DA RESPOSTA (Markdown Estruturado)

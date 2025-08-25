@@ -63,7 +63,7 @@ const Index = () => {
       throw new Error("Chave da API HuggingFace não configurada");
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch(
         `https://api-inference.huggingface.co/models/${HF_MODEL}`,

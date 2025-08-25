@@ -10,6 +10,7 @@ import {
   generateClinicalPrompt,
 } from "@/lib/medicalKnowledge";
 import { generateMainPrompt } from "@/lib/mainPrompt";
+import { callGroq } from "@/lib/groq";
 
 interface PatientData {
   name: string;
@@ -37,8 +38,6 @@ const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [mainResponse, setMainResponse] = useState<string | null>(null);
-  // Modelo open source de alto desempenho
-  const HF_MODEL = "meta-llama/Meta-Llama-3-70B-Instruct";
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
@@ -70,54 +69,13 @@ const Index = () => {
     }
   };
 
-  const fetchFromHF = async (payload: string): Promise<string> => {
-    const apiKey = import.meta.env.VITE_HF_API_KEY || process.env.HF_API_KEY;
-    if (!apiKey) {
-      throw new Error("Chave da API HuggingFace não configurada");
-    }
-    const controller = new AbortController();
-    // evitar espera indefinida em modelos grandes
-    const timeout = setTimeout(() => controller.abort(), 20000);
-    try {
-      const response = await fetch(
-        `https://api-inference.huggingface.co/models/${HF_MODEL}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            inputs: payload,
-            parameters: { temperature: 0.2, max_new_tokens: 800 },
-          }),
-          signal: controller.signal,
-        }
-      );
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(`Erro da API HF: ${response.status} ${message}`);
-      }
-      const result = await response.json();
-      const text = result?.[0]?.generated_text?.trim();
-      if (!text) {
-        throw new Error("Resposta vazia da IA");
-      }
-      return text;
-    } catch (error: unknown) {
-      if ((error as Error).name === "AbortError") {
-        throw new Error("Tempo de resposta da IA excedido");
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeout);
-    }
-  };
-
   const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
     const instruction =
       "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[]}],\"emergencyWarning\":\"\"}.";
-    const text = await fetchFromHF(`${instruction}\n\n${prompt}`);
+    const text = await callGroq([
+      { role: "system", content: instruction },
+      { role: "user", content: prompt },
+    ]);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("JSON não encontrado na resposta da IA");
@@ -130,7 +88,7 @@ const Index = () => {
   };
 
   const runMainPrompt = async (prompt: string): Promise<string> => {
-    return fetchFromHF(prompt);
+    return callGroq([{ role: "user", content: prompt }]);
   };
 
   const prioritizeBySymptomMatch = (

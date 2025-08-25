@@ -26,6 +26,7 @@ interface DiagnosisData {
     treatment: string;
     explanation: string;
     differentials: string[];
+    remedies: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
@@ -75,7 +76,7 @@ const Index = () => {
 
   const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
     const instruction =
-      "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[]}],\"emergencyWarning\":\"\"}.";
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[],\"remedies\":[]}],\"emergencyWarning\":\"\"}.";
     const text = await callGroq([
       { role: "system", content: instruction },
       { role: "user", content: prompt },
@@ -148,11 +149,16 @@ const Index = () => {
         treatment: "—",
         explanation: "—",
         differentials: [],
+        remedies: [],
       });
     }
     return {
       ...data,
-      hypotheses: normalized.map((h, i) => ({ ...h, probability: defaults[i] })),
+      hypotheses: normalized.map((h, i) => ({
+        ...h,
+        remedies: h.remedies ?? [],
+        probability: defaults[i],
+      })),
     };
   };
 
@@ -188,7 +194,8 @@ const Index = () => {
             probability: "Baixa",
             treatment: "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
             explanation: "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
-            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"]
+            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"],
+            remedies: []
           }
         ]
       };
@@ -207,7 +214,8 @@ const Index = () => {
         probability: probabilityMap[condition.urgencyLevel],
         treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
         explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
-        differentials: condition.differentials.slice(0, 4)
+        differentials: condition.differentials.slice(0, 4),
+        remedies: condition.treatments.slice(0, 3)
       };
     });
 

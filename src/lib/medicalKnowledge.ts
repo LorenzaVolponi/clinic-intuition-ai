@@ -312,7 +312,8 @@ CRITÉRIOS DE ANÁLISE:
 3. Avalie urgência baseada em sinais de alarme
 4. Sugira condutas baseadas em guidelines atuais
 5. Mencione exames complementares quando indicados
-6. SEMPRE inclua aviso de que é simulação educacional
+6. Respeite regras absolutas: não priorize hipertensão, hipoglicemia, anemia, diabetes descompensado ou insuficiência cardíaca sem dados objetivos.
+7. SEMPRE inclua aviso de que é simulação educacional
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Máximo 3 hipóteses diagnósticas
@@ -320,6 +321,7 @@ FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Tratamentos apenas como exemplos educacionais
 - Explicação fisiopatológica quando relevante
 - Se sinais de alarme: incluir aviso de emergência
+- Campo "remedies" com 2-3 medicamentos comuns (exemplos educacionais)
 
 ${matchingConditions.some(c => c.urgencyLevel === 'emergencia') ? 
   'ALERTA: Este caso apresenta possíveis sinais de emergência médica. Orienta-se busca imediata por atendimento médico.' : ''}

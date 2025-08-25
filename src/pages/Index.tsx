@@ -9,7 +9,6 @@ import {
   findMatchingConditions,
   generateClinicalPrompt,
 } from "@/lib/medicalKnowledge";
-import { generateMainPrompt } from "@/lib/mainPrompt";
 import { callGroq } from "@/lib/groq";
 
 interface PatientData {
@@ -37,8 +36,6 @@ const Index = () => {
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const [mainResponse, setMainResponse] = useState<string | null>(null);
-
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
@@ -55,15 +52,6 @@ const Index = () => {
         emergencyWarning,
         unexplainedSymptoms: missing,
       });
-
-      try {
-        const mainPrompt = generateMainPrompt(data);
-        const aiText = await runMainPrompt(mainPrompt);
-        setMainResponse(aiText);
-      } catch (error) {
-        console.error("Erro no prompt principal:", error);
-        setMainResponse(null);
-      }
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
       // Fallback local em caso de falha na IA
@@ -80,7 +68,6 @@ const Index = () => {
         emergencyWarning,
         unexplainedSymptoms: missing,
       });
-      setMainResponse(null);
     } finally {
       setIsAnalyzing(false);
     }
@@ -102,12 +89,6 @@ const Index = () => {
     } catch {
       throw new Error("JSON inválido retornado pela IA");
     }
-  };
-
-  const runMainPrompt = async (prompt: string): Promise<string> => {
-    const raw = await callGroq([{ role: "user", content: prompt }]);
-    const start = raw.indexOf("🩺");
-    return start !== -1 ? raw.slice(start).trim() : raw.trim();
   };
 
   const prioritizeBySymptomMatch = (
@@ -315,7 +296,6 @@ const Index = () => {
             <DiagnosisResult 
               diagnosis={diagnosis}
               patientData={patientData}
-              mainResponse={mainResponse ?? undefined}
               onReset={handleReset}
             />
           )}

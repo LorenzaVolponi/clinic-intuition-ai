@@ -2,7 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   Stethoscope, 
   Pill, 
@@ -38,11 +37,10 @@ interface DiagnosisData {
 interface DiagnosisResultProps {
   diagnosis: DiagnosisData;
   patientData: PatientData;
-  mainResponse?: string;
   onReset: () => void;
 }
 
-export const DiagnosisResult = ({ diagnosis, patientData, onReset, mainResponse }: DiagnosisResultProps) => {
+export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
   const getProbabilityColor = (probability: string) => {
     switch (probability.toLowerCase()) {
       case "alta":
@@ -127,18 +125,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset, mainResponse 
           </div>
         </CardContent>
       </Card>
-
-      {mainResponse && (
-        <Card className="border-primary/20 shadow-lg">
-          <CardContent className="p-4 sm:p-6">
-            <Textarea
-              readOnly
-              value={mainResponse}
-              className="min-h-[150px] whitespace-pre-wrap text-sm sm:text-base"
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {diagnosis.unexplainedSymptoms && diagnosis.unexplainedSymptoms.length > 0 && (
         <Card className="border-warning/40 bg-warning/5 shadow-lg">

@@ -72,7 +72,8 @@ const Index = () => {
     // modelos grandes podem demorar para responder
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
-      const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`,
+      const response = await fetch(
+        `https://api-inference.huggingface.co/models/${HF_MODEL}`,
         {
           method: "POST",
           headers: {
@@ -96,6 +97,11 @@ const Index = () => {
         throw new Error("Resposta vazia da IA");
       }
       return text;
+    } catch (error: unknown) {
+      if ((error as Error).name === "AbortError") {
+        throw new Error("Tempo de resposta da IA excedido");
+      }
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
@@ -105,8 +111,12 @@ const Index = () => {
     const instruction =
       "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[]}],\"emergencyWarning\":\"\"}.";
     const text = await fetchFromHF(`${instruction}\n\n${prompt}`);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("JSON não encontrado na resposta da IA");
+    }
     try {
-      return JSON.parse(text) as DiagnosisData;
+      return JSON.parse(jsonMatch[0]) as DiagnosisData;
     } catch {
       throw new Error("JSON inválido retornado pela IA");
     }

@@ -24,6 +24,7 @@ interface DiagnosisData {
     differentials: string[];
   }>;
   emergencyWarning?: string;
+  unexplainedSymptoms?: string[];
 }
 
 const Index = () => {
@@ -42,7 +43,8 @@ const Index = () => {
     try {
       const prompt = generateClinicalPrompt(data);
       const aiDiagnosis = await analyzeWithAI(prompt);
-      setDiagnosis(aiDiagnosis);
+      const missing = validateSymptomCoverage(data.symptoms, aiDiagnosis);
+      setDiagnosis({ ...aiDiagnosis, unexplainedSymptoms: missing });
 
       try {
         const mainPrompt = generateMainPrompt(data);
@@ -126,6 +128,20 @@ const Index = () => {
     return fetchFromHF(prompt);
   };
 
+  const validateSymptomCoverage = (symptoms: string, data: DiagnosisData): string[] => {
+    const list = symptoms
+      .split(/,|;| e /i)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return list.filter((symptom) =>
+      !data.hypotheses.some((h) =>
+        `${h.name} ${h.explanation} ${h.differentials.join(" ")}`
+          .toLowerCase()
+          .includes(symptom)
+      )
+    );
+  };
+
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
     const matchingConditions = findMatchingConditions(
       data.symptoms,
@@ -148,10 +164,10 @@ const Index = () => {
       };
     }
 
-    const hypotheses = matchingConditions.slice(0, 3).map((condition, index) => {
+    const hypotheses = matchingConditions.slice(0, 3).map((condition) => {
       const probabilityMap = {
         'emergencia': 'Alta',
-        'alta': 'Alta', 
+        'alta': 'Alta',
         'moderada': 'Moderada',
         'baixa': 'Baixa'
       };
@@ -167,14 +183,17 @@ const Index = () => {
 
     // Check for emergency conditions
     const hasEmergency = matchingConditions.some(c => c.urgencyLevel === 'emergencia');
-    const emergencyWarning = hasEmergency ? 
-      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." : 
+    const emergencyWarning = hasEmergency ?
+      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." :
       undefined;
 
-    return {
+    const diagnosis: DiagnosisData = {
       hypotheses,
       emergencyWarning
     };
+
+    const missing = validateSymptomCoverage(data.symptoms, diagnosis);
+    return { ...diagnosis, unexplainedSymptoms: missing };
   };
 
   const handleReset = () => {

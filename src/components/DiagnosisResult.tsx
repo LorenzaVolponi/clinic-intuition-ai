@@ -31,6 +31,7 @@ interface DiagnosisData {
     differentials: string[];
   }>;
   emergencyWarning?: string;
+  unexplainedSymptoms?: string[];
 }
 
 interface DiagnosisResultProps {
@@ -130,6 +131,24 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset, mainResponse 
         <Card className="border-primary/20 shadow-lg">
           <CardContent className="p-4 sm:p-6 whitespace-pre-line text-sm sm:text-base">
             {mainResponse}
+          </CardContent>
+        </Card>
+      )}
+
+      {diagnosis.unexplainedSymptoms && diagnosis.unexplainedSymptoms.length > 0 && (
+        <Card className="border-warning/40 bg-warning/5 shadow-lg">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-warning/20 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
+              </div>
+              <div className="text-sm sm:text-base">
+                <p className="font-semibold text-warning mb-1">Sintomas não explicados</p>
+                <p className="text-warning-foreground">
+                  {diagnosis.unexplainedSymptoms.join(', ')}
+                </p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

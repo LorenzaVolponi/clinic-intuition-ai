@@ -4,7 +4,7 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { findMatchingConditions } from "@/lib/medicalKnowledge";
+import { findMatchingConditions, generateClinicalPrompt } from "@/lib/medicalKnowledge";
 
 interface PatientData {
   name: string;
@@ -35,16 +35,55 @@ const Index = () => {
     setPatientData(data);
 
     try {
-      // Simulate AI analysis
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Mock diagnosis based on symptoms
-      const mockDiagnosis = generateMockDiagnosis(data);
-      setDiagnosis(mockDiagnosis);
+      const prompt = generateClinicalPrompt(data);
+      const aiDiagnosis = await analyzeWithAI(prompt);
+      setDiagnosis(aiDiagnosis);
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
+      // Fallback local em caso de falha na IA
+      const mockDiagnosis = generateMockDiagnosis(data);
+      setDiagnosis(mockDiagnosis);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Chave da API OpenAI não configurada");
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um médico experiente. Responda APENAS em JSON no formato {hypotheses: [{name, probability, treatment, explanation, differentials: []}], emergencyWarning?}",
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      throw new Error("Resposta vazia da IA");
+    }
+
+    try {
+      return JSON.parse(content) as DiagnosisData;
+    } catch (err) {
+      throw new Error("JSON inválido retornado pela IA");
     }
   };
 

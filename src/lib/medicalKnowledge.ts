@@ -14,6 +14,14 @@ export interface MedicalCondition {
   clinicalPearls: string[];
 }
 
+export interface PatientInput {
+  name: string;
+  age: number;
+  gender: string;
+  symptoms: string;
+  duration: string;
+}
+
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   // CARDIOVASCULAR
   {
@@ -217,7 +225,7 @@ export function findMatchingConditions(symptoms: string, age: number, gender: st
   });
 }
 
-export function generateClinicalPrompt(patientData: any): string {
+export function generateClinicalPrompt(patientData: PatientInput): string {
   const matchingConditions = findMatchingConditions(
     patientData.symptoms, 
     patientData.age, 

@@ -265,7 +265,7 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold text-success mb-2 text-sm sm:text-base">
-                  💊 Remédios recomendados
+                  💊 Exemplo educacional de conduta
                 </h3>
                 <ul className="list-disc list-inside space-y-1 text-success/90 text-sm leading-relaxed">
                   {diagnosis.remedies.map((med, i) => (
@@ -273,7 +273,7 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   ))}
                 </ul>
                 <p className="text-xs text-success/90 mt-2">
-                  (exemplos educacionais – consultar protocolo institucional)
+                  (exemplos ilustrativos – consultar protocolo institucional)
                 </p>
               </div>
             </div>

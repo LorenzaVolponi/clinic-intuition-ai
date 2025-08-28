@@ -22,12 +22,17 @@ export async function getDiagnosisFromGroq(patient: PatientData): Promise<Diagno
         { role: 'system', content: 'Você é um assistente médico. Responda em português.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.2
+      temperature: 0,
+      top_p: 1
     })
   });
 
+  if (!response.ok) {
+    throw new Error(`Groq API error: ${response.status} ${response.statusText}`);
+  }
+
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
+  const content = data.choices?.[0]?.message?.content?.trim();
 
   try {
     return JSON.parse(content);

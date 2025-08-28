@@ -4,25 +4,9 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
-
-interface PatientData {
-  name: string;
-  age: number;
-  gender: string;
-  symptoms: string;
-  duration: string;
-}
-
-interface DiagnosisData {
-  hypotheses: Array<{
-    name: string;
-    probability: string;
-    treatment: string;
-    explanation: string;
-    differentials: string[];
-  }>;
-  emergencyWarning?: string;
-}
+import { PatientData, DiagnosisData } from "@/types";
+import { getDiagnosisFromGroq } from "@/lib/groq";
+import { findMatchingConditions } from "@/lib/medicalKnowledge";
 
 const Index = () => {
   const [patientData, setPatientData] = useState<PatientData | null>(null);
@@ -32,19 +16,21 @@ const Index = () => {
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
-    
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock diagnosis based on symptoms
-    const mockDiagnosis = generateMockDiagnosis(data);
-    setDiagnosis(mockDiagnosis);
-    setIsAnalyzing(false);
+
+    try {
+      const aiDiagnosis = await getDiagnosisFromGroq(data);
+      setDiagnosis(aiDiagnosis);
+    } catch (error) {
+      console.error(error);
+      const fallback = generateMockDiagnosis(data);
+      setDiagnosis(fallback);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
     // Import medical knowledge
-    const { findMatchingConditions, generateClinicalPrompt } = require('@/lib/medicalKnowledge');
     
     const matchingConditions = findMatchingConditions(
       data.symptoms, 

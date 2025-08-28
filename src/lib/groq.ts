@@ -6,12 +6,9 @@ interface GroqMessage {
 const GROQ_MODEL = "llama3-70b-8192";
 
 export async function callGroq(messages: GroqMessage[]): Promise<string> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "Chave da API Groq não configurada. Defina VITE_GROQ_API_KEY no arquivo .env."
-    );
-  }
+  const apiKey =
+    import.meta.env.VITE_GROQ_API_KEY ??
+    "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";
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);

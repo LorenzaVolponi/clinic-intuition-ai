@@ -60,6 +60,16 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Configuração da chave da Groq
+
+Defina a variável de ambiente `VITE_GROQ_API_KEY` com a sua chave de API da Groq para habilitar as análises clínicas. Exemplo:
+
+```bash
+export VITE_GROQ_API_KEY="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"
+```
+
+Durante o desenvolvimento a chave também pode ser definida em um arquivo `.env` na raiz do projeto.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and click on Share -> Publish.

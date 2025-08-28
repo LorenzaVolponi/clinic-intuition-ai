@@ -60,15 +60,18 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## Configuração da chave da Groq
+## Configuração da API Groq
 
-Defina a variável de ambiente `VITE_GROQ_API_KEY` com a sua chave de API da Groq para habilitar as análises clínicas. Exemplo:
+Este projeto usa a API da Groq para gerar hipóteses diagnósticas. Para executar localmente:
 
-```bash
-export VITE_GROQ_API_KEY="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"
-```
+1. Obtenha uma chave de API em [console.groq.com](https://console.groq.com/).
+2. Crie um arquivo `.env` na raiz do projeto e adicione:
 
-Durante o desenvolvimento a chave também pode ser definida em um arquivo `.env` na raiz do projeto.
+   ```bash
+   VITE_GROQ_API_KEY=suachaveaqui
+   ```
+
+3. Reinicie o servidor de desenvolvimento para que a variável seja reconhecida.
 
 ## How can I deploy this project?
 

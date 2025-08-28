@@ -4,11 +4,17 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import ErrorToast from "@/components/ErrorToast";
 import {
   MEDICAL_CONDITIONS,
   findMatchingConditions,
   generateClinicalPrompt,
 } from "@/lib/medicalKnowledge";
+import {
+  DiagnosisData,
+  prioritizeBySymptomMatch,
+  normalizeHypotheses,
+} from "@/lib/diagnosisUtils";
 import { callGroq } from "@/lib/groq";
 
 interface PatientData {
@@ -19,28 +25,17 @@ interface PatientData {
   duration: string;
 }
 
-interface DiagnosisData {
-  hypotheses: Array<{
-    name: string;
-    probability: string;
-    treatment: string;
-    explanation: string;
-    differentials: string[];
-    remedies: string[];
-    exams: string[];
-  }>;
-  emergencyWarning?: string;
-  unexplainedSymptoms?: string[];
-}
 
 const Index = () => {
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
+    setError(null);
 
     try {
       const prompt = generateClinicalPrompt(data);
@@ -56,6 +51,7 @@ const Index = () => {
       });
     } catch (error) {
       console.error("Erro ao gerar diagnóstico:", error);
+      setError((error as Error).message);
       // Fallback local em caso de falha na IA
       const mockDiagnosisRaw = generateMockDiagnosis(data);
       const orderedMock = prioritizeBySymptomMatch(
@@ -93,28 +89,6 @@ const Index = () => {
     }
   };
 
-  const prioritizeBySymptomMatch = (
-    symptoms: string,
-    data: DiagnosisData
-  ): DiagnosisData => {
-    const list = symptoms
-      .split(/,|;| e /i)
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean);
-    const scored = data.hypotheses
-      .map((h) => {
-        const text = `${h.name} ${h.explanation} ${h.differentials.join(" ")}`.toLowerCase();
-        const score = list.reduce(
-          (acc, symptom) => acc + (text.includes(symptom) ? 1 : 0),
-          0
-        );
-        return { score, ...h };
-      })
-      .sort((a, b) => b.score - a.score)
-      .map(({ score, ...rest }) => rest);
-    return { ...data, hypotheses: scored };
-  };
-
   const validateSymptomCoverage = (
     symptoms: string,
     data: DiagnosisData
@@ -138,31 +112,6 @@ const Index = () => {
           )
       );
     });
-  };
-
-  const normalizeHypotheses = (data: DiagnosisData): DiagnosisData => {
-    const defaults = ["Alta", "Moderada", "Baixa"] as const;
-    const normalized = data.hypotheses.slice(0, 3);
-    while (normalized.length < 3) {
-      normalized.push({
-        name: "Hipótese não fornecida",
-        probability: "Baixa",
-        treatment: "—",
-        explanation: "—",
-        differentials: [],
-        remedies: [],
-        exams: [],
-      });
-    }
-    return {
-      ...data,
-      hypotheses: normalized.map((h, i) => ({
-        ...h,
-        remedies: h.remedies ?? [],
-        exams: h.exams ?? [],
-        probability: defaults[i],
-      })),
-    };
   };
 
   const determineEmergencyWarning = (
@@ -306,10 +255,16 @@ const Index = () => {
 
           {/* Diagnosis Results */}
           {diagnosis && patientData && (
-            <DiagnosisResult 
+            <DiagnosisResult
               diagnosis={diagnosis}
               patientData={patientData}
               onReset={handleReset}
+            />
+          )}
+          {error && (
+            <ErrorToast
+              message={error}
+              onRetry={() => patientData && handleFormSubmit(patientData)}
             />
           )}
         </div>

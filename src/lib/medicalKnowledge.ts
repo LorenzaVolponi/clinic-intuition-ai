@@ -9,9 +9,18 @@ export interface MedicalCondition {
   genderPreference?: 'masculino' | 'feminino' | 'both';
   urgencyLevel: 'baixa' | 'moderada' | 'alta' | 'emergencia';
   treatments: string[];
+  exams: string[];
   differentials: string[];
   redFlags: string[];
   clinicalPearls: string[];
+}
+
+export interface PatientInput {
+  name: string;
+  age: number;
+  gender: string;
+  symptoms: string;
+  duration: string;
 }
 
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
@@ -26,6 +35,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     genderPreference: "masculino",
     urgencyLevel: "emergencia",
     treatments: ["AAS 200mg", "Clopidogrel 300-600mg", "Atorvastatina 80mg", "Metoprolol"],
+    exams: ["ECG", "Troponina", "Ecocardiograma"],
     differentials: ["Pericardite", "Embolia pulmonar", "Pneumotórax", "Dissecção aórtica"],
     redFlags: ["dor em aperto/peso", "irradiação para braço esquerdo", "sudorese profusa"],
     clinicalPearls: ["ECG em até 10min", "Troponinas seriadas", "Score TIMI/GRACE"]
@@ -33,12 +43,13 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
     name: "Insuficiência Cardíaca Aguda",
     icd10: "I50",
-    category: "cardiovascular", 
+    category: "cardiovascular",
     commonSymptoms: ["dispneia", "edema", "ortopneia", "dispneia paroxística noturna"],
     riskFactors: ["hipertensão", "diabetes", "cardiopatia isquêmica", "idade > 65"],
     ageGroups: ["adulto", "idoso"],
     urgencyLevel: "alta",
     treatments: ["Furosemida 40-80mg", "Captopril 6,25-25mg", "Carvedilol 3,125mg"],
+    exams: ["BNP", "Ecocardiograma", "RX tórax"],
     differentials: ["Pneumonia", "DPOC", "Embolia pulmonar"],
     redFlags: ["sat O2 < 90%", "crepitantes bibasais", "B3 audível"],
     clinicalPearls: ["BNP/NT-proBNP", "Ecocardiograma", "Classificação NYHA"]
@@ -54,6 +65,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["adulto", "idoso"],
     urgencyLevel: "moderada",
     treatments: ["Amoxicilina 875mg 8/8h", "Azitromicina 500mg/dia", "Levofloxacino 750mg"],
+    exams: ["RX tórax", "Hemograma", "Procalcitonina"],
     differentials: ["Bronquite aguda", "COVID-19", "Tuberculose"],
     redFlags: ["sat O2 < 90%", "confusão mental", "hipotensão"],
     clinicalPearls: ["Score CURB-65", "RX tórax", "Procalcitonina se disponível"]
@@ -67,6 +79,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["crianca", "adolescente", "adulto"],
     urgencyLevel: "moderada",
     treatments: ["Salbutamol spray", "Budesonida inalatória", "Prednisolona 40mg"],
+    exams: ["Peak flow", "Oximetria", "Gasometria"],
     differentials: ["DPOC", "Pneumonia", "Pneumotórax"],
     redFlags: ["uso de musculatura acessória", "cianose", "silêncio auscultatório"],
     clinicalPearls: ["Peak flow", "Saturação O2", "Resposta ao broncodilatador"]
@@ -82,6 +95,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["crianca", "adolescente", "adulto"],
     urgencyLevel: "alta",
     treatments: ["Ceftriaxona 2g", "Metronidazol 500mg", "Dipirona 500mg"],
+    exams: ["Ultrassom abdome", "TC abdome", "Hemograma"],
     differentials: ["Gastroenterite", "DIP", "Litíase urinária", "Gravidez ectópica"],
     redFlags: ["sinal de Blumberg", "migração da dor", "leucocitose com desvio"],
     clinicalPearls: ["Score de Alvarado", "TC abdome se dúvida", "Cirurgia urgente"]
@@ -95,6 +109,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["crianca", "adulto"],
     urgencyLevel: "baixa",
     treatments: ["Soro de reidratação oral", "Probióticos", "Sintomáticos"],
+    exams: ["Coprocultura", "Hemograma", "Eletrólitos"],
     differentials: ["Apendicite", "DII", "Intoxicação alimentar"],
     redFlags: ["desidratação severa", "sangue nas fezes", "febre alta"],
     clinicalPearls: ["Hidratação é fundamental", "Evitar antidiarreicos se febre"]
@@ -110,6 +125,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["adolescente", "adulto"],
     urgencyLevel: "baixa",
     treatments: ["Dipirona 500mg", "Paracetamol 750mg", "Relaxantes musculares"],
+    exams: ["Avaliação clínica", "Exame neurológico"],
     differentials: ["Enxaqueca", "Cefaleia em salvas", "Hipertensão intracraniana"],
     redFlags: ["início súbito", "febre + rigidez nucal", "alterações neurológicas"],
     clinicalPearls: ["História é fundamental", "Sinais de alarme", "Diário da cefaleia"]
@@ -117,15 +133,46 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
     name: "Acidente Vascular Cerebral",
     icd10: "I64",
-    category: "neurologico", 
+    category: "neurologico",
     commonSymptoms: ["hemiparesia", "afasia", "alteração consciência", "cefaleia súbita"],
     riskFactors: ["hipertensão", "diabetes", "FA", "idade > 55", "tabagismo"],
     ageGroups: ["adulto", "idoso"],
     urgencyLevel: "emergencia",
     treatments: ["AAS 300mg", "Atorvastatina 80mg", "Trombólise se indicada"],
+    exams: ["TC de crânio", "RM", "Angiotomografia"],
     differentials: ["Hipoglicemia", "Enxaqueca com aura", "Convulsão"],
     redFlags: ["déficit focal súbito", "NIHSS > 4", "< 4,5h de início"],
     clinicalPearls: ["Janela terapêutica", "TC crânio urgente", "Scale NIHSS/ABCD2"]
+  },
+
+  // FUNCIONAL/PSICOLÓGICO
+  {
+    name: "Ansiedade Aguda",
+    icd10: "F41.0",
+    category: "funcional",
+    commonSymptoms: [
+      "palpitações",
+      "tremores",
+      "boca seca",
+      "dor de cabeça",
+      "náusea",
+    ],
+    riskFactors: ["estresse", "transtorno de ansiedade prévio", "cafeína"],
+    ageGroups: ["adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Respiração guiada",
+      "Apoio psicológico",
+      "Técnicas de relaxamento",
+    ],
+    exams: ["Avaliação psicológica", "Escalas de ansiedade", "Exames laboratoriais básicos"],
+    differentials: ["Hipoglicemia", "Hipertireoidismo", "Uso de estimulantes"],
+    redFlags: ["dispneia intensa", "dor torácica", "síncope"],
+    clinicalPearls: [
+      "Avaliar com escalas de ansiedade",
+      "Descartar causas orgânicas",
+      "Considerar terapia cognitivo-comportamental",
+    ],
   },
 
   // GENITOURINÁRIO
@@ -139,6 +186,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     genderPreference: "feminino",
     urgencyLevel: "baixa",
     treatments: ["Nitrofurantoína 100mg", "Sulfametoxazol+Trimetoprim", "Fosfomicina 3g"],
+    exams: ["EAS", "Urocultura", "Ultrassom se recorrente"],
     differentials: ["Vaginite", "Uretrite", "Pielonefrite"],
     redFlags: ["febre + dor lombar", "náuseas/vômitos", "hematúria macroscópica"],
     clinicalPearls: ["EAS + urocultura", "Tratamento empírico inicial", "Seguimento clínico"]
@@ -154,6 +202,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ["adulto", "idoso"],
     urgencyLevel: "moderada",
     treatments: ["Sintomáticos", "Corticóides se O2 < 94%", "Anticoagulação"],
+    exams: ["RT-PCR", "Hemograma", "Oximetria"],
     differentials: ["Influenza", "Pneumonia bacteriana", "Outras viroses"],
     redFlags: ["sat O2 < 94%", "dispneia progressiva", "confusão mental"],
     clinicalPearls: ["RT-PCR", "D-dímero elevado", "Isolamento necessário"]
@@ -191,33 +240,57 @@ export const CLINICAL_SCALES = {
   }
 };
 
-export function findMatchingConditions(symptoms: string, age: number, gender: string, duration: string): MedicalCondition[] {
-  const symptomsLower = symptoms.toLowerCase();
-  const ageGroup = age < 18 ? 'crianca' : age < 65 ? 'adulto' : 'idoso';
-  
-  return MEDICAL_CONDITIONS.filter(condition => {
-    // Check symptom match
-    const symptomMatch = condition.commonSymptoms.some(symptom => 
-      symptomsLower.includes(symptom.toLowerCase())
-    );
-    
-    // Check age group
+export function findMatchingConditions(
+  symptoms: string,
+  age: number,
+  gender: string,
+  duration: string
+): MedicalCondition[] {
+  const symptomList = symptoms
+    .toLowerCase()
+    .split(/,|;| e /i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const ageGroup = age < 18 ? "crianca" : age < 65 ? "adulto" : "idoso";
+  const requiredScore = symptomList.length > 1 ? 2 : 1;
+
+  return MEDICAL_CONDITIONS.map((condition) => {
+    // Score by number of symptom matches
+    const matchScore = condition.commonSymptoms.reduce((score, symptom) => {
+      return score + (symptomList.includes(symptom.toLowerCase()) ? 1 : 0);
+    }, 0);
+
     const ageMatch = condition.ageGroups.includes(ageGroup);
-    
-    // Check gender preference
-    const genderMatch = !condition.genderPreference || 
-      condition.genderPreference === gender || 
-      condition.genderPreference === 'both';
-    
-    return symptomMatch && ageMatch && genderMatch;
-  }).sort((a, b) => {
-    // Sort by urgency level (emergency first)
-    const urgencyOrder = { 'emergencia': 0, 'alta': 1, 'moderada': 2, 'baixa': 3 };
-    return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
-  });
+    const genderMatch =
+      !condition.genderPreference ||
+      condition.genderPreference === gender ||
+      condition.genderPreference === "both";
+
+    return { condition, matchScore, ageMatch, genderMatch };
+  })
+    .filter(
+      (item) =>
+        item.matchScore >= requiredScore && item.ageMatch && item.genderMatch
+    )
+    .sort((a, b) => {
+      if (b.matchScore !== a.matchScore) {
+        return b.matchScore - a.matchScore;
+      }
+      const urgencyOrder = {
+        emergencia: 0,
+        alta: 1,
+        moderada: 2,
+        baixa: 3,
+      } as const;
+      return (
+        urgencyOrder[a.condition.urgencyLevel] -
+        urgencyOrder[b.condition.urgencyLevel]
+      );
+    })
+    .map((item) => item.condition);
 }
 
-export function generateClinicalPrompt(patientData: any): string {
+export function generateClinicalPrompt(patientData: PatientInput): string {
   const matchingConditions = findMatchingConditions(
     patientData.symptoms, 
     patientData.age, 
@@ -251,7 +324,8 @@ CRITÉRIOS DE ANÁLISE:
 3. Avalie urgência baseada em sinais de alarme
 4. Sugira condutas baseadas em guidelines atuais
 5. Mencione exames complementares quando indicados
-6. SEMPRE inclua aviso de que é simulação educacional
+6. Respeite regras absolutas: não priorize hipertensão, hipoglicemia, anemia, diabetes descompensado ou insuficiência cardíaca sem dados objetivos.
+7. SEMPRE inclua aviso de que é simulação educacional
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Máximo 3 hipóteses diagnósticas
@@ -259,6 +333,8 @@ FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Tratamentos apenas como exemplos educacionais
 - Explicação fisiopatológica quando relevante
 - Se sinais de alarme: incluir aviso de emergência
+  - Campo "remedies" com 2-3 medicamentos comuns (exemplos educacionais)
+  - Campo "exams" com 2-3 exames complementares sugeridos
 
 ${matchingConditions.some(c => c.urgencyLevel === 'emergencia') ? 
   'ALERTA: Este caso apresenta possíveis sinais de emergência médica. Orienta-se busca imediata por atendimento médico.' : ''}

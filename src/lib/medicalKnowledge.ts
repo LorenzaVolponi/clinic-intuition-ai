@@ -1,4 +1,6 @@
 // Base de conhecimento médico avançada para o Dr. IA
+import { PatientData } from '@/types'
+
 export interface MedicalCondition {
   name: string;
   icd10?: string;
@@ -217,7 +219,7 @@ export function findMatchingConditions(symptoms: string, age: number, gender: st
   });
 }
 
-export function generateClinicalPrompt(patientData: any): string {
+export function generateClinicalPrompt(patientData: PatientData): string {
   const matchingConditions = findMatchingConditions(
     patientData.symptoms, 
     patientData.age, 

@@ -32,7 +32,10 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Add your Groq API key to a new `.env` file.
+echo "VITE_GROQ_API_KEY=your_groq_api_key_here" > .env
+
+# Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 

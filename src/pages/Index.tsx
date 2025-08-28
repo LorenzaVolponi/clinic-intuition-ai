@@ -76,7 +76,7 @@ const Index = () => {
 
   const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
     const instruction =
-      "Você é um médico experiente. Responda APENAS em JSON no formato {\"hypotheses\":[{\"name\",\"probability\",\"treatment\",\"explanation\",\"differentials\":[],\"remedies\":[]}],\"emergencyWarning\":\"\"}.";
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"treatment\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"remedies\\\":[]}],\\\"emergencyWarning\\\":\\\"\\\"}. Para cada hipótese, inclua no campo \\\"remedies\\\" uma lista com 2-3 medicamentos comumente utilizados como exemplos educacionais, baseados no caso do paciente.";
     const text = await callGroq([
       { role: "system", content: instruction },
       { role: "user", content: prompt },

@@ -29,10 +29,10 @@ interface DiagnosisData {
     treatment?: string;
     explanation: string;
     differentials: string[];
-    remedies?: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
+  remedies?: string[];
 }
 
 interface DiagnosisResultProps {
@@ -214,19 +214,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                       <p className="text-success/90 text-sm leading-relaxed whitespace-pre-line">
                         {hypothesis.treatment}
                       </p>
-                      {hypothesis.remedies && hypothesis.remedies.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
-                          {hypothesis.remedies.map((med, i) => (
-                            <Badge
-                              key={i}
-                              variant="secondary"
-                              className="text-xs justify-center py-1 px-2"
-                            >
-                              {med}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -268,6 +255,31 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           </Card>
         ))}
       </div>
+
+      {diagnosis.remedies && diagnosis.remedies.length > 0 && (
+        <Card className="border-success/40 bg-success/5 shadow-lg">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-success/20 rounded-full">
+                <Pill className="h-5 w-5 text-success flex-shrink-0" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-success mb-2 text-sm sm:text-base">
+                  💊 Remédios recomendados
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-success/90 text-sm leading-relaxed">
+                  {diagnosis.remedies.map((med, i) => (
+                    <li key={i}>{med}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-success/90 mt-2">
+                  (exemplos educacionais – consultar protocolo institucional)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Educational Notice */}
       <Card className="bg-gradient-to-r from-warning-soft/50 to-orange-50/50 border-warning shadow-lg">

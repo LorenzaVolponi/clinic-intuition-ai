@@ -26,10 +26,10 @@ interface DiagnosisData {
     treatment?: string;
     explanation: string;
     differentials: string[];
-    remedies?: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
+  remedies?: string[];
 }
 
 const Index = () => {
@@ -76,7 +76,7 @@ const Index = () => {
 
   const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
     const instruction =
-      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"treatment?\\\",\\\"remedies?\\\"}],\\\"emergencyWarning\\\":\\\"\\\"}. Inclua os campos \\\"treatment\\\" e \\\"remedies\\\" apenas na primeira hipótese, usando de 2 a 3 medicamentos como exemplos educacionais.";
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"treatment?\\\"}],\\\"remedies\\\":[],\\\"emergencyWarning\\\":\\\"\\\"}. Inclua o campo \\\"treatment\\\" apenas na primeira hipótese e preencha \\\"remedies\\\" com 2 a 3 medicamentos como exemplos educacionais.";
     const text = await callGroq([
       { role: "system", content: instruction },
       { role: "user", content: prompt },
@@ -148,14 +148,12 @@ const Index = () => {
         probability: "Baixa",
         explanation: "—",
         differentials: [],
-        remedies: [],
       });
     }
     return {
       ...data,
       hypotheses: normalized.map((h, i) => ({
         ...h,
-        remedies: h.remedies ?? [],
         probability: h.probability ?? defaults[i],
       })),
     };
@@ -191,12 +189,22 @@ const Index = () => {
           {
             name: "Quadro Clínico Inespecífico",
             probability: "Baixa",
-            treatment: "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
-            explanation: "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
-            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"],
-            remedies: []
-          }
-        ]
+            treatment:
+              "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
+            explanation:
+              "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
+            differentials: [
+              "Síndrome viral inespecífica",
+              "Distúrbios funcionais",
+              "Manifestações psicossomáticas",
+              "Patologias em fase inicial",
+            ],
+          },
+        ],
+        remedies: [
+          "Dipirona → para dor e febre",
+          "Paracetamol (acetaminofeno) → alternativa em alérgicos",
+        ],
       };
     }
 
@@ -218,13 +226,15 @@ const Index = () => {
       return index === 0
         ? {
             ...base,
-            treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
-            remedies: condition.treatments.slice(0, 3)
+            treatment: `${condition.treatments
+              .slice(0, 2)
+              .join(", ")} (exemplos educacionais - sempre consultar protocolo institucional)`,
           }
         : base;
     });
+    const remedies = matchingConditions[0].treatments.slice(0, 3);
 
-    return { hypotheses };
+    return { hypotheses, remedies };
   };
 
   const handleReset = () => {

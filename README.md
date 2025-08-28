@@ -60,6 +60,19 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+## Configuração da API Groq
+
+Este projeto usa a API da Groq para gerar hipóteses diagnósticas. Para executar localmente:
+
+1. Obtenha uma chave de API em [console.groq.com](https://console.groq.com/).
+2. Crie um arquivo `.env` na raiz do projeto e adicione:
+
+   ```bash
+   VITE_GROQ_API_KEY=suachaveaqui
+   ```
+
+3. Reinicie o servidor de desenvolvimento para que a variável seja reconhecida.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and click on Share -> Publish.

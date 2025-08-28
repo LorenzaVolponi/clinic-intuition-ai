@@ -4,6 +4,18 @@ import { DiagnosisResult } from "@/components/DiagnosisResult";
 import { SafetyWarning } from "@/components/SafetyWarning";
 import { Stethoscope, Brain, BookOpen } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import ErrorToast from "@/components/ErrorToast";
+import {
+  MEDICAL_CONDITIONS,
+  findMatchingConditions,
+  generateClinicalPrompt,
+} from "@/lib/medicalKnowledge";
+import {
+  DiagnosisData,
+  prioritizeBySymptomMatch,
+  normalizeHypotheses,
+} from "@/lib/diagnosisUtils";
+import { callGroq } from "@/lib/groq";
 
 interface PatientData {
   name: string;
@@ -13,43 +25,116 @@ interface PatientData {
   duration: string;
 }
 
-interface DiagnosisData {
-  hypotheses: Array<{
-    name: string;
-    probability: string;
-    treatment: string;
-    explanation: string;
-    differentials: string[];
-  }>;
-  emergencyWarning?: string;
-}
 
 const Index = () => {
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
-    
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock diagnosis based on symptoms
-    const mockDiagnosis = generateMockDiagnosis(data);
-    setDiagnosis(mockDiagnosis);
-    setIsAnalyzing(false);
+    setError(null);
+
+    try {
+      const prompt = generateClinicalPrompt(data);
+      const aiDiagnosis = await analyzeWithAI(prompt);
+      const ordered = prioritizeBySymptomMatch(data.symptoms, aiDiagnosis);
+      const normalized = normalizeHypotheses(ordered);
+      const missing = validateSymptomCoverage(data.symptoms, normalized);
+      const emergencyWarning = determineEmergencyWarning(data.symptoms);
+      setDiagnosis({
+        ...normalized,
+        emergencyWarning,
+        unexplainedSymptoms: missing,
+      });
+    } catch (error) {
+      console.error("Erro ao gerar diagnóstico:", error);
+      setError((error as Error).message);
+      // Fallback local em caso de falha na IA
+      const mockDiagnosisRaw = generateMockDiagnosis(data);
+      const orderedMock = prioritizeBySymptomMatch(
+        data.symptoms,
+        mockDiagnosisRaw
+      );
+      const mockDiagnosis = normalizeHypotheses(orderedMock);
+      const emergencyWarning = determineEmergencyWarning(data.symptoms);
+      const missing = validateSymptomCoverage(data.symptoms, mockDiagnosis);
+      setDiagnosis({
+        ...mockDiagnosis,
+        emergencyWarning,
+        unexplainedSymptoms: missing,
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
+    const instruction =
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"treatment\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"remedies\\\":[],\\\"exams\\\":[]}],\\\"emergencyWarning\\\":\\\"\\\"}.";
+    const text = await callGroq([
+      { role: "system", content: instruction },
+      { role: "user", content: prompt },
+    ]);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("JSON não encontrado na resposta da IA");
+    }
+    try {
+      return JSON.parse(jsonMatch[0]) as DiagnosisData;
+    } catch {
+      throw new Error("JSON inválido retornado pela IA");
+    }
+  };
+
+  const validateSymptomCoverage = (
+    symptoms: string,
+    data: DiagnosisData
+  ): string[] => {
+    const list = symptoms
+      .split(/,|;| e /i)
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    return list.filter((symptom) => {
+      const inDiagnosis = data.hypotheses.some((h) =>
+        `${h.name} ${h.explanation} ${h.differentials.join(" ")}`
+          .toLowerCase()
+          .includes(symptom)
+      );
+      if (inDiagnosis) return false;
+      return !MEDICAL_CONDITIONS.some(
+        (c) =>
+          c.commonSymptoms.some((s) => s.toLowerCase() === symptom) &&
+          data.hypotheses.some(
+            (h) => h.name.toLowerCase() === c.name.toLowerCase()
+          )
+      );
+    });
+  };
+
+  const determineEmergencyWarning = (
+    symptoms: string
+  ): string | undefined => {
+    const list = symptoms
+      .toLowerCase()
+      .split(/,|;| e /i)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const emergencyFlags = MEDICAL_CONDITIONS.filter(
+      (c) => c.urgencyLevel === "emergencia"
+    ).flatMap((c) => c.redFlags.map((r) => r.toLowerCase()));
+    return emergencyFlags.some((flag) => list.includes(flag))
+      ? "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)."
+      : undefined;
   };
 
   const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
-    // Import medical knowledge
-    const { findMatchingConditions, generateClinicalPrompt } = require('@/lib/medicalKnowledge');
-    
     const matchingConditions = findMatchingConditions(
-      data.symptoms, 
-      data.age, 
-      data.gender, 
+      data.symptoms,
+      data.age,
+      data.gender,
       data.duration
     );
 
@@ -61,16 +146,18 @@ const Index = () => {
             probability: "Baixa",
             treatment: "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
             explanation: "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
-            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"]
+            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"],
+            remedies: [],
+            exams: []
           }
         ]
       };
     }
 
-    const hypotheses = matchingConditions.slice(0, 3).map((condition, index) => {
+    const hypotheses = matchingConditions.slice(0, 3).map((condition) => {
       const probabilityMap = {
         'emergencia': 'Alta',
-        'alta': 'Alta', 
+        'alta': 'Alta',
         'moderada': 'Moderada',
         'baixa': 'Baixa'
       };
@@ -80,20 +167,13 @@ const Index = () => {
         probability: probabilityMap[condition.urgencyLevel],
         treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
         explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
-        differentials: condition.differentials.slice(0, 4)
+        differentials: condition.differentials.slice(0, 4),
+        remedies: condition.treatments.slice(0, 3),
+        exams: condition.exams.slice(0, 3)
       };
     });
 
-    // Check for emergency conditions
-    const hasEmergency = matchingConditions.some(c => c.urgencyLevel === 'emergencia');
-    const emergencyWarning = hasEmergency ? 
-      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." : 
-      undefined;
-
-    return {
-      hypotheses,
-      emergencyWarning
-    };
+    return { hypotheses };
   };
 
   const handleReset = () => {
@@ -102,7 +182,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/20">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background/95 to-accent/20">
       {/* Header */}
       <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4 sm:py-6">
@@ -124,7 +204,7 @@ const Index = () => {
       <SafetyWarning />
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 sm:py-8">
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
         <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
           
           {/* Introduction */}
@@ -175,14 +255,25 @@ const Index = () => {
 
           {/* Diagnosis Results */}
           {diagnosis && patientData && (
-            <DiagnosisResult 
+            <DiagnosisResult
               diagnosis={diagnosis}
               patientData={patientData}
               onReset={handleReset}
             />
           )}
+          {error && (
+            <ErrorToast
+              message={error}
+              onRetry={() => patientData && handleFormSubmit(patientData)}
+            />
+          )}
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-muted/20 text-center text-xs sm:text-sm text-muted-foreground py-4">
+        Desenvolvido por AIX8C - @lorenzavolponi
+      </footer>
     </div>
   );
 };

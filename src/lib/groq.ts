@@ -3,7 +3,7 @@ interface GroqMessage {
   content: string;
 }
 
-const GROQ_MODEL = "llama3-70b-8192";
+export const GROQ_MODEL = "llama3-70b-8192";
 
 export const GROQ_API_KEY =
   "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";
@@ -55,5 +55,3 @@ export async function callGroq(messages: GroqMessage[]): Promise<string> {
     clearTimeout(timeout);
   }
 }
-
-export { GROQ_MODEL, GROQ_API_KEY };

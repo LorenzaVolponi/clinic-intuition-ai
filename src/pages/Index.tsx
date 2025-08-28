@@ -156,7 +156,7 @@ const Index = () => {
       hypotheses: normalized.map((h, i) => ({
         ...h,
         remedies: h.remedies ?? [],
-        probability: defaults[i],
+        probability: h.probability ?? defaults[i],
       })),
     };
   };

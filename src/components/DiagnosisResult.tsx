@@ -26,10 +26,10 @@ interface DiagnosisData {
   hypotheses: Array<{
     name: string;
     probability: string;
-    treatment: string;
+    treatment?: string;
     explanation: string;
     differentials: string[];
-    remedies: string[];
+    remedies?: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
@@ -203,32 +203,34 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
             
             <CardContent className="space-y-4 pt-0">
               {/* Treatment */}
-              <div className="bg-success-soft p-3 sm:p-4 rounded-lg border border-success/20">
-                <div className="flex items-start gap-3">
-                  <Pill className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">
-                      💊 Exemplo educacional de conduta
-                    </h4>
-                    <p className="text-success/90 text-sm leading-relaxed whitespace-pre-line">
-                      {hypothesis.treatment}
-                    </p>
-                    {hypothesis.remedies && hypothesis.remedies.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {hypothesis.remedies.map((med, i) => (
-                          <Badge
-                            key={i}
-                            variant="secondary"
-                            className="text-xs justify-center py-1 px-2"
-                          >
-                            {med}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+              {hypothesis.treatment && (
+                <div className="bg-success-soft p-3 sm:p-4 rounded-lg border border-success/20">
+                  <div className="flex items-start gap-3">
+                    <Pill className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">
+                        💊 Exemplo educacional de conduta
+                      </h4>
+                      <p className="text-success/90 text-sm leading-relaxed whitespace-pre-line">
+                        {hypothesis.treatment}
+                      </p>
+                      {hypothesis.remedies && hypothesis.remedies.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {hypothesis.remedies.map((med, i) => (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="text-xs justify-center py-1 px-2"
+                            >
+                              {med}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Clinical Explanation */}
               <div className="bg-primary-soft p-3 sm:p-4 rounded-lg border border-primary/20">

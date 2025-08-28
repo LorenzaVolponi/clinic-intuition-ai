@@ -413,7 +413,7 @@ Quando o paciente apresentar sintomas como febre, dor de garganta, tosse, dor to
 
 ⚠️ **Aviso Educacional:** Este simulador tem finalidade exclusivamente didática. Não substitui consulta médica, exames complementares ou julgamento clínico. Qualquer decisão terapêutica deve ser feita por um profissional de saúde qualificado.
 
-Para o JSON de saída, retorne um objeto com até 3 hipóteses no campo "hypotheses". Cada hipótese deve conter "name", "probability", "treatment", "explanation", "differentials" e "remedies" (lista com 2-3 medicamentos comuns como exemplos educacionais).
+Para o JSON de saída, retorne um objeto com até 3 hipóteses no campo "hypotheses". Cada hipótese deve conter "name", "probability", "explanation" e "differentials". Apenas a primeira hipótese deve incluir também "treatment" e "remedies" (lista com 2-3 medicamentos como exemplos educacionais).
 
 ${matchingConditions.some(c => c.urgencyLevel === 'emergencia') ?
   'ALERTA: Este caso apresenta possíveis sinais de emergência médica. Orienta-se busca imediata por atendimento médico.' : ''}

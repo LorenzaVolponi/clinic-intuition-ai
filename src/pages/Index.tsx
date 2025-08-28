@@ -23,10 +23,10 @@ interface DiagnosisData {
   hypotheses: Array<{
     name: string;
     probability: string;
-    treatment: string;
+    treatment?: string;
     explanation: string;
     differentials: string[];
-    remedies: string[];
+    remedies?: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
@@ -76,7 +76,7 @@ const Index = () => {
 
   const analyzeWithAI = async (prompt: string): Promise<DiagnosisData> => {
     const instruction =
-      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"treatment\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"remedies\\\":[]}],\\\"emergencyWarning\\\":\\\"\\\"}. Para cada hipótese, inclua no campo \\\"remedies\\\" uma lista com 2-3 medicamentos comumente utilizados como exemplos educacionais, baseados no caso do paciente.";
+      "Você é um médico experiente. Responda APENAS em JSON no formato {\\\"hypotheses\\\":[{\\\"name\\\",\\\"probability\\\",\\\"explanation\\\",\\\"differentials\\\":[],\\\"treatment?\\\",\\\"remedies?\\\"}],\\\"emergencyWarning\\\":\\\"\\\"}. Inclua os campos \\\"treatment\\\" e \\\"remedies\\\" apenas na primeira hipótese, usando de 2 a 3 medicamentos como exemplos educacionais.";
     const text = await callGroq([
       { role: "system", content: instruction },
       { role: "user", content: prompt },
@@ -146,7 +146,6 @@ const Index = () => {
       normalized.push({
         name: "Hipótese não fornecida",
         probability: "Baixa",
-        treatment: "—",
         explanation: "—",
         differentials: [],
         remedies: [],
@@ -201,22 +200,28 @@ const Index = () => {
       };
     }
 
-    const hypotheses = matchingConditions.slice(0, 3).map((condition) => {
+    const hypotheses = matchingConditions.slice(0, 3).map((condition, index) => {
       const probabilityMap = {
-        'emergencia': 'Alta',
-        'alta': 'Alta',
-        'moderada': 'Moderada',
-        'baixa': 'Baixa'
+        emergencia: 'Alta',
+        alta: 'Alta',
+        moderada: 'Moderada',
+        baixa: 'Baixa'
+      } as const;
+
+      const base = {
+        name: condition.name,
+        probability: probabilityMap[condition.urgencyLevel as keyof typeof probabilityMap],
+        explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
+        differentials: condition.differentials.slice(0, 4)
       };
 
-      return {
-        name: condition.name,
-        probability: probabilityMap[condition.urgencyLevel],
-        treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
-        explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
-        differentials: condition.differentials.slice(0, 4),
-        remedies: condition.treatments.slice(0, 3)
-      };
+      return index === 0
+        ? {
+            ...base,
+            treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
+            remedies: condition.treatments.slice(0, 3)
+          }
+        : base;
     });
 
     return { hypotheses };

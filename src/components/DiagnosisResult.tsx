@@ -29,8 +29,10 @@ interface DiagnosisData {
     treatment: string;
     explanation: string;
     differentials: string[];
+    remedies: string[];
   }>;
   emergencyWarning?: string;
+  unexplainedSymptoms?: string[];
 }
 
 interface DiagnosisResultProps {
@@ -124,6 +126,24 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           </div>
         </CardContent>
       </Card>
+
+      {diagnosis.unexplainedSymptoms && diagnosis.unexplainedSymptoms.length > 0 && (
+        <Card className="border-warning/40 bg-warning/5 shadow-lg">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-warning/20 rounded-full">
+                <AlertTriangle className="h-5 w-5 text-warning flex-shrink-0" />
+              </div>
+              <div className="text-sm sm:text-base">
+                <p className="font-semibold text-warning mb-1">Sintomas não explicados</p>
+                <p className="text-warning-foreground">
+                  {diagnosis.unexplainedSymptoms.join(', ')}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Emergency Warning */}
       {diagnosis.emergencyWarning && (
@@ -226,6 +246,31 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   </div>
                 </div>
               </div>
+
+              {/* Recommended Remedies */}
+              {hypothesis.remedies && hypothesis.remedies.length > 0 && (
+                <div className="bg-muted/50 p-3 sm:p-4 rounded-lg border border-border/50">
+                  <div className="flex items-start gap-3">
+                    <Pill className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-muted-foreground mb-3 text-sm sm:text-base">
+                        💊 Remédios recomendados
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {hypothesis.remedies.map((med, i) => (
+                          <Badge
+                            key={i}
+                            variant="secondary"
+                            className="text-xs justify-center py-1 px-2"
+                          >
+                            {med}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

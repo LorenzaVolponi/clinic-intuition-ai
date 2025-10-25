@@ -14,6 +14,14 @@ export interface MedicalCondition {
   clinicalPearls: string[];
 }
 
+export interface PatientInput {
+  name: string;
+  age: number;
+  gender: string;
+  symptoms: string;
+  duration: string;
+}
+
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   // CARDIOVASCULAR
   {
@@ -128,6 +136,35 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     clinicalPearls: ["Janela terapêutica", "TC crânio urgente", "Scale NIHSS/ABCD2"]
   },
 
+  // FUNCIONAL/PSICOLÓGICO
+  {
+    name: "Ansiedade Aguda",
+    icd10: "F41.0",
+    category: "funcional",
+    commonSymptoms: [
+      "palpitações",
+      "tremores",
+      "boca seca",
+      "dor de cabeça",
+      "náusea",
+    ],
+    riskFactors: ["estresse", "transtorno de ansiedade prévio", "cafeína"],
+    ageGroups: ["adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Respiração guiada",
+      "Apoio psicológico",
+      "Técnicas de relaxamento",
+    ],
+    differentials: ["Hipoglicemia", "Hipertireoidismo", "Uso de estimulantes"],
+    redFlags: ["dispneia intensa", "dor torácica", "síncope"],
+    clinicalPearls: [
+      "Avaliar com escalas de ansiedade",
+      "Descartar causas orgânicas",
+      "Considerar terapia cognitivo-comportamental",
+    ],
+  },
+
   // GENITOURINÁRIO
   {
     name: "Infecção do Trato Urinário",
@@ -191,33 +228,57 @@ export const CLINICAL_SCALES = {
   }
 };
 
-export function findMatchingConditions(symptoms: string, age: number, gender: string, duration: string): MedicalCondition[] {
-  const symptomsLower = symptoms.toLowerCase();
-  const ageGroup = age < 18 ? 'crianca' : age < 65 ? 'adulto' : 'idoso';
-  
-  return MEDICAL_CONDITIONS.filter(condition => {
-    // Check symptom match
-    const symptomMatch = condition.commonSymptoms.some(symptom => 
-      symptomsLower.includes(symptom.toLowerCase())
-    );
-    
-    // Check age group
+export function findMatchingConditions(
+  symptoms: string,
+  age: number,
+  gender: string,
+  duration: string
+): MedicalCondition[] {
+  const symptomList = symptoms
+    .toLowerCase()
+    .split(/,|;| e /i)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const ageGroup = age < 18 ? "crianca" : age < 65 ? "adulto" : "idoso";
+  const requiredScore = symptomList.length > 1 ? 2 : 1;
+
+  return MEDICAL_CONDITIONS.map((condition) => {
+    // Score by number of symptom matches
+    const matchScore = condition.commonSymptoms.reduce((score, symptom) => {
+      return score + (symptomList.includes(symptom.toLowerCase()) ? 1 : 0);
+    }, 0);
+
     const ageMatch = condition.ageGroups.includes(ageGroup);
-    
-    // Check gender preference
-    const genderMatch = !condition.genderPreference || 
-      condition.genderPreference === gender || 
-      condition.genderPreference === 'both';
-    
-    return symptomMatch && ageMatch && genderMatch;
-  }).sort((a, b) => {
-    // Sort by urgency level (emergency first)
-    const urgencyOrder = { 'emergencia': 0, 'alta': 1, 'moderada': 2, 'baixa': 3 };
-    return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
-  });
+    const genderMatch =
+      !condition.genderPreference ||
+      condition.genderPreference === gender ||
+      condition.genderPreference === "both";
+
+    return { condition, matchScore, ageMatch, genderMatch };
+  })
+    .filter(
+      (item) =>
+        item.matchScore >= requiredScore && item.ageMatch && item.genderMatch
+    )
+    .sort((a, b) => {
+      if (b.matchScore !== a.matchScore) {
+        return b.matchScore - a.matchScore;
+      }
+      const urgencyOrder = {
+        emergencia: 0,
+        alta: 1,
+        moderada: 2,
+        baixa: 3,
+      } as const;
+      return (
+        urgencyOrder[a.condition.urgencyLevel] -
+        urgencyOrder[b.condition.urgencyLevel]
+      );
+    })
+    .map((item) => item.condition);
 }
 
-export function generateClinicalPrompt(patientData: any): string {
+export function generateClinicalPrompt(patientData: PatientInput): string {
   const matchingConditions = findMatchingConditions(
     patientData.symptoms, 
     patientData.age, 
@@ -251,7 +312,8 @@ CRITÉRIOS DE ANÁLISE:
 3. Avalie urgência baseada em sinais de alarme
 4. Sugira condutas baseadas em guidelines atuais
 5. Mencione exames complementares quando indicados
-6. SEMPRE inclua aviso de que é simulação educacional
+6. Respeite regras absolutas: não priorize hipertensão, hipoglicemia, anemia, diabetes descompensado ou insuficiência cardíaca sem dados objetivos.
+7. SEMPRE inclua aviso de que é simulação educacional
 
 FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Máximo 3 hipóteses diagnósticas
@@ -259,6 +321,7 @@ FORMATO DE RESPOSTA OBRIGATÓRIO:
 - Tratamentos apenas como exemplos educacionais
 - Explicação fisiopatológica quando relevante
 - Se sinais de alarme: incluir aviso de emergência
+- Campo "remedies" com 2-3 medicamentos comuns (exemplos educacionais)
 
 ${matchingConditions.some(c => c.urgencyLevel === 'emergencia') ? 
   'ALERTA: Este caso apresenta possíveis sinais de emergência médica. Orienta-se busca imediata por atendimento médico.' : ''}

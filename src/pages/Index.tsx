@@ -34,6 +34,23 @@ interface ChatMessage {
   content: string;
   source?: 'local' | 'groq';
 }
+import { useState } from 'react';
+import { PatientForm } from '@/components/PatientForm';
+import { DiagnosisResult } from '@/components/DiagnosisResult';
+import { SafetyWarning } from '@/components/SafetyWarning';
+import { analyzeClinicalCase } from '@/lib/aiClient';
+import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
+import { Stethoscope, Brain, BookOpen, Activity, ShieldCheck, Sparkles } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+
+const NAV_ITEMS = [
+  { id: 'inicio', label: 'Início', icon: Sparkles },
+  { id: 'casos', label: 'Casos', icon: ClipboardList },
+  { id: 'medbot', label: 'MedBot', icon: MessageSquareText },
+  { id: 'quiz', label: 'Quiz', icon: Target },
+  { id: 'timeline', label: 'Timeline', icon: Milestone },
+  { id: 'conquistas', label: 'Conquistas', icon: Trophy },
+];
 
 const NAV_ITEMS = [
   { id: 'inicio', label: 'Início', icon: Sparkles },
@@ -111,6 +128,7 @@ const Index = () => {
       selectedTopicId,
       medbotMessages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
     );
+    const response = await askMedBot(content, selectedTopicId);
 
     setMedbotMessages((current) => [
       ...current,
@@ -177,6 +195,24 @@ const Index = () => {
                 MedInnova
               </div>
               <div className="text-sm font-medium text-slate-500">AI Lab • estudos, casos e revisão guiada</div>
+            </div>
+            <div>
+              <div className="text-3xl font-black tracking-tight bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent">
+                MedInnova
+              </div>
+              <div className="text-sm font-medium text-slate-500">AI Lab • estudos, casos e revisão guiada</div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/20">
+      <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4 sm:py-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 sm:p-3 bg-white/15 rounded-xl backdrop-blur-sm">
+              <Stethoscope className="h-6 w-6 sm:h-8 sm:w-8" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Dr. IA</h1>
+              <p className="text-primary-foreground/90 text-sm sm:text-base">
+                Simulador de diagnóstico educacional com triagem inteligente
+              </p>
             </div>
           </button>
 
@@ -445,6 +481,279 @@ const Index = () => {
                     <Button variant="outline" onClick={() => setMedbotInput(selectedTopic.medbotPrompts[0])} className="h-12 rounded-full px-6 text-base font-semibold">
                       Usar sugestão
                     </Button>
+                </div>
+                <h1 className="text-5xl font-black leading-none tracking-tight sm:text-7xl">
+                  <span className="bg-gradient-to-r from-cyan-500 via-emerald-500 to-violet-500 bg-clip-text text-transparent">MedInnova</span>
+                  <br />
+                  <span className="text-slate-900">AI Lab</span>
+                </h1>
+                <p className="mt-6 max-w-3xl text-2xl font-semibold leading-snug text-slate-600 sm:text-3xl">
+                  Explore como a <span className="text-cyan-500">Inteligência Artificial</span> e inovações tecnológicas estão
+                  <span className="text-emerald-500"> transformando a medicina</span> e salvando milhões de vidas.
+                </p>
+                <p className="mt-4 max-w-2xl text-base leading-7 text-slate-500 sm:text-lg">
+                  Agora a plataforma reúne simulador clínico, flashcards, quiz temático, MedBot educacional, timeline interativa e conquistas para estudo contínuo.
+                </p>
+
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+                  <Button
+                    size="lg"
+                    onClick={() => scrollToSection('casos')}
+                    className="h-14 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 px-8 text-lg font-bold shadow-xl"
+                  >
+                    <ClipboardList className="mr-2 h-5 w-5" />
+                    Explorar Casos Clínicos
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => scrollToSection('medbot')}
+                    className="h-14 rounded-full border-[3px] border-violet-400 px-8 text-lg font-bold text-cyan-600 shadow-xl"
+                  >
+                    <MessageSquareText className="mr-2 h-5 w-5" />
+                    Conversar com MedBot
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="relative overflow-hidden rounded-[28px] border-white/70 bg-white/80 shadow-[0_25px_70px_-35px_rgba(59,130,246,0.4)] backdrop-blur-sm">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl bg-gradient-to-r from-cyan-500 to-violet-500 p-3 text-white">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle>Hub de estudos médicos</CardTitle>
+                      <CardDescription>Uma experiência pensada para memorizar, praticar e revisar.</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {studyStats.map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="rounded-xl bg-primary-soft p-2 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <span className="font-medium text-slate-600">{label}</span>
+                      </div>
+                      <span className="text-xl font-black text-slate-900">{value}</span>
+                    </div>
+                  ))}
+
+                  <div className="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-cyan-50 p-4">
+                    <div className="mb-2 flex items-center gap-2 font-semibold text-slate-800">
+                      <Flame className="h-4 w-4 text-warning" />
+                      Progresso da sessão
+                    </div>
+                    <Progress value={(unlockedAchievements / achievements.length) * 100} className="h-3" />
+                    <p className="mt-2 text-sm text-slate-500">Desbloqueie conquistas usando quiz, timeline, MedBot e análise de casos.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
+        <section className="container mx-auto grid max-w-6xl gap-4 px-4 pb-6 md:grid-cols-2 xl:grid-cols-4">
+          {STUDY_TOPICS.map((topic) => (
+            <button
+              key={topic.id}
+              onClick={() => {
+                setSelectedTopicId(topic.id);
+                scrollToSection('quiz');
+              }}
+              className="rounded-[24px] border border-white/70 bg-white/80 p-5 text-left shadow-md transition hover:-translate-y-1 hover:shadow-xl"
+            >
+              <div className={`mb-4 inline-flex rounded-2xl bg-gradient-to-r px-4 py-2 text-2xl text-white ${topic.colorClass}`}>
+                {topic.icon}
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">{topic.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{topic.description}</p>
+              <p className="mt-3 text-sm font-medium text-cyan-600">Objetivo: {topic.objective}</p>
+            </button>
+          ))}
+        </section>
+
+        <section id="casos" className="container mx-auto max-w-6xl px-4 py-8">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <Badge className="mb-3 bg-primary/10 text-primary hover:bg-primary/10">Casos clínicos</Badge>
+              <h2 className="text-3xl font-black text-slate-900">Simulador clínico preservado e mais integrado ao estudo.</h2>
+              <p className="mt-2 max-w-3xl text-slate-500">
+                Mantive o sistema de análise funcional e encaixei ele dentro da nova jornada de aprendizagem para você revisar hipótese, red flags, triagem e exames em um fluxo só.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3 shadow-sm">
+              <p className="text-sm text-slate-500">Tema em estudo agora</p>
+              <p className="font-bold text-slate-900">{selectedTopic.title}</p>
+            </div>
+          </div>
+
+          <SafetyWarning />
+
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-6">
+              <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-2xl">
+                    <Stethoscope className="h-6 w-6 text-primary" />
+                    Modo prática guiada
+                  </CardTitle>
+                  <CardDescription>
+                    Use o tema selecionado como trilha de revisão e depois aplique em um caso clínico fictício.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {selectedTopic.quickFacts.map((fact) => (
+                    <div key={fact} className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
+                      {fact}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {!diagnosis && <PatientForm onSubmit={handleFormSubmit} isAnalyzing={isAnalyzing} patientData={patientData} />}
+            </div>
+
+            <div>
+              {diagnosis && patientData ? (
+                <DiagnosisResult diagnosis={diagnosis} patientData={patientData} onReset={handleReset} />
+              ) : (
+                <Card className="rounded-[28px] border-dashed border-primary/30 bg-white/70 shadow-lg">
+                  <CardContent className="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8 text-center">
+                    <div className="rounded-full bg-primary-soft p-5 text-primary">
+                      <Activity className="h-10 w-10" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-900">Seu relatório clínico vai aparecer aqui</h3>
+                    <p className="max-w-xl text-slate-500">
+                      Ao enviar um caso, o sistema mostra triagem, hipótese principal, exames sugeridos, ações imediatas e sinais de alarme em um formato mais didático.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section id="medbot" className="container mx-auto max-w-6xl px-4 py-8">
+          <div className="mb-6">
+            <Badge className="mb-3 bg-violet-100 text-violet-700 hover:bg-violet-100">MedBot</Badge>
+            <h2 className="text-3xl font-black text-slate-900">Tutor de estudo conversacional.</h2>
+            <p className="mt-2 max-w-3xl text-slate-500">
+              Peça resumos, perguntas, comparações e mini planos de estudo. Sem API configurada, ele continua funcional com respostas locais orientadas por tema.
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+            <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+              <CardHeader>
+                <CardTitle>Prompts rápidos</CardTitle>
+                <CardDescription>Ideias para começar sem travar.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {selectedTopic.medbotPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => handleAskMedBot(prompt)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-violet-500" />
+                  Conversa com o MedBot
+                </CardTitle>
+                <CardDescription>Foco atual: {selectedTopic.title}.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-h-[360px] space-y-3 overflow-auto rounded-3xl border border-slate-200/70 bg-slate-50/80 p-4">
+                  {medbotMessages.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      className={`max-w-[90%] rounded-3xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                        message.role === 'assistant'
+                          ? 'bg-white text-slate-700'
+                          : 'ml-auto bg-gradient-to-r from-cyan-500 to-violet-500 text-white'
+                      }`}
+                    >
+                      <div className="whitespace-pre-line">{message.content}</div>
+                      {message.source && message.role === 'assistant' && (
+                        <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte: {message.source}</div>
+                      )}
+                    </div>
+                  ))}
+                  {isMedbotLoading && (
+                    <div className="max-w-[90%] rounded-3xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+                      MedBot está organizando uma resposta de estudo...
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <Textarea
+                    value={medbotInput}
+                    onChange={(event) => setMedbotInput(event.target.value)}
+                    placeholder="Ex.: gere 5 perguntas de revisão sobre pneumonia, compare ITU baixa vs pielonefrite, crie plano de 15 minutos..."
+                    className="min-h-[110px] rounded-3xl bg-white"
+                  />
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button onClick={() => handleAskMedBot()} className="h-12 flex-1 rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 text-base font-bold">
+                      <MessageSquareText className="mr-2 h-4 w-4" />
+                      Perguntar ao MedBot
+                    </Button>
+                    <Button variant="outline" onClick={() => setMedbotInput(selectedTopic.medbotPrompts[0])} className="h-12 rounded-full px-6 text-base font-semibold">
+                      Usar sugestão
+                    </Button>
+      <SafetyWarning />
+
+      <main className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
+          {!patientData && (
+            <Card className="p-6 sm:p-8 bg-gradient-to-r from-card to-accent border-l-4 border-l-primary">
+              <div className="text-center space-y-4">
+                <div className="flex justify-center gap-4 mb-6">
+                  <div className="p-3 bg-primary/10 rounded-full">
+                    <Brain className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                  </div>
+                  <div className="p-3 bg-success/10 rounded-full">
+                    <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-success" />
+                  </div>
+                  <div className="p-3 bg-warning/10 rounded-full">
+                    <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-warning" />
+                  </div>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
+                  Versão atualizada do Dr. IA
+                </h2>
+                <p className="text-muted-foreground text-base sm:text-lg max-w-3xl mx-auto leading-relaxed">
+                  O sistema agora combina uma base clínica local com suporte opcional à Groq via variável de ambiente,
+                  priorização por gravidade, exames sugeridos, ações imediatas e explicações mais úteis para treino de raciocínio clínico.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 text-sm">
+                  <div className="bg-primary/5 p-4 rounded-lg text-left">
+                    <div className="flex items-center gap-2 font-medium text-primary mb-1">
+                      <Activity className="h-4 w-4" /> Triagem estruturada
+                    </div>
+                    <div className="text-muted-foreground">Classificação entre emergencial, urgente e ambulatorial.</div>
+                  </div>
+                  <div className="bg-success/5 p-4 rounded-lg text-left">
+                    <div className="flex items-center gap-2 font-medium text-success mb-1">
+                      <ShieldCheck className="h-4 w-4" /> Segurança reforçada
+                    </div>
+                    <div className="text-muted-foreground">Red flags, ações imediatas e aviso educacional explícito.</div>
+                  </div>
+                  <div className="bg-warning/5 p-4 rounded-lg text-left">
+                    <div className="flex items-center gap-2 font-medium text-warning mb-1">
+                      <Sparkles className="h-4 w-4" /> IA configurável
+                    </div>
+                    <div className="text-muted-foreground">Sem chave hardcoded; a Groq entra apenas via ambiente.</div>
                   </div>
                 </div>
               </CardContent>
@@ -694,6 +1003,23 @@ const Index = () => {
                 </div>
               </CardContent>
             </Card>
+            </Card>
+
+            <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+              <CardHeader>
+                <CardTitle>{MEDICAL_TIMELINE[timelineIndex].title}</CardTitle>
+                <CardDescription>{MEDICAL_TIMELINE[timelineIndex].year}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm leading-7 text-slate-600">
+                <p>{MEDICAL_TIMELINE[timelineIndex].details}</p>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <strong className="text-slate-900">Impacto:</strong> {MEDICAL_TIMELINE[timelineIndex].impact}
+                </div>
+                <div className="rounded-2xl border border-violet-100 bg-violet-50 p-4">
+                  <strong className="text-slate-900">Conexão com o estudo atual:</strong> use este marco para criar analogias, perguntas de prova e narrativas de memória durante a revisão.
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
 
@@ -736,6 +1062,16 @@ const Index = () => {
             ))}
           </div>
         </section>
+          )}
+
+          {!diagnosis && (
+            <PatientForm onSubmit={handleFormSubmit} isAnalyzing={isAnalyzing} patientData={patientData} />
+          )}
+
+          {diagnosis && patientData && (
+            <DiagnosisResult diagnosis={diagnosis} patientData={patientData} onReset={handleReset} />
+          )}
+        </div>
       </main>
     </div>
   );

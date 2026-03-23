@@ -1,73 +1,43 @@
-# Welcome to your Lovable project
+# MedInnova AI Lab
 
-## Project info
+Plataforma educacional em React + Vite para estudo médico com:
 
-**URL**: https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974
+- simulador de casos clínicos com triagem inteligente;
+- flashcards temáticos;
+- quiz por área;
+- MedBot para revisão guiada;
+- timeline da evolução da medicina;
+- sistema leve de conquistas para gamificar a sessão.
 
-## How can I edit this code?
+## Como rodar
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Variáveis de ambiente
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+VITE_GROQ_API_KEY=your_groq_key_here
+VITE_GROQ_MODEL=llama-3.3-70b-versatile
+```
 
-**Use GitHub Codespaces**
+> Importante: por ser um app Vite, variáveis `VITE_*` ficam expostas no bundle do navegador. Para produção, o ideal é mover a chamada da Groq para backend/proxy.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## O que o sistema entrega hoje
 
-## What technologies are used for this project?
+- análise clínica local com fallback seguro;
+- refinamento opcional por Groq;
+- perguntas e respostas de estudo por tema;
+- navegação por seções inspirada em landing pages modernas;
+- interface otimizada para explorar estudo + prática clínica no mesmo fluxo.
 
-This project is built with:
+## Próximas melhorias recomendadas
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+1. Mover a integração com Groq para backend seguro.
+2. Salvar histórico de estudo, quiz e casos em persistência real.
+3. Adicionar autenticação e trilhas por nível de formação.
+4. Criar testes unitários para motor clínico e gerador de estudo.
+5. Expandir base de conteúdo com mais especialidades e multimídia.

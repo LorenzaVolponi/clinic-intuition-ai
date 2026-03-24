@@ -94,10 +94,12 @@ const Index = () => {
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
-
-    const nextDiagnosis = await analyzeClinicalCase(data);
-    setDiagnosis(nextDiagnosis);
-    setIsAnalyzing(false);
+    try {
+      const nextDiagnosis = await analyzeClinicalCase(data);
+      setDiagnosis(nextDiagnosis);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleReset = () => {
@@ -115,25 +117,29 @@ const Index = () => {
     const content = (question ?? medbotInput).trim();
     if (!content) return;
 
-    setMedbotMessages((current) => [...current, { role: 'user', content }]);
+    const nextHistory = [...medbotMessages, { role: 'user' as const, content }];
+    setMedbotMessages(nextHistory);
     setMedbotInput('');
     setIsMedbotLoading(true);
 
-    const response = await askMedBot(
-      content,
-      selectedTopicId,
-      medbotMessages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
-    );
+    try {
+      const response = await askMedBot(
+        content,
+        selectedTopicId,
+        nextHistory.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+      );
 
-    setMedbotMessages((current) => [
-      ...current,
-      {
-        role: 'assistant',
-        content: response.answer,
-        source: response.source,
-      },
-    ]);
-    setIsMedbotLoading(false);
+      setMedbotMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content: response.answer,
+          source: response.source,
+        },
+      ]);
+    } finally {
+      setIsMedbotLoading(false);
+    }
   };
 
   const achievements = useMemo<AchievementItem[]>(() => {

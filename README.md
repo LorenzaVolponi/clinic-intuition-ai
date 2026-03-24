@@ -30,12 +30,15 @@ GROQ_MODEL=llama-3.3-70b-versatile
 BACKEND_PORT=8787
 ```
 
+> Segurança: mantenha a chave apenas no `.env` local (nunca commite chaves reais no repositório).
+
 ## Backend implementado
 
 - endpoint `POST /api/clinical-analysis` com prompt de sistema clínico rigoroso;
 - endpoint `POST /api/medbot` para tutor educacional;
 - temperatura baixa e `top_p` reduzido para conter alucinação;
 - validações backend para bloquear respostas inseguras (ex.: dor torácica sem ECG, mulher fértil com dor+nausea sem Beta-HCG, sintomas inventados).
+- fallback local no frontend quando backend/IA estiver indisponível.
 
 ## Próximas melhorias recomendadas
 

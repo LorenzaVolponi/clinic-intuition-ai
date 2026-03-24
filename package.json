@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
     "dev:client": "vite",
-    "dev:server": "./node_modules/.bin/tsx watch backend/server.ts",
+    "dev:server": "tsx watch backend/server.ts",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start:server": "./node_modules/.bin/tsx backend/server.ts"
+    "start:server": "tsx backend/server.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -1,99 +1,121 @@
-import { useState } from "react";
-import { PatientForm } from "@/components/PatientForm";
-import { DiagnosisResult } from "@/components/DiagnosisResult";
-import { SafetyWarning } from "@/components/SafetyWarning";
-import { Stethoscope, Brain, BookOpen } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from 'react';
+import { askMedBot, analyzeClinicalCase, generateStudyPack } from '@/lib/aiClient';
+import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
+import { GeneratedStudyPack, MEDICAL_TIMELINE, STUDY_TOPICS, getTopicById } from '@/lib/studyContent';
+import { AchievementsSection } from '@/components/home/AchievementsSection';
+import { ClinicalCasesSection } from '@/components/home/ClinicalCasesSection';
+import { HeroSection } from '@/components/home/HeroSection';
+import { MedBotSection } from '@/components/home/MedBotSection';
+import { StudySection } from '@/components/home/StudySection';
+import { TimelineSection } from '@/components/home/TimelineSection';
+import { TopicGridSection } from '@/components/home/TopicGridSection';
+import { Milestone, NotebookTabs, Target, Trophy } from 'lucide-react';
+import { AchievementItem, ChatMessage } from '@/types/study';
 
-interface PatientData {
-  name: string;
-  age: number;
-  gender: string;
-  symptoms: string;
-  duration: string;
-}
+const LOCAL_STORAGE_KEYS = {
+  selectedTopicId: 'medinnova:selectedTopicId',
+  medbotMessages: 'medinnova:medbotMessages',
+  timelineIndex: 'medinnova:timelineIndex',
+};
 
-interface DiagnosisData {
-  hypotheses: Array<{
-    name: string;
-    probability: string;
-    treatment: string;
-    explanation: string;
-    differentials: string[];
-  }>;
-  emergencyWarning?: string;
-}
+const DEFAULT_MEDBOT_MESSAGE: ChatMessage = {
+  role: 'assistant',
+  content: 'Olá! Eu sou o MedBot. Posso resumir temas, montar revisão rápida, comparar diagnósticos e sugerir perguntas de estudo.',
+  source: 'local',
+};
 
 const Index = () => {
   const [patientData, setPatientData] = useState<PatientData | null>(null);
-  const [diagnosis, setDiagnosis] = useState<DiagnosisData | null>(null);
+  const [diagnosis, setDiagnosis] = useState<ClinicalAssessment | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedTopicId, setSelectedTopicId] = useState(STUDY_TOPICS[0].id);
+  const [flashcardIndex, setFlashcardIndex] = useState(0);
+  const [flashcardFlipped, setFlashcardFlipped] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [timelineIndex, setTimelineIndex] = useState(0);
+  const [timelineClicks, setTimelineClicks] = useState<number[]>([0]);
+  const [medbotInput, setMedbotInput] = useState('');
+  const [isMedbotLoading, setIsMedbotLoading] = useState(false);
+  const [medbotMessages, setMedbotMessages] = useState<ChatMessage[]>([DEFAULT_MEDBOT_MESSAGE]);
+  const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
+  const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
+
+  const selectedTopic = useMemo(() => getTopicById(selectedTopicId), [selectedTopicId]);
+  const quizScore = selectedTopic.quiz.reduce((score, question, index) => {
+    return selectedAnswers[index] === question.answer ? score + 1 : score;
+  }, 0);
+
+  useEffect(() => {
+    try {
+      const persistedTopic = localStorage.getItem(LOCAL_STORAGE_KEYS.selectedTopicId);
+      const persistedMessages = localStorage.getItem(LOCAL_STORAGE_KEYS.medbotMessages);
+      const persistedTimelineIndex = localStorage.getItem(LOCAL_STORAGE_KEYS.timelineIndex);
+
+      if (persistedTopic && STUDY_TOPICS.some((topic) => topic.id === persistedTopic)) {
+        setSelectedTopicId(persistedTopic);
+      }
+
+      if (persistedMessages) {
+        const parsed = JSON.parse(persistedMessages) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMedbotMessages(parsed);
+        }
+      }
+
+      if (persistedTimelineIndex) {
+        const index = Number(persistedTimelineIndex);
+        if (!Number.isNaN(index) && index >= 0 && index < MEDICAL_TIMELINE.length) {
+          setTimelineIndex(index);
+        }
+      }
+    } catch (error) {
+      console.warn('Falha ao restaurar estado local.', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.selectedTopicId, selectedTopicId);
+  }, [selectedTopicId]);
+
+  useEffect(() => {
+    const loadStudyPack = async () => {
+      setIsGeneratingStudyPack(true);
+      try {
+        const pack = await generateStudyPack(selectedTopicId);
+        setGeneratedStudyPack(pack);
+      } finally {
+        setIsGeneratingStudyPack(false);
+      }
+    };
+
+    loadStudyPack();
+  }, [selectedTopicId]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.medbotMessages, JSON.stringify(medbotMessages.slice(-20)));
+  }, [medbotMessages]);
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.timelineIndex, String(timelineIndex));
+  }, [timelineIndex]);
+
+  useEffect(() => {
+    setFlashcardIndex(0);
+    setFlashcardFlipped(false);
+    setCurrentQuestionIndex(0);
+    setSelectedAnswers({});
+  }, [selectedTopicId]);
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
     setPatientData(data);
-    
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Mock diagnosis based on symptoms
-    const mockDiagnosis = generateMockDiagnosis(data);
-    setDiagnosis(mockDiagnosis);
-    setIsAnalyzing(false);
-  };
-
-  const generateMockDiagnosis = (data: PatientData): DiagnosisData => {
-    // Import medical knowledge
-    const { findMatchingConditions, generateClinicalPrompt } = require('@/lib/medicalKnowledge');
-    
-    const matchingConditions = findMatchingConditions(
-      data.symptoms, 
-      data.age, 
-      data.gender, 
-      data.duration
-    );
-
-    if (matchingConditions.length === 0) {
-      return {
-        hypotheses: [
-          {
-            name: "Quadro Clínico Inespecífico",
-            probability: "Baixa",
-            treatment: "Observação clínica, reavaliação em 24-48h, sintomáticos conforme necessário",
-            explanation: "Sintomas apresentados são pouco específicos. Recomenda-se anamnese mais detalhada, exame físico completo e seguimento clínico para melhor caracterização do quadro.",
-            differentials: ["Síndrome viral inespecífica", "Distúrbios funcionais", "Manifestações psicossomáticas", "Patologias em fase inicial"]
-          }
-        ]
-      };
+    try {
+      const nextDiagnosis = await analyzeClinicalCase(data, { topicId: selectedTopicId, objective: selectedTopic.objective });
+      setDiagnosis(nextDiagnosis);
+    } finally {
+      setIsAnalyzing(false);
     }
-
-    const hypotheses = matchingConditions.slice(0, 3).map((condition, index) => {
-      const probabilityMap = {
-        'emergencia': 'Alta',
-        'alta': 'Alta', 
-        'moderada': 'Moderada',
-        'baixa': 'Baixa'
-      };
-
-      return {
-        name: condition.name,
-        probability: probabilityMap[condition.urgencyLevel],
-        treatment: `${condition.treatments.slice(0, 2).join(', ')} (exemplos educacionais - sempre consultar protocolo institucional)`,
-        explanation: `${condition.clinicalPearls[0] || 'Conduta baseada em apresentação clínica típica'}. Considerar fatores de risco: ${condition.riskFactors.slice(0, 2).join(', ')}.`,
-        differentials: condition.differentials.slice(0, 4)
-      };
-    });
-
-    // Check for emergency conditions
-    const hasEmergency = matchingConditions.some(c => c.urgencyLevel === 'emergencia');
-    const emergencyWarning = hasEmergency ? 
-      "🚨 ATENÇÃO: Este quadro clínico pode representar uma EMERGÊNCIA MÉDICA. Recomenda-se avaliação médica presencial IMEDIATA. Em caso de sintomas graves, procure o pronto-socorro ou ligue 192 (SAMU)." : 
-      undefined;
-
-    return {
-      hypotheses,
-      emergencyWarning
-    };
   };
 
   const handleReset = () => {
@@ -101,87 +123,167 @@ const Index = () => {
     setDiagnosis(null);
   };
 
+  const scrollToSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleAskMedBot = async (question?: string) => {
+    if (isMedbotLoading) return;
+
+    const content = (question ?? medbotInput).trim();
+    if (!content) return;
+
+    const nextHistory = [...medbotMessages, { role: 'user' as const, content }];
+    setMedbotMessages(nextHistory);
+    setMedbotInput('');
+    setIsMedbotLoading(true);
+
+    try {
+      const response = await askMedBot(
+        content,
+        selectedTopicId,
+        nextHistory.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+        {
+          objective: selectedTopic.objective,
+          quickFacts: selectedTopic.quickFacts,
+          clinicalSummary: diagnosis?.clinicalSummary,
+        },
+      );
+
+      setMedbotMessages((current) => [
+        ...current,
+        {
+          role: 'assistant',
+          content: response.answer,
+          source: response.source,
+        },
+      ]);
+    } finally {
+      setIsMedbotLoading(false);
+    }
+  };
+
+  const achievements = useMemo<AchievementItem[]>(() => {
+    const cardsViewed = flashcardIndex + (flashcardFlipped ? 1 : 0);
+    const timelineUnlocked = new Set(timelineClicks).size;
+
+    return [
+      {
+        title: 'Explorador de casos',
+        description: diagnosis ? 'Você já analisou um caso clínico nesta sessão.' : 'Analise um caso clínico para desbloquear.',
+        unlocked: Boolean(diagnosis),
+      },
+      {
+        title: 'Mestre dos flashcards',
+        description: cardsViewed >= 2 ? 'Você revisou múltiplos cartões do tema atual.' : 'Vire e avance flashcards para consolidar memória ativa.',
+        unlocked: cardsViewed >= 2,
+      },
+      {
+        title: 'Quiz runner',
+        description: Object.keys(selectedAnswers).length >= selectedTopic.quiz.length ? 'Quiz concluído no tema atual.' : 'Responda todo o quiz para desbloquear.',
+        unlocked: Object.keys(selectedAnswers).length >= selectedTopic.quiz.length,
+      },
+      {
+        title: 'Cronista da medicina',
+        description: timelineUnlocked >= 2 ? 'Você explorou múltiplos marcos da timeline médica.' : 'Clique em marcos da timeline para desbloquear.',
+        unlocked: timelineUnlocked >= 2,
+      },
+      {
+        title: 'Parceiro do MedBot',
+        description: medbotMessages.length > 2 ? 'Você já estudou com o MedBot nesta sessão.' : 'Converse com o MedBot para desbloquear.',
+        unlocked: medbotMessages.length > 2,
+      },
+    ];
+  }, [diagnosis, flashcardFlipped, flashcardIndex, medbotMessages.length, selectedAnswers, selectedTopic.quiz.length, timelineClicks]);
+
+  const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked).length;
+  const studyStats = [
+    { label: 'Temas disponíveis', value: `${STUDY_TOPICS.length}`, icon: NotebookTabs },
+    { label: 'Marcos na timeline', value: `${MEDICAL_TIMELINE.length}`, icon: Milestone },
+    { label: 'Questões ativas', value: `${selectedTopic.quiz.length}`, icon: Target },
+    { label: 'Conquistas', value: `${unlockedAchievements}/${achievements.length}`, icon: Trophy },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-accent/20">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 sm:py-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-3 bg-white/15 rounded-xl backdrop-blur-sm">
-              <Stethoscope className="h-6 w-6 sm:h-8 sm:w-8" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">Dr. IA</h1>
-              <p className="text-primary-foreground/90 text-sm sm:text-base">
-                Simulador de Diagnóstico Interativo
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] text-foreground">
+      <main>
+        <HeroSection
+          unlockedAchievements={unlockedAchievements}
+          achievementTotal={achievements.length}
+          studyStats={studyStats}
+          onExploreCases={() => scrollToSection('casos')}
+          onTalkMedBot={() => scrollToSection('medbot')}
+        />
 
-      {/* Safety Warning */}
-      <SafetyWarning />
+        <TopicGridSection
+          topics={STUDY_TOPICS}
+          onSelectTopic={(topicId) => setSelectedTopicId(topicId)}
+          onAfterSelect={() => scrollToSection('quiz')}
+        />
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8 animate-fade-in">
-          
-          {/* Introduction */}
-          {!patientData && (
-            <Card className="p-6 sm:p-8 bg-gradient-to-r from-card to-accent border-l-4 border-l-primary">
-              <div className="text-center space-y-4">
-                <div className="flex justify-center gap-4 mb-6">
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <Brain className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                  </div>
-                  <div className="p-3 bg-success/10 rounded-full">
-                    <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-success" />
-                  </div>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground">
-                  Bem-vindo ao Dr. IA
-                </h2>
-                <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-                  Sistema educacional avançado para estudantes de medicina praticarem raciocínio clínico 
-                  através de casos simulados baseados em conhecimento médico atualizado e guidelines internacionais.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 text-sm">
-                  <div className="bg-primary/5 p-3 rounded-lg">
-                    <div className="font-medium text-primary">📚 Base Científica</div>
-                    <div className="text-muted-foreground">Algoritmos diagnósticos atualizados</div>
-                  </div>
-                  <div className="bg-success/5 p-3 rounded-lg">
-                    <div className="font-medium text-success">🎯 Casos Reais</div>
-                    <div className="text-muted-foreground">Simulações baseadas em evidências</div>
-                  </div>
-                  <div className="bg-warning/5 p-3 rounded-lg">
-                    <div className="font-medium text-warning">⚡ Triagem Inteligente</div>
-                    <div className="text-muted-foreground">Identificação de emergências</div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
+        <ClinicalCasesSection
+          selectedTopic={selectedTopic}
+          diagnosis={diagnosis}
+          patientData={patientData}
+          isAnalyzing={isAnalyzing}
+          onSubmit={handleFormSubmit}
+          onReset={handleReset}
+        />
 
-          {/* Patient Form */}
-          {!diagnosis && (
-            <PatientForm 
-              onSubmit={handleFormSubmit} 
-              isAnalyzing={isAnalyzing}
-              patientData={patientData}
-            />
-          )}
+        <MedBotSection
+          selectedTopic={selectedTopic}
+          medbotMessages={medbotMessages}
+          medbotInput={medbotInput}
+          isMedbotLoading={isMedbotLoading}
+          onInputChange={setMedbotInput}
+          onAskMedBot={handleAskMedBot}
+        />
 
-          {/* Diagnosis Results */}
-          {diagnosis && patientData && (
-            <DiagnosisResult 
-              diagnosis={diagnosis}
-              patientData={patientData}
-              onReset={handleReset}
-            />
-          )}
-        </div>
+        <StudySection
+          topics={STUDY_TOPICS}
+          selectedTopic={selectedTopic}
+          selectedTopicId={selectedTopicId}
+          onSelectTopic={(topicId) => setSelectedTopicId(topicId)}
+          flashcardIndex={flashcardIndex}
+          flashcardFlipped={flashcardFlipped}
+          onFlipFlashcard={() => setFlashcardFlipped((current) => !current)}
+          onPrevFlashcard={() => {
+            setFlashcardIndex((current) => (current === 0 ? selectedTopic.flashcards.length - 1 : current - 1));
+            setFlashcardFlipped(false);
+          }}
+          onNextFlashcard={() => {
+            setFlashcardIndex((current) => (current === selectedTopic.flashcards.length - 1 ? 0 : current + 1));
+            setFlashcardFlipped(false);
+          }}
+          currentQuestionIndex={currentQuestionIndex}
+          selectedAnswers={selectedAnswers}
+          quizScore={quizScore}
+          onSelectAnswer={(option) => setSelectedAnswers((current) => ({ ...current, [currentQuestionIndex]: option }))}
+          onPrevQuestion={() => setCurrentQuestionIndex((current) => (current === 0 ? 0 : current - 1))}
+          onNextQuestion={() => setCurrentQuestionIndex((current) => (current === selectedTopic.quiz.length - 1 ? 0 : current + 1))}
+          generatedStudyPack={generatedStudyPack}
+          isGeneratingStudyPack={isGeneratingStudyPack}
+          onRegenerateStudyPack={async () => {
+            setIsGeneratingStudyPack(true);
+            try {
+              const pack = await generateStudyPack(selectedTopicId);
+              setGeneratedStudyPack(pack);
+            } finally {
+              setIsGeneratingStudyPack(false);
+            }
+          }}
+        />
+
+        <TimelineSection
+          timeline={MEDICAL_TIMELINE}
+          timelineIndex={timelineIndex}
+          onSelectTimeline={(index) => {
+            setTimelineIndex(index);
+            setTimelineClicks((current) => [...current, index]);
+          }}
+        />
+
+        <AchievementsSection achievements={achievements} unlockedAchievements={unlockedAchievements} />
       </main>
     </div>
   );

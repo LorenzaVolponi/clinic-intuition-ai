@@ -93,27 +93,45 @@ export async function askMedBot(
   question: string,
   topicId: string,
   history: Array<{ role: 'assistant' | 'user'; content: string }> = [],
-  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string },
+  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string; userLevel?: 'iniciante' | 'intermediario' | 'avancado' },
 ) {
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
   try {
-    const response = await postJson<{ answer: string; source: 'groq' | 'local' }>(resolveApiUrl('/api/medbot'), {
+    const response = await postJson<{
+      answer?: string;
+      source: 'groq' | 'local';
+      suggestions?: string[];
+      intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      response?: {
+        content?: { text?: string };
+        suggestions?: string[];
+        intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      };
+    }>(resolveApiUrl('/api/medbot'), {
       topicId,
       question,
       history,
       context,
     });
 
+    const structuredText = response.response?.content?.text;
+    const structuredSuggestions = response.response?.suggestions;
+    const structuredIntent = response.response?.intent;
+
     return {
-      answer: response.answer || localAnswer,
+      answer: structuredText || response.answer || localAnswer,
       source: response.source || 'groq',
+      suggestions: structuredSuggestions || response.suggestions || [],
+      intent: structuredIntent || response.intent,
     };
   } catch (error) {
     console.warn('Falha ao gerar resposta do MedBot via backend. Mantendo fallback local.', error);
     return {
       answer: localAnswer,
       source: 'local' as const,
+      suggestions: ['caso clínico', 'quiz', 'red flags'],
+      intent: 'duvida' as const,
     };
   }
 }

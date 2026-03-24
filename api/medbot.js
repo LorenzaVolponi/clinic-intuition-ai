@@ -1,28 +1,62 @@
 import crypto from 'node:crypto';
 
-const MEDBOT_SYSTEM_PROMPT = `
-Você é um tutor médico educacional com isolamento por sessão.
-- Responda em JSON: {"answer":"...","session_metadata":{"session_uuid":"...","interaction_number":0,"timestamp":"ISO8601"}}.
-- Seja conservador, factual e orientado a segurança clínica.
-- Use apenas contexto da sessão atual.
-`;
+const MEDBOT_SYSTEM_PROMPT = `# ⚕️ MEDBOT
+Responda APENAS em JSON no formato:
+{"response":{"session_id":"string","interaction_id":"string","timestamp":"ISO8601","user_level":"iniciante|intermediario|avancado","intent":"resumo|caso|quiz|medicamento|comparacao|duvida","content":{"text":"markdown","type":"text|case|quiz|medication","metadata":{"topic":"string","sources":["string"],"difficulty":"easy|medium|hard","estimated_read_time":90}},"suggestions":["string"],"session_state":{"total_interactions":1,"topics_covered":["string"],"used_ids":["string"]}}}`;
 
-function buildLocalMedbotAnswer({ topicId, question, context = {}, source = 'local', sessionUuid = 'sessao-local' }) {
-  const objective = context.objective || 'Reforçar raciocínio clínico seguro.';
-  const facts = (context.quickFacts || []).slice(0, 3);
-  const normalized = String(question || '').toLowerCase();
+const sessionCache = new Map();
+const TTL_MS = 24 * 60 * 60 * 1000;
 
-  if (normalized.includes('plano') || normalized.includes('cronograma')) {
-    return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão]\n\nPlano (${topicId}):\n• Objetivo: ${objective}\n• Revisar: ${facts.join(' | ') || 'red flags e exames iniciais'}\n• Resolver 10 questões\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
+function detectIntent(question) {
+  const q = String(question || '').toLowerCase();
+  if (/(quiz|pergunta|quest)/i.test(q)) return 'quiz';
+  if (/(caso|anamnese|simulado)/i.test(q)) return 'caso';
+  if (/(medicamento|dose|farmaco)/i.test(q)) return 'medicamento';
+  if (/(comparar|vs|versus|diferen)/i.test(q)) return 'comparacao';
+  if (/(resumo|revis|red flag)/i.test(q)) return 'resumo';
+  return 'duvida';
+}
+
+function getSessionState(sessionId) {
+  const now = Date.now();
+  const existing = sessionCache.get(sessionId);
+  if (existing && now - existing.lastAccessed < TTL_MS) {
+    existing.lastAccessed = now;
+    return existing;
   }
+  const next = { interactions: [], topics: new Set(), usedIds: new Set(), userLevel: 'intermediario', lastAccessed: now };
+  sessionCache.set(sessionId, next);
+  return next;
+}
 
-  if (normalized.includes('anamnese') || normalized.includes('caso')) {
-    return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão clínica]\n\nAnamnese guiada (${topicId}):\n• queixa principal\n• tempo de evolução\n• **red flags**\n• diferenciais críticos\n• exames que mudam conduta\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
-  }
+function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'intermediario' }) {
+  const intent = detectIntent(question);
+  const interactionId = crypto.randomUUID();
+  const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
 
-  return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão]\n\nResumo (${topicId}): objetivo "${objective}". Pontos-chave: ${
-    facts.join(' | ') || 'hipótese principal, red flags, exames iniciais'
-  }.\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
+  const text = `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura.\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
+
+  return {
+    response: {
+      session_id: sessionUuid,
+      interaction_id: interactionId,
+      timestamp: new Date().toISOString(),
+      user_level: userLevel,
+      intent,
+      content: {
+        text,
+        type: intent === 'quiz' ? 'quiz' : intent === 'caso' ? 'case' : intent === 'medicamento' ? 'medication' : 'text',
+        metadata: {
+          topic: topicId,
+          sources: ['Consenso educacional local 2026'],
+          difficulty,
+          estimated_read_time: 90,
+        },
+      },
+      suggestions: ['caso clínico', 'quiz', 'red flags'],
+      session_state: { total_interactions: 1, topics_covered: [topicId], used_ids: [interactionId] },
+    },
+  };
 }
 
 async function callGroq(messages) {
@@ -30,25 +64,14 @@ async function callGroq(messages) {
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
   const models = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 
-  if (!apiKey) {
-    throw new Error('Backend de IA não configurado.');
-  }
+  if (!apiKey) throw new Error('Backend de IA não configurado.');
 
   let lastError = 'Erro desconhecido ao chamar Groq.';
   for (const model of models) {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        top_p: 0.5,
-        response_format: { type: 'json_object' },
-        messages,
-      }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, temperature: 0.2, top_p: 0.5, response_format: { type: 'json_object' }, messages }),
     });
 
     if (!response.ok) {
@@ -70,24 +93,28 @@ async function callGroq(messages) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { topicId, question, history = [], context = {} } = req.body || {};
+  const { topicId, question, history = [], context = {}, userLevel = 'intermediario' } = req.body || {};
   const sessionUuid = req.headers['x-session-uuid'] || crypto.randomUUID();
-  const interactionNumber = Number(req.headers['x-interaction-number'] || 1);
 
-  if (!topicId || !question) {
-    return res.status(400).json({ error: 'Payload inválido.' });
-  }
+  if (!topicId || !question || String(question).trim().length === 0) return res.status(400).json({ error: 'Payload inválido.' });
+
+  const sessionState = getSessionState(sessionUuid);
+  sessionState.userLevel = userLevel;
+  sessionState.topics.add(topicId);
+
+  const fallback = buildLocalResponse({ topicId, question, sessionUuid, userLevel });
+  sessionState.interactions.push(fallback.response.interaction_id);
+  sessionState.usedIds.add(fallback.response.interaction_id);
+  fallback.response.session_state = {
+    total_interactions: sessionState.interactions.length,
+    topics_covered: [...sessionState.topics],
+    used_ids: [...sessionState.usedIds],
+  };
 
   if (!process.env.GROQ_API_KEY) {
-    return res.status(200).json({
-      answer: buildLocalMedbotAnswer({ topicId, question, context, source: 'local', sessionUuid }),
-      source: 'local',
-      session_metadata: { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
-    });
+    return res.status(200).json({ answer: fallback.response.content.text, response: fallback.response, suggestions: fallback.response.suggestions, intent: fallback.response.intent, source: 'local' });
   }
 
   try {
@@ -95,19 +122,12 @@ export default async function handler(req, res) {
     const contextText = `Objetivo: ${context.objective || 'não informado'}\nPontos-chave: ${(context.quickFacts || []).join(' | ') || 'não informado'}\nResumo clínico: ${context.clinicalSummary || 'não informado'}`;
     const response = await callGroq([
       { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
-      { role: 'user', content: `Tema: ${topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}` },
+      { role: 'user', content: `Tema: ${topicId}\nNível: ${userLevel}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}\nSession UUID: ${sessionUuid}` },
     ]);
 
-    return res.status(200).json({
-      answer: response.answer || 'Resposta indisponível.',
-      source: 'groq',
-      session_metadata: response.session_metadata || { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
-    });
-  } catch (error) {
-    return res.status(200).json({
-      answer: buildLocalMedbotAnswer({ topicId, question, context, source: 'local', sessionUuid }),
-      source: 'local',
-      session_metadata: { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
-    });
+    const normalized = response?.response?.content?.text ? response.response : fallback.response;
+    return res.status(200).json({ answer: normalized.content.text, response: normalized, suggestions: normalized.suggestions, intent: normalized.intent, source: 'groq' });
+  } catch {
+    return res.status(200).json({ answer: fallback.response.content.text, response: fallback.response, suggestions: fallback.response.suggestions, intent: fallback.response.intent, source: 'local' });
   }
 }

@@ -58,11 +58,13 @@ const medbotRequestSchema = z.object({
   topicId: z.string(),
   question: z.string().min(1),
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string() })).optional(),
+  userLevel: z.enum(['iniciante', 'intermediario', 'avancado']).optional(),
   context: z
     .object({
       objective: z.string().optional(),
       quickFacts: z.array(z.string()).optional(),
       clinicalSummary: z.string().optional(),
+      userLevel: z.enum(['iniciante', 'intermediario', 'avancado']).optional(),
     })
     .optional(),
 });
@@ -83,6 +85,8 @@ type SessionData = {
   timestamp: string;
   interactionNumber: number;
 };
+
+type MedbotIntent = 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -119,14 +123,29 @@ const clinicalModelResponseSchema = z.object({
 });
 
 const medbotModelResponseSchema = z.object({
-  answer: z.string().min(1),
-  session_metadata: z
-    .object({
-      session_uuid: z.string(),
-      interaction_number: z.number(),
-      timestamp: z.string(),
-    })
-    .optional(),
+  response: z.object({
+    session_id: z.string(),
+    interaction_id: z.string(),
+    timestamp: z.string(),
+    user_level: z.enum(['iniciante', 'intermediario', 'avancado']),
+    intent: z.enum(['resumo', 'caso', 'quiz', 'medicamento', 'comparacao', 'duvida']),
+    content: z.object({
+      text: z.string().min(1),
+      type: z.enum(['text', 'case', 'quiz', 'medication']),
+      metadata: z.object({
+        topic: z.string(),
+        sources: z.array(z.string()),
+        difficulty: z.enum(['easy', 'medium', 'hard']),
+        estimated_read_time: z.number(),
+      }),
+    }),
+    suggestions: z.array(z.string()).min(1),
+    session_state: z.object({
+      total_interactions: z.number(),
+      topics_covered: z.array(z.string()),
+      used_ids: z.array(z.string()),
+    }),
+  }),
 });
 
 const studyPackModelResponseSchema = z.object({
@@ -457,6 +476,68 @@ function mapClinicalResponse(aiResponse: BackendClinicalModelResponse, fallback:
   };
 }
 
+function detectMedbotIntent(question: string): MedbotIntent {
+  const q = question.toLowerCase();
+  if (/(quiz|pergunta|quest[õo]es)/i.test(q)) return 'quiz';
+  if (/(caso cl[ií]nico|anamnese|simulado)/i.test(q)) return 'caso';
+  if (/(medicamento|dose|farmaco|f[áa]rmaco)/i.test(q)) return 'medicamento';
+  if (/(comparar|vs|versus|diferen[çc]a)/i.test(q)) return 'comparacao';
+  if (/(resumo|pontos-chave|pontos chave|red flag|revis[aã]o)/i.test(q)) return 'resumo';
+  return 'duvida';
+}
+
+function sanitizeMedbotInput(input: string) {
+  const cleaned = String(input || '').trim();
+  if (!cleaned) return { valid: false as const, error: 'Input vazio.' };
+  if (cleaned.length > 500) return { valid: false as const, error: 'Input muito longo (máx 500 caracteres).' };
+  if (/(ignore|system prompt|api key|token|bypass|jailbreak)/i.test(cleaned)) return { valid: false as const, error: 'Input inválido para contexto educacional.' };
+  if (!/[a-zA-ZÀ-ÿ]/.test(cleaned)) return { valid: false as const, error: 'Input fora do contexto textual.' };
+  return { valid: true as const, sanitized: cleaned };
+}
+
+type SessionState = {
+  interactions: string[];
+  topics: Set<string>;
+  usedIds: Set<string>;
+  userLevel: 'iniciante' | 'intermediario' | 'avancado';
+  createdAt: number;
+  lastAccessed: number;
+};
+
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const sessionCache = new Map<string, SessionState>();
+
+function getSessionState(sessionId: string): SessionState {
+  const now = Date.now();
+  const existing = sessionCache.get(sessionId);
+  if (existing && now - existing.lastAccessed < SESSION_TTL_MS) {
+    existing.lastAccessed = now;
+    return existing;
+  }
+  const created: SessionState = {
+    interactions: [],
+    topics: new Set<string>(),
+    usedIds: new Set<string>(),
+    userLevel: 'intermediario',
+    createdAt: now,
+    lastAccessed: now,
+  };
+  sessionCache.set(sessionId, created);
+  return created;
+}
+
+function updateSessionState(sessionId: string, partial: Partial<SessionState>) {
+  const state = getSessionState(sessionId);
+  const next: SessionState = {
+    ...state,
+    ...partial,
+    topics: partial.topics ?? state.topics,
+    usedIds: partial.usedIds ?? state.usedIds,
+    lastAccessed: Date.now(),
+  };
+  sessionCache.set(sessionId, next);
+}
+
 function buildLocalMedbotAnswer(params: {
   topicId: string;
   question: string;
@@ -464,34 +545,55 @@ function buildLocalMedbotAnswer(params: {
   quickFacts?: string[];
   clinicalSummary?: string;
   sessionData: SessionData;
+  userLevel: 'iniciante' | 'intermediario' | 'avancado';
   source: 'local' | 'groq';
 }) {
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
   const question = params.question.toLowerCase();
+  const intent = detectMedbotIntent(params.question);
+  const interactionId = crypto.randomUUID();
+  const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
+  const sourceLabel = params.source === 'local' ? 'Consenso educacional local (atualização recomendada)' : 'Modelo Groq';
 
-  if (question.includes('plano') || question.includes('cronograma')) {
-    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão]\n\nPlano de estudo (${params.topicId}):\n• Objetivo: ${objective}\n• Revisar: ${facts.join(' | ') || 'red flags e exames iniciais'}\n• Praticar: 10 flashcards + 10 questões\n• Fechar com mini-caso clínico\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
+  let text = `📌 **TÓPICO: ${params.topicId}**\n\n🎯 **EM UMA FRASE:**\n${objective}\n\n🔑 **PONTOS-CHAVE:**\n• ${facts[0] || 'Defina hipótese principal com base em história e exame.'}\n• ${facts[1] || 'Priorize exames que mudam conduta nas próximas horas.'}\n• ${facts[2] || 'Reavalie sinais vitais e red flags continuamente.'}\n\n🚨 **RED FLAGS (NÃO IGNORE!):**\n⚠️ Rebaixamento de consciência → encaminhar emergência\n⚠️ Instabilidade hemodinâmica → suporte imediato + supervisão presencial\n\n📖 **BASEADO EM:** ${sourceLabel}\n\n---\n💡 **QUER APROFUNDAR?**\n→ Digite "caso clínico"\n→ Digite "quiz"\n→ Digite "medicamentos"`;
+
+  if (intent === 'caso') {
+    text = `🏥 **CASO CLÍNICO #${interactionId.slice(0, 8).toUpperCase()}**\n\n👤 **PACIENTE:** Adulto com foco em ${params.topicId}\n\n📋 **HISTÓRIA:**\nQueixa principal e evolução temporal objetiva.\n\n🔍 **EXAME FÍSICO:**\n• Priorize sinais vitais e achados focais.\n\n❓ **PERGUNTA:**\nQual hipótese principal e qual conduta imediata?\n\n✅ **CONDUTA CORRETA:**\nEstratificar gravidade, excluir diagnóstico letal e iniciar suporte.\n\n📚 **POR QUÊ:**\n${params.clinicalSummary || 'A conduta inicial deve ser guiada por risco e tempo-dependência.'}\n\n---\n🎯 **QUER MAIS?**\n→ "outro caso"\n→ "mais difícil"\n→ "quiz"`;
   }
 
-  if (question.includes('anamnese') || question.includes('caso')) {
-    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão clínica]\n\n• Queixa principal + tempo de evolução\n• **Red flags** e sinais de gravidade\n• Diferenciais de maior risco\n• Exames iniciais que mudam conduta\nResumo clínico: ${params.clinicalSummary || 'ainda não disponível.'}\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
+  if (intent === 'quiz') {
+    text = `📝 **QUIZ RELÂMPAGO - ${params.topicId.toUpperCase()}**\n\n**Pergunta 1/1**\nQual ação inicial traz mais segurança clínica?\n\nA) Esperar exames tardios\nB) Ignorar red flags\nC) Reavaliar risco + sinais vitais\nD) Definir diagnóstico final sem monitorização\n\n✅ **Resposta:** C\n\n📖 **EXPLICAÇÃO:**\nConduta segura começa pela estabilização e reavaliação contínua.\n\n---\n→ "próxima"\n→ "resumo"\n→ "parar"`;
   }
 
-  if (question.includes('preceptor') || question.includes('socrát')) {
-    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Preceptor Virtual]\n\n1) Qual hipótese principal você defenderia e por quê?\n2) Qual diagnóstico grave precisa excluir primeiro?\n3) Qual exame inicial mudaria conduta nas próximas 2 horas?\n4) Qual sinal faria reclassificar a triagem agora?\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
-  }
+  const suggestions =
+    intent === 'quiz' ? ['próxima', 'resumo', 'caso clínico'] : intent === 'caso' ? ['outro caso', 'mais difícil', 'quiz'] : ['medicamentos', 'caso clínico', 'quiz'];
 
-  if (question.includes('soap') || question.includes('prontuário')) {
-    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Simulador de Prontuário]\n\nS: queixa principal + duração + sintomas associados\nO: sinais vitais + exame físico focal\nA: hipótese principal + grave a excluir + diferencial comum\nP: exames iniciais + conduta imediata + reavaliação\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
-  }
-
-  const urgentPattern = /(dor no peito|falta de ar|desmaio|convuls|fraqueza súbita|confusão intensa)/i;
-  const emergencyNote = urgentPattern.test(params.question)
-    ? '\n⚠️ **Red flag:** sintomas podem indicar emergência. Procure atendimento imediato.'
-    : '';
-
-  return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão]\n\nResumo objetivo (${params.topicId}): ${objective}.\nPontos-chave: ${facts.join(' | ') || 'red flags, hipótese principal e exames iniciais'}.\n${emergencyNote}\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
+  return {
+    response: {
+      session_id: params.sessionData.sessionUuid,
+      interaction_id: interactionId,
+      timestamp: params.sessionData.timestamp,
+      user_level: params.userLevel,
+      intent,
+      content: {
+        text,
+        type: intent === 'quiz' ? 'quiz' : intent === 'caso' ? 'case' : intent === 'medicamento' ? 'medication' : 'text',
+        metadata: {
+          topic: params.topicId,
+          sources: [sourceLabel],
+          difficulty,
+          estimated_read_time: Math.max(45, Math.ceil(text.length / 12)),
+        },
+      },
+      suggestions,
+      session_state: {
+        total_interactions: params.sessionData.interactionNumber,
+        topics_covered: [params.topicId],
+        used_ids: [interactionId],
+      },
+    },
+  };
 }
 
 type RequestCounter = { count: number; resetAt: number };
@@ -557,6 +659,12 @@ function sessionIsolation(req: express.Request, _res: express.Response, next: ex
     timestamp: new Date().toISOString(),
     interactionNumber,
   };
+
+  for (const [key, state] of sessionCache.entries()) {
+    if (Date.now() - state.lastAccessed >= SESSION_TTL_MS) {
+      sessionCache.delete(key);
+    }
+  }
 
   next();
 }
@@ -626,24 +734,45 @@ export function createApp() {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
     }
+    const sanitized = sanitizeMedbotInput(parsed.data.question);
+    if (!sanitized.valid) {
+      return res.status(400).json({ error: sanitized.error });
+    }
+    const sessionId = (req.sessionData as SessionData).sessionUuid;
+    const sessionState = getSessionState(sessionId);
+    const userLevel = parsed.data.userLevel || parsed.data.context?.userLevel || sessionState.userLevel;
+    sessionState.userLevel = userLevel;
+    sessionState.topics.add(parsed.data.topicId);
 
     if (!groqApiKey) {
-      return res.json({
-        answer: buildLocalMedbotAnswer({
-          topicId: parsed.data.topicId,
-          question: parsed.data.question,
-          objective: parsed.data.context?.objective,
-          quickFacts: parsed.data.context?.quickFacts,
-          clinicalSummary: parsed.data.context?.clinicalSummary,
-          sessionData: req.sessionData as SessionData,
-          source: 'local',
-        }),
+      const fallback = buildLocalMedbotAnswer({
+        topicId: parsed.data.topicId,
+        question: sanitized.sanitized,
+        objective: parsed.data.context?.objective,
+        quickFacts: parsed.data.context?.quickFacts,
+        clinicalSummary: parsed.data.context?.clinicalSummary,
+        sessionData: req.sessionData as SessionData,
+        userLevel,
         source: 'local',
-        session_metadata: {
-          session_uuid: (req.sessionData as SessionData).sessionUuid,
-          interaction_number: (req.sessionData as SessionData).interactionNumber,
-          timestamp: (req.sessionData as SessionData).timestamp,
+      });
+      sessionState.interactions.push(fallback.response.interaction_id);
+      sessionState.usedIds.add(fallback.response.interaction_id);
+      updateSessionState(sessionId, sessionState);
+
+      return res.json({
+        answer: fallback.response.content.text,
+        response: {
+          ...fallback.response,
+          session_state: {
+            ...fallback.response.session_state,
+            total_interactions: sessionState.interactions.length,
+            topics_covered: [...sessionState.topics],
+            used_ids: [...sessionState.usedIds],
+          },
         },
+        source: 'local',
+        suggestions: fallback.response.suggestions,
+        intent: fallback.response.intent,
       });
     }
 
@@ -656,54 +785,69 @@ export function createApp() {
         { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Tema: ${parsed.data.topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
+          content: `Tema: ${parsed.data.topicId}\nNível: ${userLevel}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${sanitized.sanitized}\nSession UUID: ${(req.sessionData as SessionData).sessionUuid}\nTimestamp: ${(req.sessionData as SessionData).timestamp}\nInteraction: ${(req.sessionData as SessionData).interactionNumber}`,
         },
       ]);
       const response = medbotModelResponseSchema.safeParse(rawResponse);
+      const fallback = buildLocalMedbotAnswer({
+        topicId: parsed.data.topicId,
+        question: sanitized.sanitized,
+        objective: parsed.data.context?.objective,
+        quickFacts: parsed.data.context?.quickFacts,
+        clinicalSummary: parsed.data.context?.clinicalSummary,
+        sessionData: req.sessionData as SessionData,
+        userLevel,
+        source: 'groq',
+      });
+      const normalized = response.success ? response.data.response : fallback.response;
+      sessionState.interactions.push(normalized.interaction_id);
+      sessionState.usedIds.add(normalized.interaction_id);
+      updateSessionState(sessionId, sessionState);
 
       return res.json({
-        answer: response.success
-          ? response.data.answer
-          : buildLocalMedbotAnswer({
-              topicId: parsed.data.topicId,
-              question: parsed.data.question,
-              objective: parsed.data.context?.objective,
-              quickFacts: parsed.data.context?.quickFacts,
-              clinicalSummary: parsed.data.context?.clinicalSummary,
-              sessionData: req.sessionData as SessionData,
-              source: 'local',
-            }),
+        answer: normalized.content.text,
+        response: {
+          ...normalized,
+          session_state: {
+            ...normalized.session_state,
+            total_interactions: sessionState.interactions.length,
+            topics_covered: [...sessionState.topics],
+            used_ids: [...sessionState.usedIds],
+          },
+        },
         source: 'groq',
-        session_metadata: response.success
-          ? response.data.session_metadata || {
-              session_uuid: (req.sessionData as SessionData).sessionUuid,
-              interaction_number: (req.sessionData as SessionData).interactionNumber,
-              timestamp: (req.sessionData as SessionData).timestamp,
-            }
-          : {
-              session_uuid: (req.sessionData as SessionData).sessionUuid,
-              interaction_number: (req.sessionData as SessionData).interactionNumber,
-              timestamp: (req.sessionData as SessionData).timestamp,
-            },
+        suggestions: normalized.suggestions,
+        intent: normalized.intent,
       });
     } catch (error) {
       console.error('medbot error', error);
-      return res.json({
-        answer: buildLocalMedbotAnswer({
-          topicId: parsed.data.topicId,
-          question: parsed.data.question,
-          objective: parsed.data.context?.objective,
-          quickFacts: parsed.data.context?.quickFacts,
-          clinicalSummary: parsed.data.context?.clinicalSummary,
-          sessionData: req.sessionData as SessionData,
-          source: 'local',
-        }),
+      const fallback = buildLocalMedbotAnswer({
+        topicId: parsed.data.topicId,
+        question: sanitized.sanitized,
+        objective: parsed.data.context?.objective,
+        quickFacts: parsed.data.context?.quickFacts,
+        clinicalSummary: parsed.data.context?.clinicalSummary,
+        sessionData: req.sessionData as SessionData,
+        userLevel,
         source: 'local',
-        session_metadata: {
-          session_uuid: (req.sessionData as SessionData).sessionUuid,
-          interaction_number: (req.sessionData as SessionData).interactionNumber,
-          timestamp: (req.sessionData as SessionData).timestamp,
+      });
+      sessionState.interactions.push(fallback.response.interaction_id);
+      sessionState.usedIds.add(fallback.response.interaction_id);
+      updateSessionState(sessionId, sessionState);
+      return res.json({
+        answer: fallback.response.content.text,
+        response: {
+          ...fallback.response,
+          session_state: {
+            ...fallback.response.session_state,
+            total_interactions: sessionState.interactions.length,
+            topics_covered: [...sessionState.topics],
+            used_ids: [...sessionState.usedIds],
+          },
         },
+        source: 'local',
+        suggestions: fallback.response.suggestions,
+        intent: fallback.response.intent,
       });
     }
   });

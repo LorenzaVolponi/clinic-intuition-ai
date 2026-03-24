@@ -21,8 +21,11 @@ const LOCAL_STORAGE_KEYS = {
 
 const DEFAULT_MEDBOT_MESSAGE: ChatMessage = {
   role: 'assistant',
-  content: 'Olá! Eu sou o MedBot. Posso resumir temas, montar revisão rápida, comparar diagnósticos e sugerir perguntas de estudo.',
+  content:
+    '👋 Olá! Sou o MedBot, seu assistente de estudos médicos.\n\nPosso te ajudar com:\n• 📚 resumos rápidos\n• 🏥 casos clínicos\n• 📝 quiz interativo\n• 💊 farmacologia\n• ⚠️ red flags\n\nQual tema você quer dominar hoje? 🚀',
   source: 'local',
+  suggestions: ['resumo sepse', 'caso clínico IAM', 'quiz AVC'],
+  intent: 'duvida',
 };
 
 const Index = () => {
@@ -183,6 +186,7 @@ const Index = () => {
           objective: selectedTopic.objective,
           quickFacts: selectedTopic.quickFacts,
           clinicalSummary: diagnosis?.clinicalSummary,
+          userLevel: 'intermediario',
         },
       );
 
@@ -192,6 +196,8 @@ const Index = () => {
           role: 'assistant',
           content: response.answer,
           source: response.source,
+          suggestions: response.suggestions,
+          intent: response.intent,
         },
       ]);
     } finally {

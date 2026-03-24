@@ -91,3 +91,4 @@ curl -X POST http://localhost:8787/api/medbot \
 Se você quer um passo a passo direto para rodar, validar, commitar e subir PR sem erro:
 
 - Veja `docs/UPDATE_RUNBOOK.md`.
+- Documentação técnica completa: `docs/TECHNICAL_DOCUMENTATION.md`.

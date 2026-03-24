@@ -39,7 +39,7 @@ async function callGroq(topicId) {
     {
       role: 'system',
       content:
-        'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10], flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
+        'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10] (preferencialmente aula_rapida estruturada), flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
     },
     { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador para mobile.` },
   ];
@@ -160,11 +160,21 @@ function normalizePack(topicId, aiPack) {
     meta: aiPack.meta || { topic: topicId, generated_at: new Date().toISOString(), safety_warning: topicId === 'emergencias' },
     topicId: aiPack.topicId || aiPack.meta?.topic || topicId,
     generatedAt: aiPack.generatedAt || aiPack.meta?.generated_at || new Date().toISOString(),
-    lessons: (aiPack.lessons || []).map((lesson) => ({
-      title: lesson.title,
-      content: lesson.content,
-      topicId: lesson.topicId || topicId,
-    })),
+    lessons: (aiPack.lessons || []).map((lesson, index) => {
+      if (lesson.title && lesson.content) {
+        return {
+          title: lesson.title,
+          content: lesson.content,
+          topicId: lesson.topicId || topicId,
+        };
+      }
+      const aula = lesson.aula_rapida || {};
+      return {
+        title: `Aula rápida ${index + 1} • ${aula.topico || topicId}`,
+        content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+        topicId,
+      };
+    }),
     quiz,
     flashcards,
   };

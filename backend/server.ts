@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
+import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, QUICK_LESSON_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
 
 dotenv.config();
@@ -139,7 +139,35 @@ const studyPackModelResponseSchema = z.object({
     .optional(),
   topicId: z.string().optional(),
   generatedAt: z.string().optional(),
-  lessons: z.array(z.object({ title: z.string(), content: z.string(), topicId: z.string().optional() })).optional(),
+  lessons: z
+    .array(
+      z.union([
+        z.object({ title: z.string(), content: z.string(), topicId: z.string().optional() }),
+        z.object({
+          aula_rapida: z.object({
+            id: z.string().optional(),
+            topico: z.string(),
+            tempo_estimado_leitura: z.string().optional(),
+            nivel: z.string().optional(),
+            '1_gancho_clinico': z.object({ descricao: z.string(), pergunta_provocativa: z.string() }).optional(),
+            '2_explicacao_direta': z
+              .object({
+                conceito_chave: z.string(),
+                fisiopatologia_simplificada: z.string().optional(),
+                pontos_essenciais: z.array(z.string()).optional(),
+              })
+              .optional(),
+            '5_red_flags': z
+              .object({
+                flags: z.array(z.object({ sinal: z.string(), por_que_grave: z.string(), conduta_imediata: z.string() })).optional(),
+              })
+              .optional(),
+            '7_resumo_bolso': z.object({ frase_unico: z.string().optional(), fluxograma_simplificado: z.array(z.string()).optional() }).optional(),
+          }),
+        }),
+      ]),
+    )
+    .optional(),
   flashcards: z
     .array(
       z
@@ -317,11 +345,25 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     topicId: payload.topicId || payload.meta?.topic || topicId,
     generatedAt: payload.generatedAt || payload.meta?.generated_at || new Date().toISOString(),
     lessons:
-      payload.lessons?.map((lesson) => ({
-        title: lesson.title,
-        content: lesson.content,
-        topicId: lesson.topicId || topicId,
-      })) || [],
+      payload.lessons?.map((lesson, index) => {
+        if ('title' in lesson) {
+          return {
+            title: lesson.title,
+            content: lesson.content,
+            topicId: lesson.topicId || topicId,
+          };
+        }
+        const aula = lesson.aula_rapida;
+        return {
+          title: `Aula rápida ${index + 1} • ${aula.topico}`,
+          content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
+            aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
+          }\nRed flags: ${
+            aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
+          }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+          topicId,
+        };
+      }) || [],
     flashcards: payload.flashcards.map((card, index) => ({
       id: card.id || `${topicId}-flashcard-${index + 1}`,
       front: card.front || card.question || 'Conceito clínico',
@@ -680,11 +722,11 @@ export function createApp() {
       const rawResponse = await callGroq([
         {
           role: 'system',
-          content: STUDY_PACK_SYSTEM_PROMPT,
+          content: `${STUDY_PACK_SYSTEM_PROMPT}\n\n${QUICK_LESSON_SYSTEM_PROMPT}`,
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10), flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);

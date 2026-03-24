@@ -88,6 +88,9 @@ export function validateClinicalResponse({
     const symptomSupported = includesAny(symptoms, rule.symptomKeys);
 
     if (mentionsRuleInPrimaryHypothesis && mentionsRuleInJustification && !symptomSupported) {
+
+  for (const rule of UNSUPPORTED_TERM_RULES) {
+    if (includesAny(justificationBlob, rule.trigger) && !includesAny(symptoms, rule.symptomKeys)) {
       errors.push(`Possível alucinação clínica ao mencionar: ${rule.trigger.join(', ')}`);
     }
   }

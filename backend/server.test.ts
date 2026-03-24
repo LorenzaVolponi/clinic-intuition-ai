@@ -31,6 +31,7 @@ describe('backend server routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.lessons).toHaveLength(10);
     expect(response.body.quiz).toHaveLength(10);
+    expect(response.body.flashcards).toHaveLength(10);
   });
 
   it('POST /api/medbot sem provedor retorna fallback local', async () => {

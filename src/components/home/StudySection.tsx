@@ -77,9 +77,10 @@ export const StudySection = ({
       </div>
 
       <Tabs defaultValue="flashcards" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-4 sm:rounded-full">
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-5 sm:rounded-full">
           <TabsTrigger value="flashcards" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards</TabsTrigger>
           <TabsTrigger value="quiz" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz</TabsTrigger>
+          <TabsTrigger value="flashcards-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards IA</TabsTrigger>
           <TabsTrigger value="quiz-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
           <TabsTrigger value="aulas" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
         </TabsList>
@@ -130,6 +131,30 @@ export const StudySection = ({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="flashcards-ai">
+          <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>Flashcards gerados por IA</CardTitle>
+                <CardDescription>10 cartões novos para revisão ativa em cada geração.</CardDescription>
+              </div>
+              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novos'}
+              </Button>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {generatedStudyPack?.flashcards.map((card, index) => (
+                <details key={`${card.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">{card.question}</summary>
+                  <p className="mt-3 text-sm leading-6 text-slate-700">{card.answer}</p>
+                  <p className="mt-2 text-xs text-slate-500"><strong>Dica:</strong> {card.hint}</p>
+                </details>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="quiz">

@@ -46,6 +46,12 @@ const localAssessmentSchema = z.object({
 const clinicalRequestSchema = z.object({
   patientData: patientDataSchema,
   localAssessment: localAssessmentSchema,
+  context: z
+    .object({
+      topicId: z.string().optional(),
+      objective: z.string().optional(),
+    })
+    .optional(),
 });
 
 const medbotRequestSchema = z.object({
@@ -107,6 +113,7 @@ const studyPackModelResponseSchema = z.object({
   topicId: z.string(),
   generatedAt: z.string(),
   lessons: z.array(z.object({ title: z.string(), content: z.string(), topicId: z.string() })).min(1),
+  flashcards: z.array(z.object({ question: z.string(), answer: z.string(), hint: z.string() })).min(1),
   quiz: z.array(
     z.object({
       question: z.string(),
@@ -198,6 +205,11 @@ function buildLocalStudyPack(topicId: string) {
     topicId,
     generatedAt: new Date().toISOString(),
     lessons,
+    flashcards: Array.from({ length: 10 }, (_, index) => ({
+      question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
+      answer: shuffle(base.lessons)[0],
+      hint: 'Relacione o conceito com red flags e decisão inicial.',
+    })),
     quiz,
   };
 }
@@ -353,9 +365,13 @@ export function createApp() {
     }
 
     try {
+      const contextBlock = parsed.data.context
+        ? `Tema educacional: ${parsed.data.context.topicId || 'não informado'}\nObjetivo de estudo: ${parsed.data.context.objective || 'não informado'}`
+        : 'Sem contexto educacional adicional.';
+
       const rawAiResponse = await callGroq([
         { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
-        { role: 'user', content: buildClinicalUserPrompt(parsed.data) },
+        { role: 'user', content: `${buildClinicalUserPrompt(parsed.data)}\n${contextBlock}\nSe o tema for emergências clínicas, detalhe red flags e priorização de risco.` },
       ]);
       const aiResponse = clinicalModelResponseSchema.parse(rawAiResponse);
 
@@ -436,11 +452,11 @@ export function createApp() {
         {
           role: 'system',
           content:
-            'Você é um tutor médico educacional. Gere JSON factual e conservador. Sem inventar diretrizes. Inclua 10 aulas objetivas e 10 perguntas de quiz com 4 opções.',
+            'Você é um tutor médico educacional. Gere JSON factual e conservador. Sem inventar diretrizes. Inclua 10 aulas objetivas, 10 flashcards e 10 perguntas de quiz com 4 opções.',
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Formato JSON com topicId, generatedAt, lessons[], quiz[].`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Formato JSON com topicId, generatedAt, lessons[], flashcards[], quiz[].`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);

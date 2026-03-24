@@ -43,6 +43,7 @@ export interface GeneratedStudyPack {
   generatedAt: string;
   lessons: StudyLesson[];
   quiz: QuizQuestion[];
+  flashcards: FlashcardItem[];
 }
 
 export const STUDY_TOPICS: StudyTopic[] = [
@@ -382,11 +383,21 @@ export function generateRandomStudyPack(topicId: string): GeneratedStudyPack {
   ).slice(0, 10);
 
   const quiz = shuffleArray(buildQuizPool()).slice(0, 10);
+  const flashcards = shuffleArray(
+    STUDY_TOPICS.flatMap((item) =>
+      item.flashcards.map((card) => ({
+        question: `[${item.title}] ${card.question}`,
+        answer: card.answer,
+        hint: card.hint,
+      })),
+    ),
+  ).slice(0, 10);
 
   return {
     topicId: topic.id,
     generatedAt: new Date().toISOString(),
     lessons,
     quiz,
+    flashcards,
   };
 }

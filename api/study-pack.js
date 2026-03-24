@@ -38,7 +38,7 @@ async function callGroq(topicId) {
     {
       role: 'system',
       content:
-        'Você é um tutor médico educacional. Gere SOMENTE JSON com topicId, generatedAt, lessons[10], quiz[10]. Cada lesson: title e content. Cada quiz: question, options(4), answer, explanation.',
+        'Você é um tutor médico educacional. Gere SOMENTE JSON com topicId, generatedAt, lessons[10], quiz[10], flashcards[10]. Cada lesson: title e content. Cada quiz: question, options(4), answer, explanation. Cada flashcard: question, answer, hint.',
     },
     { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador.` },
   ];
@@ -108,6 +108,11 @@ function buildLocalPack(topicId) {
     generatedAt: new Date().toISOString(),
     lessons,
     quiz,
+    flashcards: Array.from({ length: 10 }, (_, idx) => ({
+      question: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]}`,
+      answer: shuffle(base.lessons)[0],
+      hint: 'Relacione com red flags e conduta inicial.',
+    })),
   };
 }
 
@@ -122,12 +127,21 @@ export default async function handler(req, res) {
   }
 
   const aiPack = await callGroq(parsed.data.topicId);
-  if (aiPack && Array.isArray(aiPack.lessons) && aiPack.lessons.length >= 10 && Array.isArray(aiPack.quiz) && aiPack.quiz.length >= 10) {
+  if (
+    aiPack &&
+    Array.isArray(aiPack.lessons) &&
+    aiPack.lessons.length >= 10 &&
+    Array.isArray(aiPack.quiz) &&
+    aiPack.quiz.length >= 10 &&
+    Array.isArray(aiPack.flashcards) &&
+    aiPack.flashcards.length >= 10
+  ) {
     return res.status(200).json({
       topicId: aiPack.topicId || parsed.data.topicId,
       generatedAt: aiPack.generatedAt || new Date().toISOString(),
       lessons: aiPack.lessons.slice(0, 10),
       quiz: aiPack.quiz.slice(0, 10),
+      flashcards: aiPack.flashcards.slice(0, 10),
     });
   }
 

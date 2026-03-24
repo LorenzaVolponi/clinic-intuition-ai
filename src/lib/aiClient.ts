@@ -59,7 +59,7 @@ function normalizeBackendAssessment(response: ClinicalApiResponse, localAssessme
   };
 }
 
-export async function analyzeClinicalCase(patientData: PatientData): Promise<ClinicalAssessment> {
+export async function analyzeClinicalCase(patientData: PatientData, context?: { topicId?: string; objective?: string }): Promise<ClinicalAssessment> {
   const localAssessment = buildLocalAssessment(patientData);
 
   try {
@@ -67,6 +67,7 @@ export async function analyzeClinicalCase(patientData: PatientData): Promise<Cli
       patientData,
       localAssessment,
       promptPreview: generateClinicalPrompt(patientData, localAssessment),
+      context,
     });
 
     return normalizeBackendAssessment(backendResponse, localAssessment);
@@ -108,7 +109,14 @@ export async function askMedBot(
 export async function generateStudyPack(topicId: string): Promise<GeneratedStudyPack> {
   try {
     const response = await postJson<GeneratedStudyPack>('/api/study-pack', { topicId });
-    if (Array.isArray(response.quiz) && Array.isArray(response.lessons) && response.quiz.length > 0 && response.lessons.length > 0) {
+    if (
+      Array.isArray(response.quiz) &&
+      Array.isArray(response.lessons) &&
+      Array.isArray(response.flashcards) &&
+      response.quiz.length > 0 &&
+      response.lessons.length > 0 &&
+      response.flashcards.length > 0
+    ) {
       return response;
     }
     return generateRandomStudyPack(topicId);

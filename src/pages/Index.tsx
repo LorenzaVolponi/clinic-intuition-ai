@@ -26,6 +26,8 @@ const DEFAULT_MEDBOT_MESSAGE: ChatMessage = {
   source: 'local',
   suggestions: ['resumo sepse', 'caso clínico IAM', 'quiz AVC'],
   intent: 'duvida',
+  content: 'Olá! Eu sou o MedBot. Posso resumir temas, montar revisão rápida, comparar diagnósticos e sugerir perguntas de estudo.',
+  source: 'local',
 };
 
 const Index = () => {

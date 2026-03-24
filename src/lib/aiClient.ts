@@ -94,6 +94,7 @@ export async function askMedBot(
   topicId: string,
   history: Array<{ role: 'assistant' | 'user'; content: string }> = [],
   context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string; userLevel?: 'iniciante' | 'intermediario' | 'avancado' },
+  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string },
 ) {
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
@@ -109,6 +110,7 @@ export async function askMedBot(
         intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
       };
     }>(resolveApiUrl('/api/medbot'), {
+    const response = await postJson<{ answer: string; source: 'groq' | 'local' }>(resolveApiUrl('/api/medbot'), {
       topicId,
       question,
       history,
@@ -124,6 +126,9 @@ export async function askMedBot(
       source: response.source || 'groq',
       suggestions: structuredSuggestions || response.suggestions || [],
       intent: structuredIntent || response.intent,
+    return {
+      answer: response.answer || localAnswer,
+      source: response.source || 'groq',
     };
   } catch (error) {
     console.warn('Falha ao gerar resposta do MedBot via backend. Mantendo fallback local.', error);

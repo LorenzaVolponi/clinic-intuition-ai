@@ -392,6 +392,27 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
       hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
     })),
     quiz: quizItems,
+    quiz: payload.quiz.map((item, index) => {
+      const options = optionsFrom(item);
+      const answer = answerFrom(item);
+      return {
+        id: item.id || `${topicId}-quiz-${index + 1}`,
+        difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
+        scenario: item.scenario || '',
+        question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
+        options,
+        optionObjects: item.options.map((opt, idx) =>
+          typeof opt === 'string' ? { id: String.fromCharCode(65 + idx) as 'A' | 'B' | 'C' | 'D', text: opt } : opt,
+        ),
+        correct_option_id:
+          item.correct_option_id ||
+          (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) &&
+            (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) as { id?: 'A' | 'B' | 'C' | 'D' }).id) ||
+          'A',
+        answer,
+        explanation: item.explanation,
+      };
+    }),
   };
 }
 

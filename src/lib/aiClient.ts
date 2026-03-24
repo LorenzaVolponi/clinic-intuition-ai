@@ -5,7 +5,7 @@ import {
   generateClinicalPrompt,
   PatientData,
 } from '@/lib/medicalKnowledge';
-import { buildLocalStudyResponse } from '@/lib/studyContent';
+import { buildLocalStudyResponse, generateRandomStudyPack, GeneratedStudyPack } from '@/lib/studyContent';
 
 interface ClinicalApiResponse {
   hypotheses: DiagnosisHypothesis[];
@@ -96,5 +96,18 @@ export async function askMedBot(question: string, topicId: string, history: Arra
       answer: localAnswer,
       source: 'local' as const,
     };
+  }
+}
+
+export async function generateStudyPack(topicId: string): Promise<GeneratedStudyPack> {
+  try {
+    const response = await postJson<GeneratedStudyPack>('/api/study-pack', { topicId });
+    if (Array.isArray(response.quiz) && Array.isArray(response.lessons) && response.quiz.length > 0 && response.lessons.length > 0) {
+      return response;
+    }
+    return generateRandomStudyPack(topicId);
+  } catch (error) {
+    console.warn('Falha ao gerar estudo no backend. Mantendo geração local.', error);
+    return generateRandomStudyPack(topicId);
   }
 }

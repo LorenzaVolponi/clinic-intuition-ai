@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GeneratedStudyPack, StudyTopic } from '@/lib/studyContent';
+import { RefreshCcw } from 'lucide-react';
 import { StudyTopic } from '@/lib/studyContent';
 
 interface StudySectionProps {
@@ -22,6 +24,9 @@ interface StudySectionProps {
   onSelectAnswer: (option: string) => void;
   onPrevQuestion: () => void;
   onNextQuestion: () => void;
+  generatedStudyPack: GeneratedStudyPack | null;
+  isGeneratingStudyPack: boolean;
+  onRegenerateStudyPack: () => void;
 }
 
 export const StudySection = ({
@@ -70,9 +75,11 @@ export const StudySection = ({
       </div>
 
       <Tabs defaultValue="flashcards" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-full bg-white p-1 shadow-sm">
-          <TabsTrigger value="flashcards" className="rounded-full py-3 text-base font-semibold">Flashcards</TabsTrigger>
-          <TabsTrigger value="quiz" className="rounded-full py-3 text-base font-semibold">Quiz</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-4 sm:rounded-full">
+          <TabsTrigger value="flashcards" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards</TabsTrigger>
+          <TabsTrigger value="quiz" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz</TabsTrigger>
+          <TabsTrigger value="quiz-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
+          <TabsTrigger value="aulas" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flashcards">
@@ -204,6 +211,55 @@ export const StudySection = ({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="quiz-ai">
+          <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>Quiz randômico com 10 perguntas</CardTitle>
+                <CardDescription>Novo conjunto a cada geração para treino rápido de retenção.</CardDescription>
+              </div>
+              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} className="rounded-full">
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novo quiz'}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {generatedStudyPack?.quiz.map((question, index) => (
+                <div key={`${question.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-white p-4">
+                  <p className="font-semibold text-slate-900">{index + 1}. {question.question}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                    {question.options.map((option) => <li key={`${index}-${option}`}>{option}</li>)}
+                  </ul>
+                  <p className="mt-2 text-sm text-emerald-700"><strong>Resposta:</strong> {question.answer}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="aulas">
+          <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>10 aulas rápidas geradas dinamicamente</CardTitle>
+                <CardDescription>Conteúdo curto para revisão guiada e prática clínica.</CardDescription>
+              </div>
+              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {isGeneratingStudyPack ? 'Atualizando...' : 'Atualizar aulas'}
+              </Button>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {generatedStudyPack?.lessons.map((lesson, index) => (
+                <div key={`${lesson.title}-${index}`} className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
+                  <p className="text-sm font-bold text-slate-900">{lesson.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600 whitespace-pre-line">{lesson.content}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </section>

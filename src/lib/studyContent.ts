@@ -32,6 +32,19 @@ export interface TimelineMilestone {
   impact: string;
 }
 
+export interface StudyLesson {
+  title: string;
+  content: string;
+  topicId: string;
+}
+
+export interface GeneratedStudyPack {
+  topicId: string;
+  generatedAt: string;
+  lessons: StudyLesson[];
+  quiz: QuizQuestion[];
+}
+
 export const STUDY_TOPICS: StudyTopic[] = [
   {
     id: 'emergencias',
@@ -321,4 +334,59 @@ export function buildLocalStudyResponse(input: string, topicId: string) {
   }
 
   return `Resumo de ${topic.title}: ${topic.description} Objetivo principal: ${topic.objective} Pontos de memorização: ${topic.quickFacts.join(' | ')}.`;
+}
+
+function shuffleArray<T>(items: T[]) {
+  const array = [...items];
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function buildLessonPool() {
+  return STUDY_TOPICS.flatMap((topic) => {
+    const quickFactLessons = topic.quickFacts.map((fact, index) => ({
+      topicId: topic.id,
+      title: `${topic.title} • Aula rápida ${index + 1}`,
+      content: `${fact} Objetivo da aula: ${topic.objective}`,
+    }));
+
+    const flashcardLessons = topic.flashcards.map((card, index) => ({
+      topicId: topic.id,
+      title: `${topic.title} • Revisão clínica ${index + 1}`,
+      content: `Pergunta-chave: ${card.question}\nConceito central: ${card.answer}\nDica de fixação: ${card.hint}`,
+    }));
+
+    return [...quickFactLessons, ...flashcardLessons];
+  });
+}
+
+function buildQuizPool() {
+  return STUDY_TOPICS.flatMap((topic) =>
+    topic.quiz.map((question) => ({
+      ...question,
+      options: shuffleArray(question.options),
+    })),
+  );
+}
+
+export function generateRandomStudyPack(topicId: string): GeneratedStudyPack {
+  const topic = getTopicById(topicId);
+  const lessons = shuffleArray(
+    buildLessonPool().map((lesson) => ({
+      ...lesson,
+      content: `${lesson.content}\nAplicação prática em ${topic.title}: conecte com red flags e exames iniciais.`,
+    })),
+  ).slice(0, 10);
+
+  const quiz = shuffleArray(buildQuizPool()).slice(0, 10);
+
+  return {
+    topicId: topic.id,
+    generatedAt: new Date().toISOString(),
+    lessons,
+    quiz,
+  };
 }

@@ -23,4 +23,22 @@ describe('backend server routes', () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('Payload inválido.');
   });
+
+  it('POST /api/study-pack gera pacote com 10 aulas e 10 perguntas', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/study-pack').send({ topicId: 'cardiologia' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.lessons).toHaveLength(10);
+    expect(response.body.quiz).toHaveLength(10);
+  });
+
+  it('POST /api/medbot sem provedor retorna fallback local', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/medbot').send({ topicId: 'cardiologia', question: 'como estudar?' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('local');
+    expect(typeof response.body.answer).toBe('string');
+  });
 });

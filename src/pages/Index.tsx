@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { askMedBot, analyzeClinicalCase } from '@/lib/aiClient';
+import { askMedBot, analyzeClinicalCase, generateStudyPack } from '@/lib/aiClient';
 import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
-import { MEDICAL_TIMELINE, STUDY_TOPICS, getTopicById } from '@/lib/studyContent';
+import { GeneratedStudyPack, MEDICAL_TIMELINE, STUDY_TOPICS, getTopicById } from '@/lib/studyContent';
 import { AchievementsSection } from '@/components/home/AchievementsSection';
 import { ClinicalCasesSection } from '@/components/home/ClinicalCasesSection';
 import { HeroSection } from '@/components/home/HeroSection';
@@ -38,6 +38,8 @@ const Index = () => {
   const [medbotInput, setMedbotInput] = useState('');
   const [isMedbotLoading, setIsMedbotLoading] = useState(false);
   const [medbotMessages, setMedbotMessages] = useState<ChatMessage[]>([DEFAULT_MEDBOT_MESSAGE]);
+  const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
+  const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
 
   const selectedTopic = useMemo(() => getTopicById(selectedTopicId), [selectedTopicId]);
   const quizScore = selectedTopic.quiz.reduce((score, question, index) => {
@@ -74,6 +76,20 @@ const Index = () => {
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.selectedTopicId, selectedTopicId);
+  }, [selectedTopicId]);
+
+  useEffect(() => {
+    const loadStudyPack = async () => {
+      setIsGeneratingStudyPack(true);
+      try {
+        const pack = await generateStudyPack(selectedTopicId);
+        setGeneratedStudyPack(pack);
+      } finally {
+        setIsGeneratingStudyPack(false);
+      }
+    };
+
+    loadStudyPack();
   }, [selectedTopicId]);
 
   useEffect(() => {
@@ -184,7 +200,7 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] text-foreground">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] text-foreground">
       <main>
         <HeroSection
           unlockedAchievements={unlockedAchievements}
@@ -240,6 +256,17 @@ const Index = () => {
           onSelectAnswer={(option) => setSelectedAnswers((current) => ({ ...current, [currentQuestionIndex]: option }))}
           onPrevQuestion={() => setCurrentQuestionIndex((current) => (current === 0 ? 0 : current - 1))}
           onNextQuestion={() => setCurrentQuestionIndex((current) => (current === selectedTopic.quiz.length - 1 ? 0 : current + 1))}
+          generatedStudyPack={generatedStudyPack}
+          isGeneratingStudyPack={isGeneratingStudyPack}
+          onRegenerateStudyPack={async () => {
+            setIsGeneratingStudyPack(true);
+            try {
+              const pack = await generateStudyPack(selectedTopicId);
+              setGeneratedStudyPack(pack);
+            } finally {
+              setIsGeneratingStudyPack(false);
+            }
+          }}
         />
 
         <TimelineSection

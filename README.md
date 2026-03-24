@@ -36,10 +36,12 @@ BACKEND_PORT=8787
 
 - endpoint `POST /api/clinical-analysis` com prompt de sistema clínico rigoroso;
 - endpoint `POST /api/medbot` para tutor educacional;
+- endpoint `POST /api/study-pack` para gerar 10 aulas + 10 perguntas randomizadas;
 - endpoint `GET /api/health` com status do provedor;
 - temperatura baixa e `top_p` reduzido para conter alucinação;
 - validações backend para bloquear respostas inseguras (ex.: dor torácica sem ECG, mulher fértil com dor+nausea sem Beta-HCG, sintomas inventados).
 - fallback local no frontend quando backend/IA estiver indisponível.
+- fallback local também no backend para `clinical-analysis` e `medbot` quando o provedor externo falhar/estiver indisponível.
 - rate limit básico por IP e `x-request-id` em todas as respostas para rastreabilidade.
 
 ## Testes
@@ -50,7 +52,7 @@ npm test
 
 Cobertura inicial inclui:
 - validação clínica de segurança (`backend/validators.test.ts`);
-- smoke tests dos endpoints (`backend/server.test.ts`).
+- smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
 
 ## Próximas melhorias recomendadas
 

@@ -93,11 +93,23 @@ export async function askMedBot(
   question: string,
   topicId: string,
   history: Array<{ role: 'assistant' | 'user'; content: string }> = [],
+  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string; userLevel?: 'iniciante' | 'intermediario' | 'avancado' },
   context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string },
 ) {
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
   try {
+    const response = await postJson<{
+      answer?: string;
+      source: 'groq' | 'local';
+      suggestions?: string[];
+      intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      response?: {
+        content?: { text?: string };
+        suggestions?: string[];
+        intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      };
+    }>(resolveApiUrl('/api/medbot'), {
     const response = await postJson<{ answer: string; source: 'groq' | 'local' }>(resolveApiUrl('/api/medbot'), {
       topicId,
       question,
@@ -105,6 +117,15 @@ export async function askMedBot(
       context,
     });
 
+    const structuredText = response.response?.content?.text;
+    const structuredSuggestions = response.response?.suggestions;
+    const structuredIntent = response.response?.intent;
+
+    return {
+      answer: structuredText || response.answer || localAnswer,
+      source: response.source || 'groq',
+      suggestions: structuredSuggestions || response.suggestions || [],
+      intent: structuredIntent || response.intent,
     return {
       answer: response.answer || localAnswer,
       source: response.source || 'groq',
@@ -114,6 +135,8 @@ export async function askMedBot(
     return {
       answer: localAnswer,
       source: 'local' as const,
+      suggestions: ['caso clínico', 'quiz', 'red flags'],
+      intent: 'duvida' as const,
     };
   }
 }

@@ -88,7 +88,25 @@ export const MedBotSection = ({
                 >
                   <div className="whitespace-pre-line">{message.content}</div>
                   {message.source && message.role === 'assistant' && (
-                    <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte: {message.source}</div>
+                    <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Fonte: {message.source === 'local' ? 'Fallback local estruturado' : 'Modelo Groq + validação'}
+                    </div>
+                  )}
+                  {message.role === 'assistant' && message.suggestions?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {message.suggestions.slice(0, 3).map((suggestion) => (
+                        <button
+                          key={`${suggestion}-${index}`}
+                          onClick={() => onInputChange(suggestion)}
+                          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-cyan-400 hover:text-cyan-700"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {message.intent && message.role === 'assistant' && (
+                    <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-violet-400">Intent detectada: {message.intent}</div>
                   )}
                 </div>
               ))}

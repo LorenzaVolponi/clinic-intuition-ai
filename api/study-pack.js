@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import crypto from 'node:crypto';
 
 const requestSchema = z.object({
   topicId: z.string().min(1),
@@ -38,7 +39,7 @@ async function callGroq(topicId) {
     {
       role: 'system',
       content:
-        'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10], flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
+        'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10] (preferencialmente aula_rapida estruturada), flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
     },
     { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador para mobile.` },
   ];
@@ -129,10 +130,13 @@ function normalizePack(topicId, aiPack) {
     const options = (item.options || []).map((opt) => (typeof opt === 'string' ? opt : opt.text));
     const correctOption = (item.options || []).find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
     const answer = item.answer || correctOption?.text || options[0] || 'Resposta indisponível';
+    const scenario = item.scenario || '';
+    const hash = crypto.createHash('sha256').update(`${scenario}:${item.question}`).digest('hex').slice(0, 12);
     return {
       id: item.id || `${topicId}-quiz-${index + 1}`,
+      hash,
       difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
-      scenario: item.scenario || '',
+      scenario,
       question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
       options,
       optionObjects: (item.options || []).map((opt, idx) => (typeof opt === 'string' ? { id: ['A', 'B', 'C', 'D'][idx], text: opt } : opt)),
@@ -140,7 +144,8 @@ function normalizePack(topicId, aiPack) {
       answer,
       explanation: item.explanation,
     };
-  });
+  }).filter((item, index, arr) => arr.findIndex((other) => other.hash === item.hash) === index)
+    .map(({ hash: _hash, ...rest }) => rest);
 
   const flashcards = (aiPack.flashcards || []).map((card, index) => ({
     id: card.id || `${topicId}-flashcard-${index + 1}`,
@@ -155,11 +160,21 @@ function normalizePack(topicId, aiPack) {
     meta: aiPack.meta || { topic: topicId, generated_at: new Date().toISOString(), safety_warning: topicId === 'emergencias' },
     topicId: aiPack.topicId || aiPack.meta?.topic || topicId,
     generatedAt: aiPack.generatedAt || aiPack.meta?.generated_at || new Date().toISOString(),
-    lessons: (aiPack.lessons || []).map((lesson) => ({
-      title: lesson.title,
-      content: lesson.content,
-      topicId: lesson.topicId || topicId,
-    })),
+    lessons: (aiPack.lessons || []).map((lesson, index) => {
+      if (lesson.title && lesson.content) {
+        return {
+          title: lesson.title,
+          content: lesson.content,
+          topicId: lesson.topicId || topicId,
+        };
+      }
+      const aula = lesson.aula_rapida || {};
+      return {
+        title: `Aula rápida ${index + 1} • ${aula.topico || topicId}`,
+        content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+        topicId,
+      };
+    }),
     quiz,
     flashcards,
   };

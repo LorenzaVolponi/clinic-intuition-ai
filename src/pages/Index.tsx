@@ -16,12 +16,16 @@ const LOCAL_STORAGE_KEYS = {
   selectedTopicId: 'medinnova:selectedTopicId',
   medbotMessages: 'medinnova:medbotMessages',
   timelineIndex: 'medinnova:timelineIndex',
+  studyPackCachePrefix: 'medinnova:studyPack:',
 };
 
 const DEFAULT_MEDBOT_MESSAGE: ChatMessage = {
   role: 'assistant',
-  content: 'Olá! Eu sou o MedBot. Posso resumir temas, montar revisão rápida, comparar diagnósticos e sugerir perguntas de estudo.',
+  content:
+    '👋 Olá! Sou o MedBot, seu assistente de estudos médicos.\n\nPosso te ajudar com:\n• 📚 resumos rápidos\n• 🏥 casos clínicos\n• 📝 quiz interativo\n• 💊 farmacologia\n• ⚠️ red flags\n\nQual tema você quer dominar hoje? 🚀',
   source: 'local',
+  suggestions: ['resumo sepse', 'caso clínico IAM', 'quiz AVC'],
+  intent: 'duvida',
 };
 
 const Index = () => {
@@ -40,12 +44,29 @@ const Index = () => {
   const [medbotMessages, setMedbotMessages] = useState<ChatMessage[]>([DEFAULT_MEDBOT_MESSAGE]);
   const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
   const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
+  const [aiFlashcardIndex, setAiFlashcardIndex] = useState(0);
+  const [aiFlashcardFlipped, setAiFlashcardFlipped] = useState(false);
+  const [aiQuizQuestionIndex, setAiQuizQuestionIndex] = useState(0);
+  const [aiSelectedAnswers, setAiSelectedAnswers] = useState<Record<number, string>>({});
   const [aiHealthStatus, setAiHealthStatus] = useState<AiHealthStatus>({ ok: false, providerConfigured: false });
+  const [isOffline, setIsOffline] = useState(false);
 
   const selectedTopic = useMemo(() => getTopicById(selectedTopicId), [selectedTopicId]);
   const quizScore = selectedTopic.quiz.reduce((score, question, index) => {
     return selectedAnswers[index] === question.answer ? score + 1 : score;
   }, 0);
+
+  useEffect(() => {
+    setIsOffline(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+    const onOffline = () => setIsOffline(true);
+    const onOnline = () => setIsOffline(false);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, []);
 
   useEffect(() => {
     const loadAiHealth = async () => {
@@ -92,15 +113,27 @@ const Index = () => {
     const loadStudyPack = async () => {
       setIsGeneratingStudyPack(true);
       try {
+        const cacheKey = `${LOCAL_STORAGE_KEYS.studyPackCachePrefix}${selectedTopicId}`;
+        const cachedPack = localStorage.getItem(cacheKey);
+        if (isOffline && cachedPack) {
+          try {
+            setGeneratedStudyPack(JSON.parse(cachedPack) as GeneratedStudyPack);
+            return;
+          } catch (error) {
+            console.warn('Cache local de estudo inválido. Regerando conteúdo.', error);
+          }
+        }
+
         const pack = await generateStudyPack(selectedTopicId);
         setGeneratedStudyPack(pack);
+        localStorage.setItem(cacheKey, JSON.stringify(pack));
       } finally {
         setIsGeneratingStudyPack(false);
       }
     };
 
     loadStudyPack();
-  }, [selectedTopicId]);
+  }, [isOffline, selectedTopicId]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.medbotMessages, JSON.stringify(medbotMessages.slice(-20)));
@@ -115,6 +148,10 @@ const Index = () => {
     setFlashcardFlipped(false);
     setCurrentQuestionIndex(0);
     setSelectedAnswers({});
+    setAiFlashcardIndex(0);
+    setAiFlashcardFlipped(false);
+    setAiQuizQuestionIndex(0);
+    setAiSelectedAnswers({});
   }, [selectedTopicId]);
 
   const handleFormSubmit = async (data: PatientData) => {
@@ -157,6 +194,7 @@ const Index = () => {
           objective: selectedTopic.objective,
           quickFacts: selectedTopic.quickFacts,
           clinicalSummary: diagnosis?.clinicalSummary,
+          userLevel: 'intermediario',
         },
       );
 
@@ -166,6 +204,8 @@ const Index = () => {
           role: 'assistant',
           content: response.answer,
           source: response.source,
+          suggestions: response.suggestions,
+          intent: response.intent,
         },
       ]);
     } finally {
@@ -207,6 +247,12 @@ const Index = () => {
   }, [diagnosis, flashcardFlipped, flashcardIndex, medbotMessages.length, selectedAnswers, selectedTopic.quiz.length, timelineClicks]);
 
   const unlockedAchievements = achievements.filter((achievement) => achievement.unlocked).length;
+  const aiQuizScore = useMemo(() => {
+    if (!generatedStudyPack?.quiz?.length) return 0;
+    return generatedStudyPack.quiz.reduce((score, question, index) => {
+      return aiSelectedAnswers[index] === question.answer ? score + 1 : score;
+    }, 0);
+  }, [aiSelectedAnswers, generatedStudyPack?.quiz]);
   const studyStats = [
     { label: 'Temas disponíveis', value: `${STUDY_TOPICS.length}`, icon: NotebookTabs },
     { label: 'Marcos na timeline', value: `${MEDICAL_TIMELINE.length}`, icon: Milestone },
@@ -217,11 +263,15 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] text-foreground">
       <main>
+        {isOffline && (
+          <div className="mx-auto mt-3 w-full max-w-6xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Modo offline: conteúdo limitado. Conecte-se para IA ao vivo.
+          </div>
+        )}
         <HeroSection
           unlockedAchievements={unlockedAchievements}
           achievementTotal={achievements.length}
           studyStats={studyStats}
-          aiHealthStatus={aiHealthStatus}
           onExploreCases={() => scrollToSection('casos')}
           onTalkMedBot={() => scrollToSection('medbot')}
         />
@@ -275,11 +325,40 @@ const Index = () => {
           onNextQuestion={() => setCurrentQuestionIndex((current) => (current === selectedTopic.quiz.length - 1 ? 0 : current + 1))}
           generatedStudyPack={generatedStudyPack}
           isGeneratingStudyPack={isGeneratingStudyPack}
+          aiFlashcardIndex={aiFlashcardIndex}
+          aiFlashcardFlipped={aiFlashcardFlipped}
+          onFlipAiFlashcard={() => setAiFlashcardFlipped((current) => !current)}
+          onPrevAiFlashcard={() => {
+            const total = generatedStudyPack?.flashcards.length || 0;
+            if (!total) return;
+            setAiFlashcardIndex((current) => (current === 0 ? total - 1 : current - 1));
+            setAiFlashcardFlipped(false);
+          }}
+          onNextAiFlashcard={() => {
+            const total = generatedStudyPack?.flashcards.length || 0;
+            if (!total) return;
+            setAiFlashcardIndex((current) => (current === total - 1 ? 0 : current + 1));
+            setAiFlashcardFlipped(false);
+          }}
+          aiQuizQuestionIndex={aiQuizQuestionIndex}
+          aiSelectedAnswers={aiSelectedAnswers}
+          aiQuizScore={aiQuizScore}
+          onSelectAiAnswer={(option) => setAiSelectedAnswers((current) => ({ ...current, [aiQuizQuestionIndex]: option }))}
+          onPrevAiQuestion={() => setAiQuizQuestionIndex((current) => (current === 0 ? 0 : current - 1))}
+          onNextAiQuestion={() => {
+            const total = generatedStudyPack?.quiz.length || 0;
+            if (!total) return;
+            setAiQuizQuestionIndex((current) => (current === total - 1 ? 0 : current + 1));
+          }}
           onRegenerateStudyPack={async () => {
             setIsGeneratingStudyPack(true);
             try {
               const pack = await generateStudyPack(selectedTopicId);
               setGeneratedStudyPack(pack);
+              setAiFlashcardIndex(0);
+              setAiFlashcardFlipped(false);
+              setAiQuizQuestionIndex(0);
+              setAiSelectedAnswers({});
             } finally {
               setIsGeneratingStudyPack(false);
             }

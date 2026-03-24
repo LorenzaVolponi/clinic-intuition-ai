@@ -13,7 +13,7 @@ function detectIntent(question) {
   if (/(caso|anamnese|simulado)/i.test(q)) return 'caso';
   if (/(medicamento|dose|farmaco)/i.test(q)) return 'medicamento';
   if (/(comparar|vs|versus|diferen)/i.test(q)) return 'comparacao';
-  if (/(resumo|revis|red flag)/i.test(q)) return 'resumo';
+  if (/(resumo|resuma|resumir|revis|red flag)/i.test(q)) return 'resumo';
   return 'duvida';
 }
 
@@ -34,7 +34,10 @@ function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'inter
   const interactionId = crypto.randomUUID();
   const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
 
-  const text = `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura.\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
+  const text =
+    intent === 'medicamento'
+      ? `💊 **FARMACOLOGIA: foco em ${topicId}**\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• benefício clínico com evidência\n• contexto de urgência sob supervisão\n• manutenção após estabilização\n\n⚠️ **SEGURANÇA:**\n• validar contraindicações\n• não usar dose sem protocolo local\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n→ interações\n→ alternativas\n→ caso clínico`
+      : `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura.\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
 
   return {
     response: {

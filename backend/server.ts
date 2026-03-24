@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, QUICK_LESSON_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
+import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
 
 dotenv.config();
@@ -58,7 +58,6 @@ const medbotRequestSchema = z.object({
   topicId: z.string(),
   question: z.string().min(1),
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string() })).optional(),
-  userLevel: z.enum(['iniciante', 'intermediario', 'avancado']).optional(),
   context: z
     .object({
       objective: z.string().optional(),
@@ -123,6 +122,19 @@ const clinicalModelResponseSchema = z.object({
 });
 
 const medbotModelResponseSchema = z.object({
+  answer: z.string().min(1),
+});
+
+const studyPackModelResponseSchema = z.object({
+  topicId: z.string(),
+  generatedAt: z.string(),
+  lessons: z.array(z.object({ title: z.string(), content: z.string(), topicId: z.string() })).min(1),
+  flashcards: z.array(z.object({ question: z.string(), answer: z.string(), hint: z.string() })).min(1),
+  quiz: z.array(
+    z.object({
+      question: z.string(),
+      options: z.array(z.string()).min(2),
+      answer: z.string(),
   response: z.object({
     session_id: z.string(),
     interaction_id: z.string(),
@@ -551,6 +563,18 @@ function buildLocalMedbotAnswer(params: {
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
   const question = params.question.toLowerCase();
+
+  if (question.includes('plano') || question.includes('cronograma')) {
+    return `Plano de estudo (${params.topicId}):\n1) Objetivo: ${objective}\n2) Revise: ${facts.join(' | ') || 'red flags e exames iniciais'}\n3) Faça 10 flashcards IA + 10 questões IA\n4) Feche com um mini-caso e compare hipótese principal x diferenciais críticos.`;
+  }
+
+  if (question.includes('anamnese') || question.includes('caso')) {
+    return `Estrutura sugerida de anamnese (${params.topicId}):\n- Queixa principal e tempo de evolução\n- Sinais de gravidade (red flags)\n- Diferenciais de maior risco\n- Exames iniciais que mudam conduta\nResumo clínico da sessão: ${params.clinicalSummary || 'ainda não disponível.'}`;
+  }
+
+  return `Resumo orientado por tema (${params.topicId}): objetivo "${objective}". Pontos-chave: ${
+    facts.join(' | ') || 'red flags, hipótese principal e exames iniciais'
+  }. Se quiser, te entrego agora um quiz de 10 perguntas com feedback por questão.`;
   const intent = detectMedbotIntent(params.question);
   const interactionId = crypto.randomUUID();
   const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
@@ -598,6 +622,10 @@ function buildLocalMedbotAnswer(params: {
 
 type RequestCounter = { count: number; resetAt: number };
 const rateCounter = new Map<string, RequestCounter>();
+
+function createRateLimiter(maxRequests = 40, windowMs = 60_000) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
 const sessionInteractions = new Map<string, number>();
 
 function createRateLimiter(maxRequests = 40, windowMs = 60_000) {
@@ -734,6 +762,17 @@ export function createApp() {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
     }
+
+    if (!groqApiKey) {
+      return res.json({
+        answer: buildLocalMedbotAnswer({
+          topicId: parsed.data.topicId,
+          question: parsed.data.question,
+          objective: parsed.data.context?.objective,
+          quickFacts: parsed.data.context?.quickFacts,
+          clinicalSummary: parsed.data.context?.clinicalSummary,
+        }),
+        source: 'local',
     const sanitized = sanitizeMedbotInput(parsed.data.question);
     if (!sanitized.valid) {
       return res.status(400).json({ error: sanitized.error });
@@ -785,6 +824,23 @@ export function createApp() {
         { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
         {
           role: 'user',
+          content: `Tema: ${parsed.data.topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
+        },
+      ]);
+      const response = medbotModelResponseSchema.safeParse(rawResponse);
+
+      return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
+    } catch (error) {
+      console.error('medbot error', error);
+      return res.json({
+        answer: buildLocalMedbotAnswer({
+          topicId: parsed.data.topicId,
+          question: parsed.data.question,
+          objective: parsed.data.context?.objective,
+          quickFacts: parsed.data.context?.quickFacts,
+          clinicalSummary: parsed.data.context?.clinicalSummary,
+        }),
+        source: 'local',
           content: `Tema: ${parsed.data.topicId}\nNível: ${userLevel}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${sanitized.sanitized}\nSession UUID: ${(req.sessionData as SessionData).sessionUuid}\nTimestamp: ${(req.sessionData as SessionData).timestamp}\nInteraction: ${(req.sessionData as SessionData).interactionNumber}`,
         },
       ]);
@@ -866,18 +922,19 @@ export function createApp() {
       const rawResponse = await callGroq([
         {
           role: 'system',
-          content: `${STUDY_PACK_SYSTEM_PROMPT}\n\n${QUICK_LESSON_SYSTEM_PROMPT}`,
+          content:
+            'Você é um tutor médico educacional. Gere JSON factual e conservador. Sem inventar diretrizes. Inclua 10 aulas objetivas, 10 flashcards e 10 perguntas de quiz com 4 opções.',
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Formato JSON com topicId, generatedAt, lessons[], flashcards[], quiz[].`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
         return res.json(buildLocalStudyPack(parsed.data.topicId));
       }
-      return res.json(normalizeStudyPackForClient(parsed.data.topicId, response.data));
+      return res.json(response.data);
     } catch (error) {
       console.error('study-pack error', error);
       return res.json(buildLocalStudyPack(parsed.data.topicId));

@@ -1,3 +1,8 @@
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { AiHealthStatus } from '@/lib/aiClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -13,6 +18,7 @@ interface HeroSectionProps {
   unlockedAchievements: number;
   achievementTotal: number;
   studyStats: StudyStat[];
+  aiHealthStatus: AiHealthStatus;
   onExploreCases: () => void;
   onTalkMedBot: () => void;
 }
@@ -21,6 +27,7 @@ export const HeroSection = ({
   unlockedAchievements,
   achievementTotal,
   studyStats,
+  aiHealthStatus,
   onExploreCases,
   onTalkMedBot,
 }: HeroSectionProps) => {
@@ -57,6 +64,9 @@ export const HeroSection = ({
             <div className="rounded-full bg-warning px-4 py-2 text-sm font-bold text-warning-foreground shadow-lg">
               {unlockedAchievements} conquistas
             </div>
+            <Badge className={aiHealthStatus.providerConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+              {aiHealthStatus.providerConfigured ? `IA ativa${aiHealthStatus.model ? ` (${aiHealthStatus.model})` : ''}` : 'Modo local (sem chave IA)'}
+            </Badge>
           </div>
         </div>
 

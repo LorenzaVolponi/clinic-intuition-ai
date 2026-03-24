@@ -1,25 +1,12 @@
 export interface FlashcardItem {
-  id?: string;
-  front?: string;
-  back?: string;
   question: string;
   answer: string;
   hint: string;
 }
 
-export interface QuizOption {
-  id: 'A' | 'B' | 'C' | 'D';
-  text: string;
-}
-
 export interface QuizQuestion {
-  id?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
-  scenario?: string;
   question: string;
   options: string[];
-  optionObjects?: QuizOption[];
-  correct_option_id?: 'A' | 'B' | 'C' | 'D';
   answer: string;
   explanation: string;
 }
@@ -52,11 +39,6 @@ export interface StudyLesson {
 }
 
 export interface GeneratedStudyPack {
-  meta?: {
-    topic: string;
-    generated_at: string;
-    safety_warning?: boolean;
-  };
   topicId: string;
   generatedAt: string;
   lessons: StudyLesson[];

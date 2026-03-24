@@ -55,6 +55,7 @@ export const MedBotSection = ({
             {selectedTopic.medbotPrompts.map((prompt) => (
               <button
                 key={prompt}
+                onClick={() => onAskMedBot(prompt)}
                 onClick={() => {
                   triggerHaptic(10);
                   onAskMedBot(prompt);
@@ -88,6 +89,7 @@ export const MedBotSection = ({
                 >
                   <div className="whitespace-pre-line">{message.content}</div>
                   {message.source && message.role === 'assistant' && (
+                    <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte: {message.source}</div>
                     <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                       Fonte: {message.source === 'local' ? 'Fallback local estruturado' : 'Modelo Groq + validação'}
                     </div>
@@ -112,6 +114,7 @@ export const MedBotSection = ({
               ))}
               {isMedbotLoading && (
                 <div className="max-w-[90%] rounded-3xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+                  MedBot está organizando uma resposta de estudo...
                   <div className="mb-2 h-3 w-40 animate-pulse rounded bg-slate-200" />
                   <div className="mb-2 h-3 w-full animate-pulse rounded bg-slate-200" />
                   <div className="h-3 w-4/5 animate-pulse rounded bg-slate-200" />

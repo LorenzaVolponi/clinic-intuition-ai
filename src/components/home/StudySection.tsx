@@ -127,6 +127,7 @@ export const StudySection = ({
               <CardContent className="p-6 sm:p-8">
                 <button
                   className="flex min-h-[320px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-cyan-50 p-6 text-left transition hover:shadow-lg"
+                  onClick={onFlipFlashcard}
                   onClick={() => {
                     triggerHaptic(10);
                     onFlipFlashcard();
@@ -184,6 +185,14 @@ export const StudySection = ({
                 {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novos'}
               </Button>
             </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {generatedStudyPack?.flashcards.map((card, index) => (
+                <details key={`${card.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">{card.question}</summary>
+                  <p className="mt-3 text-sm leading-6 text-slate-700">{card.answer}</p>
+                  <p className="mt-2 text-xs text-slate-500"><strong>Dica:</strong> {card.hint}</p>
+                </details>
+              ))}
             <CardContent>
               {!activeAiFlashcard ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando flashcards IA...</div>
@@ -226,11 +235,17 @@ export const StudySection = ({
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
+                    <CardTitle>{activeQuestion.question}</CardTitle>
                     <CardTitle id={`quiz-question-${currentQuestionIndex}`}>{activeQuestion.question}</CardTitle>
                     <CardDescription>Pergunta {currentQuestionIndex + 1} de {selectedTopic.quiz.length}.</CardDescription>
                   </div>
                   <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Score {quizScore}/{selectedTopic.quiz.length}</Badge>
                 </div>
+                <Progress value={((currentQuestionIndex + 1) / selectedTopic.quiz.length) * 100} className="h-3" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {activeQuestion.options.map((option) => {
+                  const selected = selectedAnswers[currentQuestionIndex] === option;
                 <Progress value={((currentQuestionIndex + 1) / selectedTopic.quiz.length) * 100} className={`h-3 ${isCurrentCorrect ? 'animate-pulse' : ''}`} />
               </CardHeader>
               <CardContent className="space-y-3">
@@ -243,6 +258,7 @@ export const StudySection = ({
                   return (
                     <button
                       key={option}
+                      onClick={() => onSelectAnswer(option)}
                       role="radio"
                       aria-checked={selected}
                       tabIndex={0}
@@ -265,6 +281,7 @@ export const StudySection = ({
                       {option}
                     </button>
                   );
+                })}
                   })}
                 </div>
 
@@ -327,6 +344,8 @@ export const StudySection = ({
           <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
+                <CardTitle>Quiz randômico com 10 perguntas</CardTitle>
+                <CardDescription>Novo conjunto a cada geração para treino rápido de retenção.</CardDescription>
                 <CardTitle>Quiz IA interativo (10 perguntas)</CardTitle>
                 <CardDescription>Responda uma por vez com feedback imediato e score em tempo real.</CardDescription>
               </div>
@@ -336,6 +355,15 @@ export const StudySection = ({
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
+              {generatedStudyPack?.quiz.map((question, index) => (
+                <div key={`${question.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-white p-4">
+                  <p className="font-semibold text-slate-900">{index + 1}. {question.question}</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                    {question.options.map((option) => <li key={`${index}-${option}`}>{option}</li>)}
+                  </ul>
+                  <p className="mt-2 text-sm text-emerald-700"><strong>Resposta:</strong> {question.answer}</p>
+                </div>
+              ))}
               {!activeAiQuestion ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando quiz IA...</div>
               ) : (

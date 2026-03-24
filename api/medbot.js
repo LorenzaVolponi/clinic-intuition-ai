@@ -1,8 +1,4 @@
-const MEDBOT_SYSTEM_PROMPT = `
-Você é um tutor médico educacional.
-- Responda em JSON: {"answer":"..."}.
-- Seja conservador, factual e orientado a segurança clínica.
-`;
+import { MEDBOT_SYSTEM_PROMPT } from '../backend/prompts.js';
 
 async function callGroq(messages) {
   const apiKey = process.env.GROQ_API_KEY;

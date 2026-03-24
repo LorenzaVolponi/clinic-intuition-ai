@@ -32,6 +32,13 @@ BACKEND_PORT=8787
 
 > Segurança: mantenha a chave apenas no `.env` local (nunca commite chaves reais no repositório).
 
+### Configuração recomendada (local + Vercel)
+
+- **Local**: crie `.env` com `cp .env.example .env` e preencha `GROQ_API_KEY`.
+- **Vercel**: adicione `GROQ_API_KEY` e `GROQ_MODEL` em **Project Settings → Environment Variables**.
+- Após deploy, valide em:
+  - `GET /api/health` → `providerConfigured: true` quando a chave estiver correta.
+
 ## Backend implementado
 
 - endpoint `POST /api/clinical-analysis` com prompt de sistema clínico rigoroso;

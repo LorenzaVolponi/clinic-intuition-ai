@@ -77,6 +77,19 @@ type GroqContentResponse = {
   choices?: Array<{ message?: { content?: string } }>;
 };
 
+type SessionData = {
+  sessionUuid: string;
+  userId: string;
+  timestamp: string;
+  interactionNumber: number;
+};
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    sessionData?: SessionData;
+  }
+}
+
 const clinicalModelResponseSchema = z.object({
   triageLevel: z.enum(['Eletivo', 'Urgência', 'Emergência']),
   triageReason: z.string(),
@@ -107,6 +120,13 @@ const clinicalModelResponseSchema = z.object({
 
 const medbotModelResponseSchema = z.object({
   answer: z.string().min(1),
+  session_metadata: z
+    .object({
+      session_uuid: z.string(),
+      interaction_number: z.number(),
+      timestamp: z.string(),
+    })
+    .optional(),
 });
 
 const studyPackModelResponseSchema = z.object({
@@ -401,34 +421,40 @@ function buildLocalMedbotAnswer(params: {
   objective?: string;
   quickFacts?: string[];
   clinicalSummary?: string;
+  sessionData: SessionData;
+  source: 'local' | 'groq';
 }) {
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
   const question = params.question.toLowerCase();
 
   if (question.includes('plano') || question.includes('cronograma')) {
-    return `Plano de estudo (${params.topicId}):\n1) Objetivo: ${objective}\n2) Revise: ${facts.join(' | ') || 'red flags e exames iniciais'}\n3) Faça 10 flashcards IA + 10 questões IA\n4) Feche com um mini-caso e compare hipótese principal x diferenciais críticos.`;
+    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão]\n\nPlano de estudo (${params.topicId}):\n• Objetivo: ${objective}\n• Revisar: ${facts.join(' | ') || 'red flags e exames iniciais'}\n• Praticar: 10 flashcards + 10 questões\n• Fechar com mini-caso clínico\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
   if (question.includes('anamnese') || question.includes('caso')) {
-    return `Estrutura sugerida de anamnese (${params.topicId}):\n- Queixa principal e tempo de evolução\n- Sinais de gravidade (red flags)\n- Diferenciais de maior risco\n- Exames iniciais que mudam conduta\nResumo clínico da sessão: ${params.clinicalSummary || 'ainda não disponível.'}`;
+    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão clínica]\n\n• Queixa principal + tempo de evolução\n• **Red flags** e sinais de gravidade\n• Diferenciais de maior risco\n• Exames iniciais que mudam conduta\nResumo clínico: ${params.clinicalSummary || 'ainda não disponível.'}\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
   if (question.includes('preceptor') || question.includes('socrát')) {
-    return `Modo preceptor virtual (${params.topicId}):\n1) Qual hipótese principal você defenderia e por quê?\n2) Qual diagnóstico grave você precisa excluir primeiro?\n3) Qual exame inicial mudaria sua conduta nas próximas 2 horas?\n4) Qual sinal clínico faria você reclassificar a triagem agora?`;
+    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Preceptor Virtual]\n\n1) Qual hipótese principal você defenderia e por quê?\n2) Qual diagnóstico grave precisa excluir primeiro?\n3) Qual exame inicial mudaria conduta nas próximas 2 horas?\n4) Qual sinal faria reclassificar a triagem agora?\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
   if (question.includes('soap') || question.includes('prontuário')) {
-    return `Simulador SOAP (${params.topicId}):\nS: Queixa principal + duração + sintomas associados.\nO: Sinais vitais, exame físico focal e achados relevantes.\nA: Hipótese principal + diferencial grave + diferencial comum.\nP: Exames iniciais, conduta imediata e plano de reavaliação.\nUse linguagem objetiva e orientada por segurança clínica.`;
+    return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Simulador de Prontuário]\n\nS: queixa principal + duração + sintomas associados\nO: sinais vitais + exame físico focal\nA: hipótese principal + grave a excluir + diferencial comum\nP: exames iniciais + conduta imediata + reavaliação\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
-  return `Resumo orientado por tema (${params.topicId}): objetivo "${objective}". Pontos-chave: ${
-    facts.join(' | ') || 'red flags, hipótese principal e exames iniciais'
-  }. Se quiser, te entrego agora um quiz de 10 perguntas com feedback por questão.`;
+  const urgentPattern = /(dor no peito|falta de ar|desmaio|convuls|fraqueza súbita|confusão intensa)/i;
+  const emergencyNote = urgentPattern.test(params.question)
+    ? '\n⚠️ **Red flag:** sintomas podem indicar emergência. Procure atendimento imediato.'
+    : '';
+
+  return `[Modo: ${params.source === 'local' ? 'Offline' : 'Online'} | Sessão: ${params.sessionData.sessionUuid}]\n[Contexto: Revisão]\n\nResumo objetivo (${params.topicId}): ${objective}.\nPontos-chave: ${facts.join(' | ') || 'red flags, hipótese principal e exames iniciais'}.\n${emergencyNote}\n\nFONTE: ${params.source === 'local' ? 'LOCAL' : 'GROQ'}`;
 }
 
 type RequestCounter = { count: number; resetAt: number };
 const rateCounter = new Map<string, RequestCounter>();
+const sessionInteractions = new Map<string, number>();
 
 function createRateLimiter(maxRequests = 40, windowMs = 60_000) {
   return (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -466,9 +492,29 @@ function requestLogger(req: express.Request, res: express.Response, next: expres
         path: req.path,
         status: res.statusCode,
         durationMs,
+        sessionUuid: req.sessionData?.sessionUuid || null,
       }),
     );
   });
+
+  next();
+}
+
+function sessionIsolation(req: express.Request, _res: express.Response, next: express.NextFunction) {
+  const incomingSession = typeof req.headers['x-session-uuid'] === 'string' ? req.headers['x-session-uuid'].trim() : '';
+  const incomingUser = typeof req.headers['x-user-id'] === 'string' ? req.headers['x-user-id'].trim() : '';
+  const sessionUuid = incomingSession || crypto.randomUUID();
+  const userId = incomingUser || `anon:${req.ip || req.socket.remoteAddress || 'unknown'}`;
+  const interactionNumber = (sessionInteractions.get(sessionUuid) || 0) + 1;
+  sessionInteractions.set(sessionUuid, interactionNumber);
+
+  req.headers['x-session-uuid'] = sessionUuid;
+  req.sessionData = {
+    sessionUuid,
+    userId,
+    timestamp: new Date().toISOString(),
+    interactionNumber,
+  };
 
   next();
 }
@@ -478,6 +524,7 @@ export function createApp() {
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
   app.use(createRateLimiter());
+  app.use(sessionIsolation);
   app.use(requestLogger);
 
   app.get('/api/health', (_req, res) => {
@@ -546,8 +593,15 @@ export function createApp() {
           objective: parsed.data.context?.objective,
           quickFacts: parsed.data.context?.quickFacts,
           clinicalSummary: parsed.data.context?.clinicalSummary,
+          sessionData: req.sessionData as SessionData,
+          source: 'local',
         }),
         source: 'local',
+        session_metadata: {
+          session_uuid: (req.sessionData as SessionData).sessionUuid,
+          interaction_number: (req.sessionData as SessionData).interactionNumber,
+          timestamp: (req.sessionData as SessionData).timestamp,
+        },
       });
     }
 
@@ -565,7 +619,31 @@ export function createApp() {
       ]);
       const response = medbotModelResponseSchema.safeParse(rawResponse);
 
-      return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
+      return res.json({
+        answer: response.success
+          ? response.data.answer
+          : buildLocalMedbotAnswer({
+              topicId: parsed.data.topicId,
+              question: parsed.data.question,
+              objective: parsed.data.context?.objective,
+              quickFacts: parsed.data.context?.quickFacts,
+              clinicalSummary: parsed.data.context?.clinicalSummary,
+              sessionData: req.sessionData as SessionData,
+              source: 'local',
+            }),
+        source: 'groq',
+        session_metadata: response.success
+          ? response.data.session_metadata || {
+              session_uuid: (req.sessionData as SessionData).sessionUuid,
+              interaction_number: (req.sessionData as SessionData).interactionNumber,
+              timestamp: (req.sessionData as SessionData).timestamp,
+            }
+          : {
+              session_uuid: (req.sessionData as SessionData).sessionUuid,
+              interaction_number: (req.sessionData as SessionData).interactionNumber,
+              timestamp: (req.sessionData as SessionData).timestamp,
+            },
+      });
     } catch (error) {
       console.error('medbot error', error);
       return res.json({
@@ -575,8 +653,15 @@ export function createApp() {
           objective: parsed.data.context?.objective,
           quickFacts: parsed.data.context?.quickFacts,
           clinicalSummary: parsed.data.context?.clinicalSummary,
+          sessionData: req.sessionData as SessionData,
+          source: 'local',
         }),
         source: 'local',
+        session_metadata: {
+          session_uuid: (req.sessionData as SessionData).sessionUuid,
+          interaction_number: (req.sessionData as SessionData).interactionNumber,
+          timestamp: (req.sessionData as SessionData).timestamp,
+        },
       });
     }
   });

@@ -75,7 +75,10 @@ export const MEDBOT_SYSTEM_PROMPT = `Você é o MedBot backend do MedInnova AI L
 - Explique com clareza, organize por tópicos e favoreça revisão rápida.
 - Se o usuário pedir plano de estudo, devolva um plano objetivo e acionável.
 - Se pedir comparação, organize em contraste claro.
-Responda SOMENTE em JSON válido: {"answer":"string"}`;
+- Isolamento obrigatório: use APENAS o contexto da sessão atual informado no input.
+- Nunca mencione ou compare com outros usuários/sessões.
+- Em possíveis emergências, destacar **red flags** e recomendar atendimento imediato.
+Responda SOMENTE em JSON válido: {"answer":"string","session_metadata":{"session_uuid":"string","interaction_number":0,"timestamp":"ISO8601"}}`;
 
 export const STUDY_PACK_SYSTEM_PROMPT = `# ROLE & OBJECTIVE
 Você é um Assistente Médico Sênior para educação médica mobile (iOS/Android).

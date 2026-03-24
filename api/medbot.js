@@ -1,25 +1,28 @@
+import crypto from 'node:crypto';
+
 const MEDBOT_SYSTEM_PROMPT = `
-Você é um tutor médico educacional.
-- Responda em JSON: {"answer":"..."}.
+Você é um tutor médico educacional com isolamento por sessão.
+- Responda em JSON: {"answer":"...","session_metadata":{"session_uuid":"...","interaction_number":0,"timestamp":"ISO8601"}}.
 - Seja conservador, factual e orientado a segurança clínica.
+- Use apenas contexto da sessão atual.
 `;
 
-function buildLocalMedbotAnswer({ topicId, question, context = {} }) {
+function buildLocalMedbotAnswer({ topicId, question, context = {}, source = 'local', sessionUuid = 'sessao-local' }) {
   const objective = context.objective || 'Reforçar raciocínio clínico seguro.';
   const facts = (context.quickFacts || []).slice(0, 3);
   const normalized = String(question || '').toLowerCase();
 
   if (normalized.includes('plano') || normalized.includes('cronograma')) {
-    return `Plano (${topicId}):\n1) Objetivo: ${objective}\n2) Revisar: ${facts.join(' | ') || 'red flags e exames iniciais'}\n3) Resolver 10 questões IA\n4) Aplicar em mini-caso clínico.`;
+    return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão]\n\nPlano (${topicId}):\n• Objetivo: ${objective}\n• Revisar: ${facts.join(' | ') || 'red flags e exames iniciais'}\n• Resolver 10 questões\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
   if (normalized.includes('anamnese') || normalized.includes('caso')) {
-    return `Anamnese guiada (${topicId}): queixa principal, tempo de evolução, red flags, diferenciais críticos e exames que mudam conduta.`;
+    return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão clínica]\n\nAnamnese guiada (${topicId}):\n• queixa principal\n• tempo de evolução\n• **red flags**\n• diferenciais críticos\n• exames que mudam conduta\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
   }
 
-  return `Resumo (${topicId}): objetivo "${objective}". Pontos-chave: ${
+  return `[Modo: ${source === 'local' ? 'Offline' : 'Online'} | Sessão: ${sessionUuid}]\n[Contexto: Revisão]\n\nResumo (${topicId}): objetivo "${objective}". Pontos-chave: ${
     facts.join(' | ') || 'hipótese principal, red flags, exames iniciais'
-  }.`;
+  }.\n\nFONTE: ${source === 'local' ? 'LOCAL' : 'GROQ'}`;
 }
 
 async function callGroq(messages) {
@@ -72,6 +75,8 @@ export default async function handler(req, res) {
   }
 
   const { topicId, question, history = [], context = {} } = req.body || {};
+  const sessionUuid = req.headers['x-session-uuid'] || crypto.randomUUID();
+  const interactionNumber = Number(req.headers['x-interaction-number'] || 1);
 
   if (!topicId || !question) {
     return res.status(400).json({ error: 'Payload inválido.' });
@@ -79,8 +84,9 @@ export default async function handler(req, res) {
 
   if (!process.env.GROQ_API_KEY) {
     return res.status(200).json({
-      answer: buildLocalMedbotAnswer({ topicId, question, context }),
+      answer: buildLocalMedbotAnswer({ topicId, question, context, source: 'local', sessionUuid }),
       source: 'local',
+      session_metadata: { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
     });
   }
 
@@ -92,11 +98,16 @@ export default async function handler(req, res) {
       { role: 'user', content: `Tema: ${topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}` },
     ]);
 
-    return res.status(200).json({ answer: response.answer || 'Resposta indisponível.', source: 'groq' });
+    return res.status(200).json({
+      answer: response.answer || 'Resposta indisponível.',
+      source: 'groq',
+      session_metadata: response.session_metadata || { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
+    });
   } catch (error) {
     return res.status(200).json({
-      answer: buildLocalMedbotAnswer({ topicId, question, context }),
+      answer: buildLocalMedbotAnswer({ topicId, question, context, source: 'local', sessionUuid }),
       source: 'local',
+      session_metadata: { session_uuid: sessionUuid, interaction_number: interactionNumber, timestamp: new Date().toISOString() },
     });
   }
 }

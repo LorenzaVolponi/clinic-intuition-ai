@@ -77,12 +77,12 @@ export const StudySection = ({
       </div>
 
       <Tabs defaultValue="flashcards" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-5 sm:rounded-full">
-          <TabsTrigger value="flashcards" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards</TabsTrigger>
-          <TabsTrigger value="quiz" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz</TabsTrigger>
-          <TabsTrigger value="flashcards-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards IA</TabsTrigger>
-          <TabsTrigger value="quiz-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
-          <TabsTrigger value="aulas" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
+        <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm sm:justify-center sm:rounded-full">
+          <TabsTrigger value="flashcards" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Flashcards</TabsTrigger>
+          <TabsTrigger value="quiz" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Quiz</TabsTrigger>
+          <TabsTrigger value="flashcards-ai" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Flashcards IA</TabsTrigger>
+          <TabsTrigger value="quiz-ai" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
+          <TabsTrigger value="aulas" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flashcards">

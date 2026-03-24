@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { AiHealthStatus } from '@/lib/aiClient';
 import { StudyTopic } from '@/lib/studyContent';
 import { ChatMessage } from '@/types/study';
 import { Bot, MessageSquareText } from 'lucide-react';
@@ -11,6 +12,7 @@ interface MedBotSectionProps {
   medbotMessages: ChatMessage[];
   medbotInput: string;
   isMedbotLoading: boolean;
+  aiHealthStatus: AiHealthStatus;
   onInputChange: (value: string) => void;
   onAskMedBot: (question?: string) => void;
 }
@@ -20,6 +22,7 @@ export const MedBotSection = ({
   medbotMessages,
   medbotInput,
   isMedbotLoading,
+  aiHealthStatus,
   onInputChange,
   onAskMedBot,
 }: MedBotSectionProps) => {
@@ -31,6 +34,9 @@ export const MedBotSection = ({
         <p className="mt-2 max-w-3xl text-slate-500">
           Peça resumos, perguntas, comparações e mini planos de estudo. Sem API configurada, ele continua funcional com respostas locais orientadas por tema.
         </p>
+        <Badge className={`mt-3 ${aiHealthStatus.providerConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} hover:opacity-100`}>
+          {aiHealthStatus.providerConfigured ? `IA online${aiHealthStatus.model ? ` • ${aiHealthStatus.model}` : ''}` : 'IA externa offline • fallback local ativo'}
+        </Badge>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">

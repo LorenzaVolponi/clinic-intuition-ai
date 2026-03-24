@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { askMedBot, analyzeClinicalCase, generateStudyPack } from '@/lib/aiClient';
+import { AiHealthStatus, askMedBot, analyzeClinicalCase, generateStudyPack, getAiHealthStatus } from '@/lib/aiClient';
 import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
 import { GeneratedStudyPack, MEDICAL_TIMELINE, STUDY_TOPICS, getTopicById } from '@/lib/studyContent';
 import { AchievementsSection } from '@/components/home/AchievementsSection';
@@ -40,11 +40,21 @@ const Index = () => {
   const [medbotMessages, setMedbotMessages] = useState<ChatMessage[]>([DEFAULT_MEDBOT_MESSAGE]);
   const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
   const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
+  const [aiHealthStatus, setAiHealthStatus] = useState<AiHealthStatus>({ ok: false, providerConfigured: false });
 
   const selectedTopic = useMemo(() => getTopicById(selectedTopicId), [selectedTopicId]);
   const quizScore = selectedTopic.quiz.reduce((score, question, index) => {
     return selectedAnswers[index] === question.answer ? score + 1 : score;
   }, 0);
+
+  useEffect(() => {
+    const loadAiHealth = async () => {
+      const status = await getAiHealthStatus();
+      setAiHealthStatus(status);
+    };
+
+    loadAiHealth();
+  }, []);
 
   useEffect(() => {
     try {
@@ -211,6 +221,7 @@ const Index = () => {
           unlockedAchievements={unlockedAchievements}
           achievementTotal={achievements.length}
           studyStats={studyStats}
+          aiHealthStatus={aiHealthStatus}
           onExploreCases={() => scrollToSection('casos')}
           onTalkMedBot={() => scrollToSection('medbot')}
         />
@@ -235,6 +246,7 @@ const Index = () => {
           medbotMessages={medbotMessages}
           medbotInput={medbotInput}
           isMedbotLoading={isMedbotLoading}
+          aiHealthStatus={aiHealthStatus}
           onInputChange={setMedbotInput}
           onAskMedBot={handleAskMedBot}
         />

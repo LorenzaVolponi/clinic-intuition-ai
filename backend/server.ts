@@ -295,6 +295,30 @@ function mapClinicalResponse(aiResponse: BackendClinicalModelResponse, fallback:
   };
 }
 
+function buildLocalMedbotAnswer(params: {
+  topicId: string;
+  question: string;
+  objective?: string;
+  quickFacts?: string[];
+  clinicalSummary?: string;
+}) {
+  const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
+  const facts = (params.quickFacts || []).slice(0, 3);
+  const question = params.question.toLowerCase();
+
+  if (question.includes('plano') || question.includes('cronograma')) {
+    return `Plano de estudo (${params.topicId}):\n1) Objetivo: ${objective}\n2) Revise: ${facts.join(' | ') || 'red flags e exames iniciais'}\n3) Faça 10 flashcards IA + 10 questões IA\n4) Feche com um mini-caso e compare hipótese principal x diferenciais críticos.`;
+  }
+
+  if (question.includes('anamnese') || question.includes('caso')) {
+    return `Estrutura sugerida de anamnese (${params.topicId}):\n- Queixa principal e tempo de evolução\n- Sinais de gravidade (red flags)\n- Diferenciais de maior risco\n- Exames iniciais que mudam conduta\nResumo clínico da sessão: ${params.clinicalSummary || 'ainda não disponível.'}`;
+  }
+
+  return `Resumo orientado por tema (${params.topicId}): objetivo "${objective}". Pontos-chave: ${
+    facts.join(' | ') || 'red flags, hipótese principal e exames iniciais'
+  }. Se quiser, te entrego agora um quiz de 10 perguntas com feedback por questão.`;
+}
+
 type RequestCounter = { count: number; resetAt: number };
 const rateCounter = new Map<string, RequestCounter>();
 
@@ -406,8 +430,13 @@ export function createApp() {
 
     if (!groqApiKey) {
       return res.json({
-        answer:
-          'Backend sem provedor IA no momento. Use revisão local: priorize sinais de alarme, hipótese principal, diferenciais críticos e exames iniciais de confirmação.',
+        answer: buildLocalMedbotAnswer({
+          topicId: parsed.data.topicId,
+          question: parsed.data.question,
+          objective: parsed.data.context?.objective,
+          quickFacts: parsed.data.context?.quickFacts,
+          clinicalSummary: parsed.data.context?.clinicalSummary,
+        }),
         source: 'local',
       });
     }
@@ -430,8 +459,13 @@ export function createApp() {
     } catch (error) {
       console.error('medbot error', error);
       return res.json({
-        answer:
-          'Falha temporária na IA externa. Revisão local sugerida: 1) red flags 2) hipótese principal 3) exames-chave 4) reavaliação de risco.',
+        answer: buildLocalMedbotAnswer({
+          topicId: parsed.data.topicId,
+          question: parsed.data.question,
+          objective: parsed.data.context?.objective,
+          quickFacts: parsed.data.context?.quickFacts,
+          clinicalSummary: parsed.data.context?.clinicalSummary,
+        }),
         source: 'local',
       });
     }

@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { AiHealthStatus } from '@/lib/aiClient';
 import { ClipboardList, Flame, HeartPulse, LucideIcon, Sparkles } from 'lucide-react';
 
 interface StudyStat {
@@ -14,6 +15,7 @@ interface HeroSectionProps {
   unlockedAchievements: number;
   achievementTotal: number;
   studyStats: StudyStat[];
+  aiHealthStatus: AiHealthStatus;
   onExploreCases: () => void;
   onTalkMedBot: () => void;
 }
@@ -22,6 +24,7 @@ export const HeroSection = ({
   unlockedAchievements,
   achievementTotal,
   studyStats,
+  aiHealthStatus,
   onExploreCases,
   onTalkMedBot,
 }: HeroSectionProps) => {
@@ -42,7 +45,7 @@ export const HeroSection = ({
       </div>
 
       <div className="container mx-auto max-w-6xl">
-        <div className="mb-10 flex items-center justify-between">
+        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 text-white shadow-lg">
               <HeartPulse className="h-7 w-7" />
@@ -54,19 +57,24 @@ export const HeroSection = ({
               <div className="text-sm font-medium text-slate-500">AI Lab • diagnóstico educacional, estudo e revisão guiada</div>
             </div>
           </div>
-          <div className="hidden rounded-full bg-warning px-4 py-2 text-sm font-bold text-warning-foreground shadow-lg sm:block">
-            {unlockedAchievements} conquistas
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-warning px-4 py-2 text-sm font-bold text-warning-foreground shadow-lg">
+              {unlockedAchievements} conquistas
+            </div>
+            <Badge className={aiHealthStatus.providerConfigured ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
+              {aiHealthStatus.providerConfigured ? `IA ativa${aiHealthStatus.model ? ` (${aiHealthStatus.model})` : ''}` : 'Modo local (sem chave IA)'}
+            </Badge>
           </div>
         </div>
 
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
           <div className="relative z-10 text-center lg:text-left">
-            <h1 className="text-5xl font-black leading-none tracking-tight sm:text-7xl">
+            <h1 className="text-4xl font-black leading-none tracking-tight sm:text-6xl lg:text-7xl">
               <span className="bg-gradient-to-r from-cyan-500 via-emerald-500 to-violet-500 bg-clip-text text-transparent">MedInnova</span>
               <br />
               <span className="text-slate-900">AI Lab</span>
             </h1>
-            <p className="mt-6 max-w-4xl text-2xl font-semibold leading-snug text-slate-600 sm:text-3xl">
+            <p className="mt-6 max-w-4xl text-xl font-semibold leading-snug text-slate-600 sm:text-3xl">
               Explore como a <span className="text-cyan-500">Inteligência Artificial</span> e inovações tecnológicas estão
               <span className="text-emerald-500"> transformando a medicina</span> e salvando milhões de vidas.
             </p>
@@ -78,7 +86,7 @@ export const HeroSection = ({
               <Button
                 size="lg"
                 onClick={onExploreCases}
-                className="h-14 rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 px-8 text-lg font-bold shadow-xl"
+                className="h-14 w-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500 px-8 text-base font-bold shadow-xl sm:w-auto sm:text-lg"
               >
                 <ClipboardList className="mr-2 h-5 w-5" />
                 Explorar Casos Clínicos
@@ -87,7 +95,7 @@ export const HeroSection = ({
                 size="lg"
                 variant="outline"
                 onClick={onTalkMedBot}
-                className="h-14 rounded-full border-[3px] border-violet-400 px-8 text-lg font-bold text-cyan-600 shadow-xl"
+                className="h-14 w-full rounded-full border-[3px] border-violet-400 px-8 text-base font-bold text-cyan-600 shadow-xl sm:w-auto sm:text-lg"
               >
                 <Sparkles className="mr-2 h-5 w-5" />
                 Conversar com MedBot

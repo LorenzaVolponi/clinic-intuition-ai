@@ -28,6 +28,7 @@ Isso sobe:
 GROQ_API_KEY=your_secure_groq_key_here
 GROQ_MODEL=llama-3.3-70b-versatile
 BACKEND_PORT=8787
+VITE_API_BASE_URL=
 ```
 
 > Segurança: mantenha a chave apenas no `.env` local (nunca commite chaves reais no repositório).
@@ -35,6 +36,7 @@ BACKEND_PORT=8787
 ### Configuração recomendada (local + Vercel)
 
 - **Local**: crie `.env` com `cp .env.example .env` e preencha `GROQ_API_KEY`.
+- Se frontend e API estiverem em domínios diferentes, configure `VITE_API_BASE_URL` com o host da API (ex.: `https://seu-app.vercel.app`).
 - **Vercel**: adicione `GROQ_API_KEY` e `GROQ_MODEL` em **Project Settings → Environment Variables**.
 - Após deploy, valide em:
   - `GET /api/health` → `providerConfigured: true` quando a chave estiver correta.
@@ -56,11 +58,25 @@ BACKEND_PORT=8787
 
 ```bash
 npm test
+npm run build
+npm run verify
 ```
 
 Cobertura inicial inclui:
 - validação clínica de segurança (`backend/validators.test.ts`);
 - smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
+
+### Smoke test rápido local (API + frontend)
+
+Com `npm run dev` rodando:
+
+```bash
+curl http://localhost:8787/api/health
+curl http://localhost:8080/api/health
+curl -X POST http://localhost:8787/api/medbot \
+  -H "content-type: application/json" \
+  -d '{"topicId":"cardiologia","question":"resuma IAM"}'
+```
 
 ## Próximas melhorias recomendadas
 

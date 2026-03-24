@@ -60,6 +60,7 @@ VITE_API_BASE_URL=
 npm test
 npm run build
 npm run verify
+npm run auto:guard
 ```
 
 Cobertura inicial inclui:
@@ -92,3 +93,19 @@ Se você quer um passo a passo direto para rodar, validar, commitar e subir PR s
 
 - Veja `docs/UPDATE_RUNBOOK.md`.
 - Documentação técnica completa: `docs/TECHNICAL_DOCUMENTATION.md`.
+
+## Automação diária de correções e validação
+
+Foi adicionado um guard automático em `scripts/auto-guard.sh` com dois modos:
+
+- **Rodada única** (CI/local): `npm run auto:guard`
+- **Loop contínuo** (quase real-time): `npm run auto:guard:watch`
+
+O guard executa em sequência:
+
+1. `npm ci`
+2. `npm run lint -- --fix`
+3. `npm test`
+4. `npm run build`
+
+Também foi incluído workflow diário em `.github/workflows/daily-auto-guard.yml` (cron) com upload de logs.

@@ -15,6 +15,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "verify": "npm run lint && npm test && npm run build",
+    "auto:guard": "bash scripts/auto-guard.sh --once",
+    "auto:guard:watch": "bash scripts/auto-guard.sh --watch --interval 300",
     "preview": "vite preview",
     "start:server": "tsx backend/server.ts"
   },

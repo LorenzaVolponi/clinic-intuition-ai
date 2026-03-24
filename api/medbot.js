@@ -43,7 +43,10 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.GROQ_API_KEY) {
-    return res.status(503).json({ error: 'Backend de IA não configurado.' });
+    return res.status(200).json({
+      answer: 'Modo local ativo: revise red flags, hipótese principal, diferenciais críticos e exames iniciais.',
+      source: 'local',
+    });
   }
 
   try {
@@ -55,6 +58,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ answer: response.answer || 'Resposta indisponível.', source: 'groq' });
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+    return res.status(200).json({
+      answer: 'Falha temporária da IA externa. Continue com revisão local estruturada por sinais de alarme e conduta inicial.',
+      source: 'local',
+    });
   }
 }

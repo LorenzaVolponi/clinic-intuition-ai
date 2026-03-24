@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GeneratedStudyPack, StudyTopic } from '@/lib/studyContent';
 import { RefreshCcw } from 'lucide-react';
-import { StudyTopic } from '@/lib/studyContent';
 
 interface StudySectionProps {
   topics: StudyTopic[];
@@ -45,6 +44,9 @@ export const StudySection = ({
   onSelectAnswer,
   onPrevQuestion,
   onNextQuestion,
+  generatedStudyPack,
+  isGeneratingStudyPack,
+  onRegenerateStudyPack,
 }: StudySectionProps) => {
   const activeFlashcard = selectedTopic.flashcards[flashcardIndex];
   const activeQuestion = selectedTopic.quiz[currentQuestionIndex];

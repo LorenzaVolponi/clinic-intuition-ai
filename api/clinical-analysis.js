@@ -1,6 +1,45 @@
 import { z } from 'zod';
-import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT } from '../backend/prompts.js';
-import { validateClinicalResponse } from '../backend/validators.js';
+
+const CLINICAL_SYSTEM_PROMPT = `
+Você é um assistente clínico educacional.
+- Responda SOMENTE em JSON válido.
+- Não invente dados.
+- Inclua exames mandatórios para dor torácica (ECG) e contexto fértil com dor+náusea (beta-HCG).
+`;
+
+function buildClinicalUserPrompt(payload) {
+  return `Paciente: ${JSON.stringify(payload.patientData)}\nAvaliação local: ${JSON.stringify(payload.localAssessment)}\nRetorne JSON estruturado.`;
+}
+
+function normalize(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
+function includesAny(text, terms) {
+  return terms.some((term) => text.includes(normalize(term)));
+}
+
+function validateClinicalResponse({ patientData, response }) {
+  const errors = [];
+  const symptoms = normalize(patientData?.symptoms || '');
+  const hasChestPain = includesAny(symptoms, ['dor no peito', 'dor toracica', 'aperto no peito']);
+  const hasPain = includesAny(symptoms, ['dor', 'dor abdominal', 'dor no peito']);
+  const hasNausea = includesAny(symptoms, ['nausea', 'enjoo', 'vomito']);
+  const isFertileWoman = normalize(patientData?.gender) === 'feminino' && patientData?.age >= 12 && patientData?.age <= 55;
+
+  const planBlob = normalize(JSON.stringify(response?.investigationPlan || {}));
+  if (hasChestPain && !includesAny(planBlob, ['ecg', 'eletrocardiograma'])) {
+    errors.push('Dor torácica sem ECG no plano sugerido.');
+  }
+  if (isFertileWoman && hasPain && hasNausea && !includesAny(planBlob, ['beta-hcg', 'beta hcg', 'gravidez'])) {
+    errors.push('Mulher em idade fértil com dor + náusea sem atenção para beta-HCG/gravidez.');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
 
 const patientDataSchema = z.object({
   name: z.string().optional(),
@@ -117,7 +156,10 @@ export default async function handler(req, res) {
   }
 
   if (!process.env.GROQ_API_KEY) {
-    return res.status(503).json({ error: 'Backend de IA não configurado.' });
+    return res.status(200).json({
+      ...parsed.data.localAssessment,
+      analysisSource: 'local',
+    });
   }
 
   try {
@@ -137,6 +179,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json(mapClinicalResponse(aiResponse, parsed.data.localAssessment));
   } catch (error) {
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+    return res.status(200).json({
+      ...parsed.data.localAssessment,
+      analysisSource: 'local',
+    });
   }
 }

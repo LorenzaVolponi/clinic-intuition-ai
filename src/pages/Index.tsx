@@ -143,6 +143,11 @@ const Index = () => {
         content,
         selectedTopicId,
         nextHistory.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+        {
+          objective: selectedTopic.objective,
+          quickFacts: selectedTopic.quickFacts,
+          clinicalSummary: diagnosis?.clinicalSummary,
+        },
       );
 
       setMedbotMessages((current) => [

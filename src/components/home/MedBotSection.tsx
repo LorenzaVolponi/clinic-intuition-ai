@@ -24,7 +24,7 @@ export const MedBotSection = ({
   onAskMedBot,
 }: MedBotSectionProps) => {
   return (
-    <section id="medbot" className="container mx-auto max-w-6xl px-4 py-8">
+    <section id="medbot" className="container mx-auto max-w-6xl px-4 py-8 pb-[max(env(safe-area-inset-bottom),1rem)]">
       <div className="mb-6">
         <Badge className="mb-3 bg-violet-100 text-violet-700 hover:bg-violet-100">MedBot</Badge>
         <h2 className="text-3xl font-black text-slate-900">Tutor de estudo conversacional.</h2>
@@ -34,7 +34,7 @@ export const MedBotSection = ({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-        <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+        <Card className="rounded-[24px] border-white/70 bg-white/90 shadow-lg sm:rounded-[28px]">
           <CardHeader>
             <CardTitle>Prompts rápidos</CardTitle>
             <CardDescription>Ideias para começar sem travar.</CardDescription>
@@ -44,7 +44,7 @@ export const MedBotSection = ({
               <button
                 key={prompt}
                 onClick={() => onAskMedBot(prompt)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 sm:p-4"
               >
                 {prompt}
               </button>
@@ -52,7 +52,7 @@ export const MedBotSection = ({
           </CardContent>
         </Card>
 
-        <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+        <Card className="rounded-[24px] border-white/70 bg-white/90 shadow-lg sm:rounded-[28px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-violet-500" />
@@ -61,7 +61,7 @@ export const MedBotSection = ({
             <CardDescription>Foco atual: {selectedTopic.title}.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="max-h-[360px] space-y-3 overflow-auto rounded-3xl border border-slate-200/70 bg-slate-50/80 p-4">
+            <div className="max-h-[360px] space-y-3 overflow-auto rounded-3xl border border-slate-200/70 bg-slate-50/80 p-3 sm:p-4">
               {medbotMessages.map((message, index) => (
                 <div
                   key={`${message.role}-${index}`}
@@ -92,11 +92,11 @@ export const MedBotSection = ({
                 className="min-h-[110px] rounded-3xl bg-white"
               />
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Button onClick={() => onAskMedBot()} className="h-12 flex-1 rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 text-base font-bold">
+                <Button onClick={() => onAskMedBot()} className="h-11 flex-1 rounded-full bg-gradient-to-r from-cyan-500 to-violet-500 text-sm font-bold sm:h-12 sm:text-base">
                   <MessageSquareText className="mr-2 h-4 w-4" />
                   Perguntar ao MedBot
                 </Button>
-                <Button variant="outline" onClick={() => onInputChange(selectedTopic.medbotPrompts[0])} className="h-12 rounded-full px-6 text-base font-semibold">
+                <Button variant="outline" onClick={() => onInputChange(selectedTopic.medbotPrompts[0])} className="h-11 rounded-full px-5 text-sm font-semibold sm:h-12 sm:px-6 sm:text-base">
                   Usar sugestão
                 </Button>
               </div>

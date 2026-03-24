@@ -27,6 +27,52 @@ const localLibrary = {
   },
 };
 
+async function callGroq(topicId) {
+  const apiKey = process.env.GROQ_API_KEY;
+  const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const models = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
+
+  if (!apiKey) return null;
+
+  const messages = [
+    {
+      role: 'system',
+      content:
+        'Você é um tutor médico educacional. Gere SOMENTE JSON com topicId, generatedAt, lessons[10], quiz[10]. Cada lesson: title e content. Cada quiz: question, options(4), answer, explanation.',
+    },
+    { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador.` },
+  ];
+
+  for (const model of models) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        top_p: 0.5,
+        response_format: { type: 'json_object' },
+        messages,
+      }),
+    });
+
+    if (!response.ok) continue;
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) continue;
+    try {
+      return JSON.parse(content);
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
 function shuffle(items) {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -40,7 +86,7 @@ function buildLocalPack(topicId) {
   const base = localLibrary[topicId] || localLibrary.emergencias;
   const lessons = Array.from({ length: 10 }, (_, idx) => ({
     title: `Aula ${idx + 1} • ${topicId}`,
-    content: `${shuffle(base.lessons)[0]} Foco em segurança clínica e revisão ativa.`,
+    content: `Objetivo: ${shuffle(base.lessons)[0]}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
     topicId,
   }));
 
@@ -73,6 +119,16 @@ export default async function handler(req, res) {
   const parsed = requestSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
+  }
+
+  const aiPack = await callGroq(parsed.data.topicId);
+  if (aiPack && Array.isArray(aiPack.lessons) && aiPack.lessons.length >= 10 && Array.isArray(aiPack.quiz) && aiPack.quiz.length >= 10) {
+    return res.status(200).json({
+      topicId: aiPack.topicId || parsed.data.topicId,
+      generatedAt: aiPack.generatedAt || new Date().toISOString(),
+      lessons: aiPack.lessons.slice(0, 10),
+      quiz: aiPack.quiz.slice(0, 10),
+    });
   }
 
   return res.status(200).json(buildLocalPack(parsed.data.topicId));

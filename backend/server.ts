@@ -10,7 +10,8 @@ dotenv.config();
 
 const port = Number(process.env.BACKEND_PORT || 8787);
 const groqApiKey = process.env.GROQ_API_KEY?.trim();
-const groqModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
+const preferredModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
+const modelFallbackChain = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 
 const patientDataSchema = z.object({
   name: z.string().optional(),
@@ -51,6 +52,13 @@ const medbotRequestSchema = z.object({
   topicId: z.string(),
   question: z.string().min(1),
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string() })).optional(),
+  context: z
+    .object({
+      objective: z.string().optional(),
+      quickFacts: z.array(z.string()).optional(),
+      clinicalSummary: z.string().optional(),
+    })
+    .optional(),
 });
 
 const studyPackRequestSchema = z.object({
@@ -199,33 +207,40 @@ async function callGroq(messages: Array<{ role: 'system' | 'user'; content: stri
     throw new Error('Backend IA não configurado. Defina GROQ_API_KEY.');
   }
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: groqModel,
-      temperature: 0.2,
-      top_p: 0.5,
-      response_format: { type: 'json_object' },
-      messages,
-    }),
-  });
+  let lastError = 'Falha desconhecida.';
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Groq ${response.status}: ${errorText}`);
+  for (const model of modelFallbackChain) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${groqApiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        top_p: 0.5,
+        response_format: { type: 'json_object' },
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      lastError = `Groq ${response.status}: ${await response.text()}`;
+      continue;
+    }
+
+    const json = (await response.json()) as GroqContentResponse;
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) {
+      lastError = `Modelo ${model} retornou conteúdo vazio.`;
+      continue;
+    }
+
+    return JSON.parse(content) as Record<string, unknown>;
   }
 
-  const json = (await response.json()) as GroqContentResponse;
-  const content = json.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('Resposta vazia da IA.');
-  }
-
-  return JSON.parse(content) as Record<string, unknown>;
+  throw new Error(lastError);
 }
 
 function mapClinicalResponse(aiResponse: BackendClinicalModelResponse, fallback: LocalAssessment) {
@@ -320,7 +335,7 @@ export function createApp() {
   app.use(requestLogger);
 
   app.get('/api/health', (_req, res) => {
-    res.json({ ok: true, providerConfigured: Boolean(groqApiKey), model: groqModel });
+    res.json({ ok: true, providerConfigured: Boolean(groqApiKey), model: preferredModel, modelFallbackChain });
   });
 
   app.post('/api/clinical-analysis', async (req, res) => {
@@ -383,11 +398,14 @@ export function createApp() {
 
     try {
       const historyText = (parsed.data.history || []).slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
+      const contextText = parsed.data.context
+        ? `Objetivo: ${parsed.data.context.objective || 'não informado'}\nPontos-chave: ${(parsed.data.context.quickFacts || []).join(' | ') || 'não informado'}\nResumo clínico: ${parsed.data.context.clinicalSummary || 'não informado'}`
+        : 'Sem contexto adicional.';
       const rawResponse = await callGroq([
         { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Tema: ${parsed.data.topicId}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
+          content: `Tema: ${parsed.data.topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
         },
       ]);
       const response = medbotModelResponseSchema.safeParse(rawResponse);

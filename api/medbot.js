@@ -1,34 +1,51 @@
-import { MEDBOT_SYSTEM_PROMPT } from '../backend/prompts.js';
+const MEDBOT_SYSTEM_PROMPT = `
+Você é um tutor médico educacional.
+- Responda em JSON: {"answer":"..."}.
+- Seja conservador, factual e orientado a segurança clínica.
+`;
 
 async function callGroq(messages) {
   const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const models = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 
   if (!apiKey) {
     throw new Error('Backend de IA não configurado.');
   }
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      top_p: 0.5,
-      response_format: { type: 'json_object' },
-      messages,
-    }),
-  });
+  let lastError = 'Erro desconhecido ao chamar Groq.';
+  for (const model of models) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        top_p: 0.5,
+        response_format: { type: 'json_object' },
+        messages,
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Groq ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+      lastError = `Groq ${response.status}: ${await response.text()}`;
+      continue;
+    }
+
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) {
+      lastError = `Modelo ${model} retornou payload vazio.`;
+      continue;
+    }
+
+    return JSON.parse(content);
   }
 
-  const json = await response.json();
-  return JSON.parse(json.choices?.[0]?.message?.content || '{}');
+  throw new Error(lastError);
 }
 
 export default async function handler(req, res) {
@@ -36,7 +53,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { topicId, question, history = [] } = req.body || {};
+  const { topicId, question, history = [], context = {} } = req.body || {};
 
   if (!topicId || !question) {
     return res.status(400).json({ error: 'Payload inválido.' });
@@ -51,9 +68,10 @@ export default async function handler(req, res) {
 
   try {
     const historyText = history.slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
+    const contextText = `Objetivo: ${context.objective || 'não informado'}\nPontos-chave: ${(context.quickFacts || []).join(' | ') || 'não informado'}\nResumo clínico: ${context.clinicalSummary || 'não informado'}`;
     const response = await callGroq([
       { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
-      { role: 'user', content: `Tema: ${topicId}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}` },
+      { role: 'user', content: `Tema: ${topicId}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}` },
     ]);
 
     return res.status(200).json({ answer: response.answer || 'Resposta indisponível.', source: 'groq' });

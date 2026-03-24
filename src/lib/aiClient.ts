@@ -76,7 +76,12 @@ export async function analyzeClinicalCase(patientData: PatientData): Promise<Cli
   }
 }
 
-export async function askMedBot(question: string, topicId: string, history: Array<{ role: 'assistant' | 'user'; content: string }> = []) {
+export async function askMedBot(
+  question: string,
+  topicId: string,
+  history: Array<{ role: 'assistant' | 'user'; content: string }> = [],
+  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string },
+) {
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
   try {
@@ -84,6 +89,7 @@ export async function askMedBot(question: string, topicId: string, history: Arra
       topicId,
       question,
       history,
+      context,
     });
 
     return {

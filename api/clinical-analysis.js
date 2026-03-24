@@ -78,33 +78,46 @@ const clinicalRequestSchema = z.object({
 
 async function callGroq(messages) {
   const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const models = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 
   if (!apiKey) {
     throw new Error('Backend de IA não configurado.');
   }
 
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      top_p: 0.5,
-      response_format: { type: 'json_object' },
-      messages,
-    }),
-  });
+  let lastError = 'Erro desconhecido ao chamar Groq.';
+  for (const model of models) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        top_p: 0.5,
+        response_format: { type: 'json_object' },
+        messages,
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Groq ${response.status}: ${await response.text()}`);
+    if (!response.ok) {
+      lastError = `Groq ${response.status}: ${await response.text()}`;
+      continue;
+    }
+
+    const json = await response.json();
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) {
+      lastError = `Modelo ${model} retornou payload vazio.`;
+      continue;
+    }
+
+    return JSON.parse(content);
   }
 
-  const json = await response.json();
-  return JSON.parse(json.choices?.[0]?.message?.content || '{}');
+  throw new Error(lastError);
 }
 
 function mapClinicalResponse(aiResponse, fallback) {

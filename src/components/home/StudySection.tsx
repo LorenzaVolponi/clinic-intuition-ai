@@ -50,6 +50,14 @@ export const StudySection = ({
 }: StudySectionProps) => {
   const activeFlashcard = selectedTopic.flashcards[flashcardIndex];
   const activeQuestion = selectedTopic.quiz[currentQuestionIndex];
+  const currentAnswer = selectedAnswers[currentQuestionIndex];
+  const isCurrentCorrect = currentAnswer === activeQuestion.answer;
+
+  const triggerHaptic = (ms = 12) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(ms);
+    }
+  };
 
   return (
     <section id="quiz" className="container mx-auto max-w-6xl px-4 py-8">
@@ -91,7 +99,10 @@ export const StudySection = ({
               <CardContent className="p-6 sm:p-8">
                 <button
                   className="flex min-h-[320px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-cyan-50 p-6 text-left transition hover:shadow-lg"
-                  onClick={onFlipFlashcard}
+                  onClick={() => {
+                    triggerHaptic(10);
+                    onFlipFlashcard();
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary">Flashcard {flashcardIndex + 1}/{selectedTopic.flashcards.length}</Badge>
@@ -163,23 +174,30 @@ export const StudySection = ({
               <CardHeader>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle>{activeQuestion.question}</CardTitle>
+                    <CardTitle id={`quiz-question-${currentQuestionIndex}`}>{activeQuestion.question}</CardTitle>
                     <CardDescription>Pergunta {currentQuestionIndex + 1} de {selectedTopic.quiz.length}.</CardDescription>
                   </div>
                   <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Score {quizScore}/{selectedTopic.quiz.length}</Badge>
                 </div>
-                <Progress value={((currentQuestionIndex + 1) / selectedTopic.quiz.length) * 100} className="h-3" />
+                <Progress value={((currentQuestionIndex + 1) / selectedTopic.quiz.length) * 100} className={`h-3 ${isCurrentCorrect ? 'animate-pulse' : ''}`} />
               </CardHeader>
               <CardContent className="space-y-3">
-                {activeQuestion.options.map((option) => {
-                  const selected = selectedAnswers[currentQuestionIndex] === option;
+                <div role="radiogroup" aria-labelledby={`quiz-question-${currentQuestionIndex}`} className="quiz-options grid gap-3">
+                  {activeQuestion.options.map((option) => {
+                    const selected = selectedAnswers[currentQuestionIndex] === option;
                   const isCorrect = option === activeQuestion.answer;
                   const showEvaluation = selectedAnswers[currentQuestionIndex] !== undefined;
 
                   return (
                     <button
                       key={option}
-                      onClick={() => onSelectAnswer(option)}
+                      role="radio"
+                      aria-checked={selected}
+                      tabIndex={0}
+                      onClick={() => {
+                        triggerHaptic(selected ? 8 : 18);
+                        onSelectAnswer(option);
+                      }}
                       className={`w-full rounded-2xl border px-4 py-4 text-left text-sm font-medium transition ${
                         showEvaluation
                           ? isCorrect
@@ -195,11 +213,24 @@ export const StudySection = ({
                       {option}
                     </button>
                   );
-                })}
+                  })}
+                </div>
 
                 {selectedAnswers[currentQuestionIndex] && (
                   <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
                     <strong className="text-slate-900">Explicação:</strong> {activeQuestion.explanation}
+                  </div>
+                )}
+
+                {currentAnswer && !isCurrentCorrect && (
+                  <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    <p className="font-semibold">Por que errei? Fluxo rápido de raciocínio:</p>
+                    <ol className="mt-2 list-decimal space-y-1 pl-5">
+                      <li>Identifique red flags no cenário clínico.</li>
+                      <li>Priorize hipótese de maior risco antes da mais comum.</li>
+                      <li>Escolha exame que muda conduta imediata.</li>
+                      <li>Reavalie se sua opção responde à pergunta principal.</li>
+                    </ol>
                   </div>
                 )}
 

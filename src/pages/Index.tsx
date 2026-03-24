@@ -16,6 +16,7 @@ const LOCAL_STORAGE_KEYS = {
   selectedTopicId: 'medinnova:selectedTopicId',
   medbotMessages: 'medinnova:medbotMessages',
   timelineIndex: 'medinnova:timelineIndex',
+  studyPackCachePrefix: 'medinnova:studyPack:',
 };
 
 const DEFAULT_MEDBOT_MESSAGE: ChatMessage = {
@@ -41,11 +42,24 @@ const Index = () => {
   const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
   const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
   const [aiHealthStatus, setAiHealthStatus] = useState<AiHealthStatus>({ ok: false, providerConfigured: false });
+  const [isOffline, setIsOffline] = useState(false);
 
   const selectedTopic = useMemo(() => getTopicById(selectedTopicId), [selectedTopicId]);
   const quizScore = selectedTopic.quiz.reduce((score, question, index) => {
     return selectedAnswers[index] === question.answer ? score + 1 : score;
   }, 0);
+
+  useEffect(() => {
+    setIsOffline(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+    const onOffline = () => setIsOffline(true);
+    const onOnline = () => setIsOffline(false);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, []);
 
   useEffect(() => {
     const loadAiHealth = async () => {
@@ -92,15 +106,27 @@ const Index = () => {
     const loadStudyPack = async () => {
       setIsGeneratingStudyPack(true);
       try {
+        const cacheKey = `${LOCAL_STORAGE_KEYS.studyPackCachePrefix}${selectedTopicId}`;
+        const cachedPack = localStorage.getItem(cacheKey);
+        if (isOffline && cachedPack) {
+          try {
+            setGeneratedStudyPack(JSON.parse(cachedPack) as GeneratedStudyPack);
+            return;
+          } catch (error) {
+            console.warn('Cache local de estudo inválido. Regerando conteúdo.', error);
+          }
+        }
+
         const pack = await generateStudyPack(selectedTopicId);
         setGeneratedStudyPack(pack);
+        localStorage.setItem(cacheKey, JSON.stringify(pack));
       } finally {
         setIsGeneratingStudyPack(false);
       }
     };
 
     loadStudyPack();
-  }, [selectedTopicId]);
+  }, [isOffline, selectedTopicId]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.medbotMessages, JSON.stringify(medbotMessages.slice(-20)));
@@ -217,6 +243,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] text-foreground">
       <main>
+        {isOffline && (
+          <div className="mx-auto mt-3 w-full max-w-6xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Modo offline: conteúdo limitado. Conecte-se para IA ao vivo.
+          </div>
+        )}
         <HeroSection
           unlockedAchievements={unlockedAchievements}
           achievementTotal={achievements.length}

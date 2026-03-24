@@ -38,9 +38,9 @@ async function callGroq(topicId) {
     {
       role: 'system',
       content:
-        'Você é um tutor médico educacional. Gere SOMENTE JSON com topicId, generatedAt, lessons[10], quiz[10], flashcards[10]. Cada lesson: title e content. Cada quiz: question, options(4), answer, explanation. Cada flashcard: question, answer, hint.',
+        'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10], flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
     },
-    { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador.` },
+    { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador para mobile.` },
   ];
 
   for (const model of models) {
@@ -104,15 +104,64 @@ function buildLocalPack(topicId) {
   }));
 
   return {
+    meta: {
+      topic: topicId,
+      generated_at: new Date().toISOString(),
+      safety_warning: topicId === 'emergencias',
+    },
     topicId,
     generatedAt: new Date().toISOString(),
     lessons,
     quiz,
     flashcards: Array.from({ length: 10 }, (_, idx) => ({
+      id: `${topicId}-flashcard-${idx + 1}`,
+      front: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]}`,
+      back: shuffle(base.lessons)[0],
       question: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]}`,
       answer: shuffle(base.lessons)[0],
       hint: 'Relacione com red flags e conduta inicial.',
     })),
+  };
+}
+
+function normalizePack(topicId, aiPack) {
+  const quiz = (aiPack.quiz || []).map((item, index) => {
+    const options = (item.options || []).map((opt) => (typeof opt === 'string' ? opt : opt.text));
+    const correctOption = (item.options || []).find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
+    const answer = item.answer || correctOption?.text || options[0] || 'Resposta indisponível';
+    return {
+      id: item.id || `${topicId}-quiz-${index + 1}`,
+      difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
+      scenario: item.scenario || '',
+      question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
+      options,
+      optionObjects: (item.options || []).map((opt, idx) => (typeof opt === 'string' ? { id: ['A', 'B', 'C', 'D'][idx], text: opt } : opt)),
+      correct_option_id: item.correct_option_id || 'A',
+      answer,
+      explanation: item.explanation,
+    };
+  });
+
+  const flashcards = (aiPack.flashcards || []).map((card, index) => ({
+    id: card.id || `${topicId}-flashcard-${index + 1}`,
+    front: card.front || card.question || 'Conceito clínico',
+    back: card.back || card.answer || 'Revisar protocolos e red flags.',
+    question: card.question || card.front || 'Conceito clínico',
+    answer: card.answer || card.back || 'Revisar protocolos e red flags.',
+    hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
+  }));
+
+  return {
+    meta: aiPack.meta || { topic: topicId, generated_at: new Date().toISOString(), safety_warning: topicId === 'emergencias' },
+    topicId: aiPack.topicId || aiPack.meta?.topic || topicId,
+    generatedAt: aiPack.generatedAt || aiPack.meta?.generated_at || new Date().toISOString(),
+    lessons: (aiPack.lessons || []).map((lesson) => ({
+      title: lesson.title,
+      content: lesson.content,
+      topicId: lesson.topicId || topicId,
+    })),
+    quiz,
+    flashcards,
   };
 }
 
@@ -132,17 +181,11 @@ export default async function handler(req, res) {
     Array.isArray(aiPack.lessons) &&
     aiPack.lessons.length >= 10 &&
     Array.isArray(aiPack.quiz) &&
-    aiPack.quiz.length >= 10 &&
+    aiPack.quiz.length >= 7 &&
     Array.isArray(aiPack.flashcards) &&
-    aiPack.flashcards.length >= 10
+    aiPack.flashcards.length >= 5
   ) {
-    return res.status(200).json({
-      topicId: aiPack.topicId || parsed.data.topicId,
-      generatedAt: aiPack.generatedAt || new Date().toISOString(),
-      lessons: aiPack.lessons.slice(0, 10),
-      quiz: aiPack.quiz.slice(0, 10),
-      flashcards: aiPack.flashcards.slice(0, 10),
-    });
+    return res.status(200).json(normalizePack(parsed.data.topicId, aiPack));
   }
 
   return res.status(200).json(buildLocalPack(parsed.data.topicId));

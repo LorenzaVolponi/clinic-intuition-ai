@@ -119,6 +119,39 @@ export async function askMedBot(
 }
 
 export async function generateStudyPack(topicId: string): Promise<GeneratedStudyPack> {
+  const normalizePack = (response: GeneratedStudyPack): GeneratedStudyPack => ({
+    ...response,
+    flashcards: response.flashcards.map((card, index) => ({
+      ...card,
+      id: card.id || `${response.topicId || topicId}-flashcard-${index + 1}`,
+      front: card.front || card.question,
+      back: card.back || card.answer,
+      question: card.question || card.front || 'Conceito clínico',
+      answer: card.answer || card.back || 'Revisar red flags e conduta inicial.',
+      hint: card.hint || 'Associe com sinais de gravidade.',
+    })),
+    quiz: response.quiz.map((item, index) => {
+      const optionObjects = item.optionObjects?.length
+        ? item.optionObjects
+        : item.options.map((option, idx) => ({ id: String.fromCharCode(65 + idx) as 'A' | 'B' | 'C' | 'D', text: option }));
+      const options = optionObjects.map((option) => option.text);
+      const answerFromId = item.correct_option_id
+        ? optionObjects.find((option) => option.id === item.correct_option_id)?.text
+        : undefined;
+
+      return {
+        ...item,
+        id: item.id || `${response.topicId || topicId}-quiz-${index + 1}`,
+        difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
+        scenario: item.scenario || '',
+        optionObjects,
+        options,
+        correct_option_id: item.correct_option_id || 'A',
+        answer: item.answer || answerFromId || options[0] || 'Resposta indisponível',
+      };
+    }),
+  });
+
   try {
     const response = await postJson<GeneratedStudyPack>(resolveApiUrl('/api/study-pack'), { topicId });
     if (
@@ -129,7 +162,7 @@ export async function generateStudyPack(topicId: string): Promise<GeneratedStudy
       response.lessons.length > 0 &&
       response.flashcards.length > 0
     ) {
-      return response;
+      return normalizePack(response);
     }
     return generateRandomStudyPack(topicId);
   } catch (error) {

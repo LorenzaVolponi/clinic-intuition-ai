@@ -85,3 +85,9 @@ curl -X POST http://localhost:8787/api/medbot \
 3. Salvar auditoria das respostas bloqueadas pelo validador clínico.
 4. Criar testes unitários/e2e para backend e frontend.
 5. Expandir a base de conteúdo e critérios clínicos.
+
+## Runbook para subir atualização
+
+Se você quer um passo a passo direto para rodar, validar, commitar e subir PR sem erro:
+
+- Veja `docs/UPDATE_RUNBOOK.md`.

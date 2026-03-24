@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
 import { z } from 'zod';
-import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT } from './prompts';
+import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
 
 dotenv.config();
@@ -110,15 +110,40 @@ const medbotModelResponseSchema = z.object({
 });
 
 const studyPackModelResponseSchema = z.object({
-  topicId: z.string(),
-  generatedAt: z.string(),
-  lessons: z.array(z.object({ title: z.string(), content: z.string(), topicId: z.string() })).min(1),
-  flashcards: z.array(z.object({ question: z.string(), answer: z.string(), hint: z.string() })).min(1),
+  meta: z
+    .object({
+      topic: z.string(),
+      generated_at: z.string(),
+      safety_warning: z.boolean().optional(),
+    })
+    .optional(),
+  topicId: z.string().optional(),
+  generatedAt: z.string().optional(),
+  lessons: z.array(z.object({ title: z.string(), content: z.string(), topicId: z.string().optional() })).optional(),
+  flashcards: z
+    .array(
+      z
+        .object({
+          id: z.string().optional(),
+          front: z.string().optional(),
+          back: z.string().optional(),
+          question: z.string().optional(),
+          answer: z.string().optional(),
+          hint: z.string().optional(),
+        })
+        .refine((item) => Boolean(item.front || item.question), 'flashcard precisa de front/question')
+        .refine((item) => Boolean(item.back || item.answer), 'flashcard precisa de back/answer'),
+    )
+    .min(1),
   quiz: z.array(
     z.object({
+      id: z.string().optional(),
+      difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+      scenario: z.string().optional(),
       question: z.string(),
-      options: z.array(z.string()).min(2),
-      answer: z.string(),
+      options: z.array(z.union([z.string(), z.object({ id: z.enum(['A', 'B', 'C', 'D']), text: z.string() })])).min(2),
+      correct_option_id: z.enum(['A', 'B', 'C', 'D']).optional(),
+      answer: z.string().optional(),
       explanation: z.string(),
     }),
   ).min(1),
@@ -202,15 +227,81 @@ function buildLocalStudyPack(topicId: string) {
   });
 
   return {
+    meta: {
+      topic: topicId,
+      generated_at: new Date().toISOString(),
+      safety_warning: topicId === 'emergencias',
+    },
     topicId,
     generatedAt: new Date().toISOString(),
     lessons,
     flashcards: Array.from({ length: 10 }, (_, index) => ({
+      id: `${topicId}-flashcard-${index + 1}`,
+      front: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
+      back: shuffle(base.lessons)[0],
       question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
       answer: shuffle(base.lessons)[0],
       hint: 'Relacione o conceito com red flags e decisão inicial.',
     })),
     quiz,
+  };
+}
+
+function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof studyPackModelResponseSchema>) {
+  const optionsFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+    return item.options.map((option) => (typeof option === 'string' ? option : option.text));
+  };
+
+  const answerFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+    if (item.answer) return item.answer;
+    if (!item.correct_option_id) return optionsFrom(item)[0] || 'Resposta indisponível';
+    const matched = item.options.find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
+    return typeof matched === 'string' ? matched : matched?.text || optionsFrom(item)[0] || 'Resposta indisponível';
+  };
+
+  return {
+    meta: payload.meta ?? {
+      topic: topicId,
+      generated_at: payload.generatedAt || new Date().toISOString(),
+      safety_warning: topicId === 'emergencias',
+    },
+    topicId: payload.topicId || payload.meta?.topic || topicId,
+    generatedAt: payload.generatedAt || payload.meta?.generated_at || new Date().toISOString(),
+    lessons:
+      payload.lessons?.map((lesson) => ({
+        title: lesson.title,
+        content: lesson.content,
+        topicId: lesson.topicId || topicId,
+      })) || [],
+    flashcards: payload.flashcards.map((card, index) => ({
+      id: card.id || `${topicId}-flashcard-${index + 1}`,
+      front: card.front || card.question || 'Conceito clínico',
+      back: card.back || card.answer || 'Revisar protocolos e red flags.',
+      question: card.question || card.front || 'Conceito clínico',
+      answer: card.answer || card.back || 'Revisar protocolos e red flags.',
+      hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
+    })),
+    quiz: payload.quiz.map((item, index) => {
+      const options = optionsFrom(item);
+      const answer = answerFrom(item);
+      return {
+        id: item.id || `${topicId}-quiz-${index + 1}`,
+        difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
+        scenario: item.scenario || '',
+        question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
+        options,
+        optionObjects: item.options.map((opt, idx) =>
+          typeof opt === 'string' ? { id: String.fromCharCode(65 + idx) as 'A' | 'B' | 'C' | 'D', text: opt } : opt,
+        ),
+        correct_option_id:
+          item.correct_option_id ||
+          (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) &&
+            (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) as { id?: 'A' | 'B' | 'C' | 'D' }).id) ||
+          'A',
+        answer,
+        explanation: item.explanation,
+      };
+    }),
   };
 }
 
@@ -485,19 +576,18 @@ export function createApp() {
       const rawResponse = await callGroq([
         {
           role: 'system',
-          content:
-            'Você é um tutor médico educacional. Gere JSON factual e conservador. Sem inventar diretrizes. Inclua 10 aulas objetivas, 10 flashcards e 10 perguntas de quiz com 4 opções.',
+          content: STUDY_PACK_SYSTEM_PROMPT,
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Formato JSON com topicId, generatedAt, lessons[], flashcards[], quiz[].`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10), flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
         return res.json(buildLocalStudyPack(parsed.data.topicId));
       }
-      return res.json(response.data);
+      return res.json(normalizeStudyPackForClient(parsed.data.topicId, response.data));
     } catch (error) {
       console.error('study-pack error', error);
       return res.json(buildLocalStudyPack(parsed.data.topicId));

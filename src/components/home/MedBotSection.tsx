@@ -26,6 +26,12 @@ export const MedBotSection = ({
   onInputChange,
   onAskMedBot,
 }: MedBotSectionProps) => {
+  const triggerHaptic = (ms = 10) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(ms);
+    }
+  };
+
   return (
     <section id="medbot" className="container mx-auto max-w-6xl px-4 py-8 pb-[max(env(safe-area-inset-bottom),1rem)]">
       <div className="mb-6">
@@ -49,7 +55,10 @@ export const MedBotSection = ({
             {selectedTopic.medbotPrompts.map((prompt) => (
               <button
                 key={prompt}
-                onClick={() => onAskMedBot(prompt)}
+                onClick={() => {
+                  triggerHaptic(10);
+                  onAskMedBot(prompt);
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 sm:p-4"
               >
                 {prompt}
@@ -85,7 +94,10 @@ export const MedBotSection = ({
               ))}
               {isMedbotLoading && (
                 <div className="max-w-[90%] rounded-3xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-                  MedBot está organizando uma resposta de estudo...
+                  <div className="mb-2 h-3 w-40 animate-pulse rounded bg-slate-200" />
+                  <div className="mb-2 h-3 w-full animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-slate-200" />
+                  <p className="mt-3 text-xs text-slate-500">Pensando como médico...</p>
                 </div>
               )}
             </div>

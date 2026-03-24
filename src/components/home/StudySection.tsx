@@ -25,6 +25,17 @@ interface StudySectionProps {
   onNextQuestion: () => void;
   generatedStudyPack: GeneratedStudyPack | null;
   isGeneratingStudyPack: boolean;
+  aiFlashcardIndex: number;
+  aiFlashcardFlipped: boolean;
+  onFlipAiFlashcard: () => void;
+  onPrevAiFlashcard: () => void;
+  onNextAiFlashcard: () => void;
+  aiQuizQuestionIndex: number;
+  aiSelectedAnswers: Record<number, string>;
+  aiQuizScore: number;
+  onSelectAiAnswer: (option: string) => void;
+  onPrevAiQuestion: () => void;
+  onNextAiQuestion: () => void;
   onRegenerateStudyPack: () => void;
 }
 
@@ -46,12 +57,29 @@ export const StudySection = ({
   onNextQuestion,
   generatedStudyPack,
   isGeneratingStudyPack,
+  aiFlashcardIndex,
+  aiFlashcardFlipped,
+  onFlipAiFlashcard,
+  onPrevAiFlashcard,
+  onNextAiFlashcard,
+  aiQuizQuestionIndex,
+  aiSelectedAnswers,
+  aiQuizScore,
+  onSelectAiAnswer,
+  onPrevAiQuestion,
+  onNextAiQuestion,
   onRegenerateStudyPack,
 }: StudySectionProps) => {
   const activeFlashcard = selectedTopic.flashcards[flashcardIndex];
   const activeQuestion = selectedTopic.quiz[currentQuestionIndex];
   const currentAnswer = selectedAnswers[currentQuestionIndex];
   const isCurrentCorrect = currentAnswer === activeQuestion.answer;
+  const aiFlashcards = generatedStudyPack?.flashcards ?? [];
+  const activeAiFlashcard = aiFlashcards[aiFlashcardIndex];
+  const aiQuiz = generatedStudyPack?.quiz ?? [];
+  const activeAiQuestion = aiQuiz[aiQuizQuestionIndex];
+  const currentAiAnswer = aiSelectedAnswers[aiQuizQuestionIndex];
+  const isAiCorrect = activeAiQuestion ? currentAiAnswer === activeAiQuestion.answer : false;
 
   const triggerHaptic = (ms = 12) => {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -156,14 +184,38 @@ export const StudySection = ({
                 {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novos'}
               </Button>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              {generatedStudyPack?.flashcards.map((card, index) => (
-                <details key={`${card.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-900">{card.question}</summary>
-                  <p className="mt-3 text-sm leading-6 text-slate-700">{card.answer}</p>
-                  <p className="mt-2 text-xs text-slate-500"><strong>Dica:</strong> {card.hint}</p>
-                </details>
-              ))}
+            <CardContent>
+              {!activeAiFlashcard ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando flashcards IA...</div>
+              ) : (
+                <>
+                  <button
+                    className="flex min-h-[280px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-violet-50 p-6 text-left transition hover:shadow-lg"
+                    onClick={() => {
+                      triggerHaptic(10);
+                      onFlipAiFlashcard();
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary">IA {aiFlashcardIndex + 1}/{aiFlashcards.length}</Badge>
+                      <span className="text-sm font-medium text-slate-400">Clique para virar</span>
+                    </div>
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.3em] text-slate-400">{aiFlashcardFlipped ? 'Resposta' : 'Pergunta'}</p>
+                      <h3 className="mt-4 text-2xl font-black leading-snug text-slate-900">
+                        {aiFlashcardFlipped ? activeAiFlashcard.answer : activeAiFlashcard.question}
+                      </h3>
+                    </div>
+                    <div className="rounded-2xl bg-slate-100/80 p-4 text-sm text-slate-500">
+                      <strong className="text-slate-700">Dica:</strong> {activeAiFlashcard.hint}
+                    </div>
+                  </button>
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                    <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiFlashcard}>Anterior IA</Button>
+                    <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500" onClick={onNextAiFlashcard}>Próximo IA</Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -275,8 +327,8 @@ export const StudySection = ({
           <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between gap-4">
               <div>
-                <CardTitle>Quiz randômico com 10 perguntas</CardTitle>
-                <CardDescription>Novo conjunto a cada geração para treino rápido de retenção.</CardDescription>
+                <CardTitle>Quiz IA interativo (10 perguntas)</CardTitle>
+                <CardDescription>Responda uma por vez com feedback imediato e score em tempo real.</CardDescription>
               </div>
               <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} className="rounded-full">
                 <RefreshCcw className="mr-2 h-4 w-4" />
@@ -284,15 +336,58 @@ export const StudySection = ({
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {generatedStudyPack?.quiz.map((question, index) => (
-                <div key={`${question.question}-${index}`} className="rounded-2xl border border-slate-200/80 bg-white p-4">
-                  <p className="font-semibold text-slate-900">{index + 1}. {question.question}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
-                    {question.options.map((option) => <li key={`${index}-${option}`}>{option}</li>)}
-                  </ul>
-                  <p className="mt-2 text-sm text-emerald-700"><strong>Resposta:</strong> {question.answer}</p>
-                </div>
-              ))}
+              {!activeAiQuestion ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando quiz IA...</div>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-lg font-bold text-slate-900">{activeAiQuestion.question}</p>
+                      <p className="text-sm text-slate-500">Pergunta {aiQuizQuestionIndex + 1} de {aiQuiz.length}</p>
+                    </div>
+                    <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100">Score IA {aiQuizScore}/{aiQuiz.length || 1}</Badge>
+                  </div>
+                  <Progress value={((aiQuizQuestionIndex + 1) / (aiQuiz.length || 1)) * 100} className={`h-3 ${isAiCorrect ? 'animate-pulse' : ''}`} />
+                  <div className="grid gap-3">
+                    {activeAiQuestion.options.map((option) => {
+                      const selected = aiSelectedAnswers[aiQuizQuestionIndex] === option;
+                      const isCorrect = option === activeAiQuestion.answer;
+                      const showEvaluation = aiSelectedAnswers[aiQuizQuestionIndex] !== undefined;
+                      return (
+                        <button
+                          key={`ai-${option}`}
+                          onClick={() => {
+                            triggerHaptic(selected ? 8 : 18);
+                            onSelectAiAnswer(option);
+                          }}
+                          className={`w-full rounded-2xl border px-4 py-4 text-left text-sm font-medium transition ${
+                            showEvaluation
+                              ? isCorrect
+                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                : selected
+                                  ? 'border-red-300 bg-red-50 text-red-700'
+                                  : 'border-slate-200 bg-white text-slate-500'
+                              : selected
+                                ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50'
+                          }`}
+                        >
+                          {option}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {aiSelectedAnswers[aiQuizQuestionIndex] && (
+                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                      <strong className="text-slate-900">Explicação IA:</strong> {activeAiQuestion.explanation}
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiQuestion}>Pergunta IA anterior</Button>
+                    <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-emerald-500" onClick={onNextAiQuestion}>Próxima IA</Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

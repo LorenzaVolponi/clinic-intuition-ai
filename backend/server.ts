@@ -62,6 +62,38 @@ type GroqContentResponse = {
   choices?: Array<{ message?: { content?: string } }>;
 };
 
+const clinicalModelResponseSchema = z.object({
+  triageLevel: z.enum(['Eletivo', 'Urgência', 'Emergência']),
+  triageReason: z.string(),
+  educationalWarning: z.string(),
+  hypotheses: z.array(
+    z.object({
+      name: z.string(),
+      role: z.enum(['mais provável', 'mais grave a excluir', 'diferencial comum']),
+      probability: z.enum(['Alta', 'Média', 'Baixa']),
+      confidenceScore: z.number().min(0).max(100),
+      justification: z.string(),
+      physiopathology: z.string(),
+      differentials: z.array(z.string()),
+      exams: z.array(z.string()),
+    }),
+  ),
+  investigationPlan: z.object({
+    immediate: z.array(z.string()),
+    complementary: z.array(z.string()),
+    specialAttention: z.array(z.string()),
+  }),
+  conduct: z.object({
+    immediateActions: z.array(z.string()),
+    monitoring: z.array(z.string()),
+    legalNotice: z.string(),
+  }),
+});
+
+const medbotModelResponseSchema = z.object({
+  answer: z.string().min(1),
+});
+
 async function callGroq(messages: Array<{ role: 'system' | 'user'; content: string }>) {
   if (!groqApiKey) {
     throw new Error('Backend IA não configurado. Defina GROQ_API_KEY.');
@@ -152,10 +184,11 @@ app.post('/api/clinical-analysis', async (req, res) => {
   }
 
   try {
-    const aiResponse = await callGroq([
+    const rawAiResponse = await callGroq([
       { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
       { role: 'user', content: buildClinicalUserPrompt(parsed.data) },
     ]);
+    const aiResponse = clinicalModelResponseSchema.parse(rawAiResponse);
 
     const validation = validateClinicalResponse({
       patientData: parsed.data.patientData,
@@ -189,15 +222,16 @@ app.post('/api/medbot', async (req, res) => {
 
   try {
     const historyText = (parsed.data.history || []).slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
-    const response = (await callGroq([
+    const rawResponse = await callGroq([
       { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
       {
         role: 'user',
         content: `Tema: ${parsed.data.topicId}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
       },
-    ])) as { answer?: string };
+    ]);
+    const response = medbotModelResponseSchema.safeParse(rawResponse);
 
-    return res.json({ answer: response.answer || 'Resposta indisponível.', source: 'groq' });
+    return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
   } catch (error) {
     console.error('medbot error', error);
     return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });

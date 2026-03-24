@@ -58,11 +58,25 @@ VITE_API_BASE_URL=
 
 ```bash
 npm test
+npm run build
+npm run verify
 ```
 
 Cobertura inicial inclui:
 - validação clínica de segurança (`backend/validators.test.ts`);
 - smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
+
+### Smoke test rápido local (API + frontend)
+
+Com `npm run dev` rodando:
+
+```bash
+curl http://localhost:8787/api/health
+curl http://localhost:8080/api/health
+curl -X POST http://localhost:8787/api/medbot \
+  -H "content-type: application/json" \
+  -d '{"topicId":"cardiologia","question":"resuma IAM"}'
+```
 
 ## Próximas melhorias recomendadas
 

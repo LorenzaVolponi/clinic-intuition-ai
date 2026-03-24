@@ -1,19 +1,16 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
 
 dotenv.config();
 
-const app = express();
 const port = Number(process.env.BACKEND_PORT || 8787);
 const groqApiKey = process.env.GROQ_API_KEY?.trim();
 const groqModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
-
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
 
 const patientDataSchema = z.object({
   name: z.string().optional(),
@@ -168,76 +165,132 @@ function mapClinicalResponse(aiResponse: BackendClinicalModelResponse, fallback:
   };
 }
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, providerConfigured: Boolean(groqApiKey), model: groqModel });
-});
+type RequestCounter = { count: number; resetAt: number };
+const rateCounter = new Map<string, RequestCounter>();
 
-app.post('/api/clinical-analysis', async (req, res) => {
-  const parsed = clinicalRequestSchema.safeParse(req.body);
+function createRateLimiter(maxRequests = 40, windowMs = 60_000) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const current = rateCounter.get(key);
 
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
-  }
-
-  if (!groqApiKey) {
-    return res.status(503).json({ error: 'Backend de IA não configurado.' });
-  }
-
-  try {
-    const rawAiResponse = await callGroq([
-      { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
-      { role: 'user', content: buildClinicalUserPrompt(parsed.data) },
-    ]);
-    const aiResponse = clinicalModelResponseSchema.parse(rawAiResponse);
-
-    const validation = validateClinicalResponse({
-      patientData: parsed.data.patientData,
-      response: aiResponse,
-    });
-
-    if (!validation.valid) {
-      return res.status(422).json({
-        error: 'Resposta da IA reprovada nas validações clínicas.',
-        validationErrors: validation.errors,
-      });
+    if (!current || now >= current.resetAt) {
+      rateCounter.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
     }
 
-    return res.json(mapClinicalResponse(aiResponse, parsed.data.localAssessment));
-  } catch (error) {
-    console.error('clinical-analysis error', error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
-  }
-});
+    if (current.count >= maxRequests) {
+      return res.status(429).json({ error: 'Muitas requisições. Tente novamente em instantes.' });
+    }
 
-app.post('/api/medbot', async (req, res) => {
-  const parsed = medbotRequestSchema.safeParse(req.body);
+    current.count += 1;
+    return next();
+  };
+}
 
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
-  }
+function requestLogger(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const requestId = crypto.randomUUID();
+  const startAt = Date.now();
+  res.setHeader('x-request-id', requestId);
 
-  if (!groqApiKey) {
-    return res.status(503).json({ error: 'Backend de IA não configurado.' });
-  }
+  res.on('finish', () => {
+    const durationMs = Date.now() - startAt;
+    console.log(
+      JSON.stringify({
+        requestId,
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs,
+      }),
+    );
+  });
 
-  try {
-    const historyText = (parsed.data.history || []).slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
-    const rawResponse = await callGroq([
-      { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Tema: ${parsed.data.topicId}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
-      },
-    ]);
-    const response = medbotModelResponseSchema.safeParse(rawResponse);
+  next();
+}
 
-    return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
-  } catch (error) {
-    console.error('medbot error', error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
-  }
-});
+export function createApp() {
+  const app = express();
+  app.use(cors());
+  app.use(express.json({ limit: '1mb' }));
+  app.use(createRateLimiter());
+  app.use(requestLogger);
 
-app.listen(port, () => {
-  console.log(`Backend MedInnova rodando em http://localhost:${port}`);
-});
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, providerConfigured: Boolean(groqApiKey), model: groqModel });
+  });
+
+  app.post('/api/clinical-analysis', async (req, res) => {
+    const parsed = clinicalRequestSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
+    }
+
+    if (!groqApiKey) {
+      return res.status(503).json({ error: 'Backend de IA não configurado.' });
+    }
+
+    try {
+      const rawAiResponse = await callGroq([
+        { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
+        { role: 'user', content: buildClinicalUserPrompt(parsed.data) },
+      ]);
+      const aiResponse = clinicalModelResponseSchema.parse(rawAiResponse);
+
+      const validation = validateClinicalResponse({
+        patientData: parsed.data.patientData,
+        response: aiResponse,
+      });
+
+      if (!validation.valid) {
+        return res.status(422).json({
+          error: 'Resposta da IA reprovada nas validações clínicas.',
+          validationErrors: validation.errors,
+        });
+      }
+
+      return res.json(mapClinicalResponse(aiResponse, parsed.data.localAssessment));
+    } catch (error) {
+      console.error('clinical-analysis error', error);
+      return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+    }
+  });
+
+  app.post('/api/medbot', async (req, res) => {
+    const parsed = medbotRequestSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
+    }
+
+    if (!groqApiKey) {
+      return res.status(503).json({ error: 'Backend de IA não configurado.' });
+    }
+
+    try {
+      const historyText = (parsed.data.history || []).slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
+      const rawResponse = await callGroq([
+        { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: `Tema: ${parsed.data.topicId}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${parsed.data.question}`,
+        },
+      ]);
+      const response = medbotModelResponseSchema.safeParse(rawResponse);
+
+      return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
+    } catch (error) {
+      console.error('medbot error', error);
+      return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+    }
+  });
+
+  return app;
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  createApp().listen(port, () => {
+    console.log(`Backend MedInnova rodando em http://localhost:${port}`);
+  });
+}

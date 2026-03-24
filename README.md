@@ -1,73 +1,62 @@
-# Welcome to your Lovable project
+# MedInnova AI Lab
 
-## Project info
+Plataforma educacional em React + Vite com backend Node para estudo médico com:
 
-**URL**: https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974
+- simulador de casos clínicos com triagem inteligente;
+- flashcards temáticos;
+- quiz por área;
+- MedBot para revisão guiada;
+- timeline da evolução da medicina;
+- backend de IA com prompt clínico rígido e validações de segurança.
 
-## How can I edit this code?
+## Como rodar
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
+cp .env.example .env
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Isso sobe:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- frontend Vite em `http://localhost:8080`
+- backend MedInnova em `http://localhost:8787`
 
-**Use GitHub Codespaces**
+## Variáveis de ambiente
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```bash
+GROQ_API_KEY=your_secure_groq_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+BACKEND_PORT=8787
+```
 
-## What technologies are used for this project?
+> Segurança: mantenha a chave apenas no `.env` local (nunca commite chaves reais no repositório).
 
-This project is built with:
+## Backend implementado
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- endpoint `POST /api/clinical-analysis` com prompt de sistema clínico rigoroso;
+- endpoint `POST /api/medbot` para tutor educacional;
+- endpoint `POST /api/study-pack` para gerar 10 aulas + 10 perguntas randomizadas;
+- endpoint `GET /api/health` com status do provedor;
+- temperatura baixa e `top_p` reduzido para conter alucinação;
+- validações backend para bloquear respostas inseguras (ex.: dor torácica sem ECG, mulher fértil com dor+nausea sem Beta-HCG, sintomas inventados).
+- fallback local no frontend quando backend/IA estiver indisponível.
+- rate limit básico por IP e `x-request-id` em todas as respostas para rastreabilidade.
 
-## How can I deploy this project?
+## Testes
 
-Simply open [Lovable](https://lovable.dev/projects/230eba23-21ab-442c-bd06-11041e119974) and click on Share -> Publish.
+```bash
+npm test
+```
 
-## Can I connect a custom domain to my Lovable project?
+Cobertura inicial inclui:
+- validação clínica de segurança (`backend/validators.test.ts`);
+- smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
 
-Yes, you can!
+## Próximas melhorias recomendadas
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+1. Persistir histórico de chats, casos e desempenho do quiz.
+2. Adicionar autenticação e trilhas por nível de formação.
+3. Salvar auditoria das respostas bloqueadas pelo validador clínico.
+4. Criar testes unitários/e2e para backend e frontend.
+5. Expandir a base de conteúdo e critérios clínicos.

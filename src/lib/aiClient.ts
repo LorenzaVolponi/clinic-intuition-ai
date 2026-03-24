@@ -18,7 +18,19 @@ interface ClinicalApiResponse {
   analysisSource: 'local' | 'groq';
 }
 
+export interface AiHealthStatus {
+  ok: boolean;
+  providerConfigured: boolean;
+  model?: string;
+}
+
 const REQUEST_TIMEOUT_MS = 15000;
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+function resolveApiUrl(path: string): string {
+  if (!apiBaseUrl) return path;
+  return `${apiBaseUrl.replace(/\/$/, '')}${path}`;
+}
 
 async function postJson<T>(url: string, payload: unknown): Promise<T> {
   const controller = new AbortController();
@@ -63,7 +75,7 @@ export async function analyzeClinicalCase(patientData: PatientData, context?: { 
   const localAssessment = buildLocalAssessment(patientData);
 
   try {
-    const backendResponse = await postJson<ClinicalApiResponse>('/api/clinical-analysis', {
+    const backendResponse = await postJson<ClinicalApiResponse>(resolveApiUrl('/api/clinical-analysis'), {
       patientData,
       localAssessment,
       promptPreview: generateClinicalPrompt(patientData, localAssessment),
@@ -86,7 +98,7 @@ export async function askMedBot(
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
   try {
-    const response = await postJson<{ answer: string; source: 'groq' | 'local' }>('/api/medbot', {
+    const response = await postJson<{ answer: string; source: 'groq' | 'local' }>(resolveApiUrl('/api/medbot'), {
       topicId,
       question,
       history,
@@ -108,7 +120,7 @@ export async function askMedBot(
 
 export async function generateStudyPack(topicId: string): Promise<GeneratedStudyPack> {
   try {
-    const response = await postJson<GeneratedStudyPack>('/api/study-pack', { topicId });
+    const response = await postJson<GeneratedStudyPack>(resolveApiUrl('/api/study-pack'), { topicId });
     if (
       Array.isArray(response.quiz) &&
       Array.isArray(response.lessons) &&
@@ -123,5 +135,27 @@ export async function generateStudyPack(topicId: string): Promise<GeneratedStudy
   } catch (error) {
     console.warn('Falha ao gerar estudo no backend. Mantendo geração local.', error);
     return generateRandomStudyPack(topicId);
+  }
+}
+
+export async function getAiHealthStatus(): Promise<AiHealthStatus> {
+  try {
+    const response = await fetch(resolveApiUrl('/api/health'));
+    if (!response.ok) {
+      throw new Error(`health check failed: ${response.status}`);
+    }
+
+    const parsed = (await response.json()) as AiHealthStatus;
+    return {
+      ok: Boolean(parsed.ok),
+      providerConfigured: Boolean(parsed.providerConfigured),
+      model: parsed.model,
+    };
+  } catch (error) {
+    console.warn('Falha ao verificar saúde da IA. Seguindo em modo local.', error);
+    return {
+      ok: false,
+      providerConfigured: false,
+    };
   }
 }

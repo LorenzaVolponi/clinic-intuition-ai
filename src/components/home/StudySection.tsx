@@ -77,11 +77,11 @@ export const StudySection = ({
       </div>
 
       <Tabs defaultValue="flashcards" className="space-y-6">
-        <TabsList className="grid h-auto w-full grid-cols-4 rounded-full bg-white p-1 shadow-sm">
-          <TabsTrigger value="flashcards" className="rounded-full py-3 text-base font-semibold">Flashcards</TabsTrigger>
-          <TabsTrigger value="quiz" className="rounded-full py-3 text-base font-semibold">Quiz</TabsTrigger>
-          <TabsTrigger value="quiz-ai" className="rounded-full py-3 text-base font-semibold">Quiz IA 10</TabsTrigger>
-          <TabsTrigger value="aulas" className="rounded-full py-3 text-base font-semibold">Aulas 10</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-2xl bg-white p-1 shadow-sm sm:grid-cols-4 sm:rounded-full">
+          <TabsTrigger value="flashcards" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Flashcards</TabsTrigger>
+          <TabsTrigger value="quiz" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz</TabsTrigger>
+          <TabsTrigger value="quiz-ai" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
+          <TabsTrigger value="aulas" className="rounded-xl py-2 text-sm font-semibold sm:rounded-full sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flashcards">

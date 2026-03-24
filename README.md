@@ -41,6 +41,7 @@ BACKEND_PORT=8787
 - temperatura baixa e `top_p` reduzido para conter alucinação;
 - validações backend para bloquear respostas inseguras (ex.: dor torácica sem ECG, mulher fértil com dor+nausea sem Beta-HCG, sintomas inventados).
 - fallback local no frontend quando backend/IA estiver indisponível.
+- fallback local também no backend para `clinical-analysis` e `medbot` quando o provedor externo falhar/estiver indisponível.
 - rate limit básico por IP e `x-request-id` em todas as respostas para rastreabilidade.
 
 ## Testes

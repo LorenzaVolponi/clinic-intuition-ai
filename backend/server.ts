@@ -120,6 +120,36 @@ const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: stri
     ],
     questions: ['Qual a prioridade inicial em dor torácica instável?', 'Qual red flag respiratória exige intervenção imediata?'],
   },
+  cardiologia: {
+    lessons: [
+      'ECG precoce e interpretação contextual mudam conduta em dor torácica.',
+      'Troponina deve ser analisada em série e junto da história clínica.',
+      'Dispneia pode ser equivalente anginoso em grupos específicos.',
+      'IC descompensada exige avaliação de congestão e perfusão.',
+      'Red flags hemodinâmicas redefinem prioridade de atendimento.',
+    ],
+    questions: ['Qual exame inicial não pode faltar na dor torácica?', 'Qual sinal clínico sugere IC descompensada?'],
+  },
+  infectologia: {
+    lessons: [
+      'Estratificação de gravidade em síndrome febril orienta local de tratamento.',
+      'Pneumonia com hipoxemia/confusão exige maior vigilância.',
+      'Sepse é reconhecimento de infecção com disfunção orgânica.',
+      'Diferenciar ITU baixa de pielonefrite muda antibiótico e seguimento.',
+      'Tempo de antibiótico em quadros graves impacta desfecho.',
+    ],
+    questions: ['Qual critério sugere gravidade em pneumonia?', 'Qual tríade sugere pielonefrite?'],
+  },
+  neurologia: {
+    lessons: [
+      'Déficit focal súbito deve ser tratado como AVC até exclusão.',
+      'Glicemia capilar é passo obrigatório no déficit neurológico agudo.',
+      'Cefaleia com sinais de alarme exige investigação urgente.',
+      'Hora do último bem define elegibilidade para terapias tempo-dependentes.',
+      'Reavaliação neurológica seriada reduz atraso diagnóstico.',
+    ],
+    questions: ['Qual exame rápido evita mimetizador de AVC?', 'Qual dado temporal é essencial no AVC agudo?'],
+  },
 };
 
 function buildLocalStudyPack(topicId: string) {
@@ -301,7 +331,10 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
-      return res.status(503).json({ error: 'Backend de IA não configurado.' });
+      return res.json({
+        ...parsed.data.localAssessment,
+        analysisSource: 'local',
+      });
     }
 
     try {
@@ -326,7 +359,10 @@ export function createApp() {
       return res.json(mapClinicalResponse(aiResponse, parsed.data.localAssessment));
     } catch (error) {
       console.error('clinical-analysis error', error);
-      return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+      return res.json({
+        ...parsed.data.localAssessment,
+        analysisSource: 'local',
+      });
     }
   });
 
@@ -338,7 +374,11 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
-      return res.status(503).json({ error: 'Backend de IA não configurado.' });
+      return res.json({
+        answer:
+          'Backend sem provedor IA no momento. Use revisão local: priorize sinais de alarme, hipótese principal, diferenciais críticos e exames iniciais de confirmação.',
+        source: 'local',
+      });
     }
 
     try {
@@ -355,7 +395,11 @@ export function createApp() {
       return res.json({ answer: response.success ? response.data.answer : 'Resposta indisponível.', source: 'groq' });
     } catch (error) {
       console.error('medbot error', error);
-      return res.status(500).json({ error: error instanceof Error ? error.message : 'Erro inesperado no backend.' });
+      return res.json({
+        answer:
+          'Falha temporária na IA externa. Revisão local sugerida: 1) red flags 2) hipótese principal 3) exames-chave 4) reavaliação de risco.',
+        source: 'local',
+      });
     }
   });
 

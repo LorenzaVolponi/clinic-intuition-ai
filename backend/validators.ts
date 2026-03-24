@@ -27,10 +27,10 @@ export type BackendClinicalModelResponse = {
 };
 
 const UNSUPPORTED_TERM_RULES = [
-  { trigger: ['dor abdominal', 'abdome', 'fossa iliaca'], symptomKeys: ['dor abdominal', 'epigastr', 'hipocondrio', 'fossa ilíaca', 'dor no abdome'] },
-  { trigger: ['dispneia', 'falta de ar'], symptomKeys: ['dispneia', 'falta de ar', 'dificuldade respir'] },
-  { trigger: ['edema'], symptomKeys: ['edema', 'inchaço'] },
-  { trigger: ['dor lombar'], symptomKeys: ['dor lombar'] },
+  { trigger: ['dor abdominal', 'abdome', 'fossa iliaca'], symptomKeys: ['dor abdominal', 'epigastr', 'hipocondrio', 'fossa ilíaca', 'dor no abdome', 'abdome'] },
+  { trigger: ['dispneia', 'falta de ar'], symptomKeys: ['dispneia', 'falta de ar', 'dificuldade respir', 'cansaço respiratório'] },
+  { trigger: ['edema'], symptomKeys: ['edema', 'inchaço', 'membro inchado'] },
+  { trigger: ['dor lombar'], symptomKeys: ['dor lombar', 'dor nas costas'] },
 ];
 
 function normalize(value: string) {
@@ -80,9 +80,14 @@ export function validateClinicalResponse({
       JSON.stringify(response.investigationPlan) +
       JSON.stringify(response.conduct),
   );
+  const primaryHypothesisBlob = normalize(response.hypotheses[0]?.name || '');
 
   for (const rule of UNSUPPORTED_TERM_RULES) {
-    if (includesAny(justificationBlob, rule.trigger) && !includesAny(symptoms, rule.symptomKeys)) {
+    const mentionsRuleInPrimaryHypothesis = includesAny(primaryHypothesisBlob, rule.trigger);
+    const mentionsRuleInJustification = includesAny(justificationBlob, rule.trigger);
+    const symptomSupported = includesAny(symptoms, rule.symptomKeys);
+
+    if (mentionsRuleInPrimaryHypothesis && mentionsRuleInJustification && !symptomSupported) {
       errors.push(`Possível alucinação clínica ao mencionar: ${rule.trigger.join(', ')}`);
     }
   }

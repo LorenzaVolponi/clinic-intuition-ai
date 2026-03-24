@@ -272,7 +272,6 @@ const Index = () => {
           unlockedAchievements={unlockedAchievements}
           achievementTotal={achievements.length}
           studyStats={studyStats}
-          aiHealthStatus={aiHealthStatus}
           onExploreCases={() => scrollToSection('casos')}
           onTalkMedBot={() => scrollToSection('medbot')}
         />

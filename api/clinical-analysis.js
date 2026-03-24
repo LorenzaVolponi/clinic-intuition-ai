@@ -74,6 +74,12 @@ const localAssessmentSchema = z.object({
 const clinicalRequestSchema = z.object({
   patientData: patientDataSchema,
   localAssessment: localAssessmentSchema,
+  context: z
+    .object({
+      topicId: z.string().optional(),
+      objective: z.string().optional(),
+    })
+    .optional(),
 });
 
 async function callGroq(messages) {
@@ -178,7 +184,12 @@ export default async function handler(req, res) {
   try {
     const aiResponse = await callGroq([
       { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
-      { role: 'user', content: buildClinicalUserPrompt(parsed.data) },
+      {
+        role: 'user',
+        content: `${buildClinicalUserPrompt(parsed.data)}\nTema educacional: ${parsed.data.context?.topicId || 'não informado'}\nObjetivo: ${
+          parsed.data.context?.objective || 'não informado'
+        }\nSe for emergência, priorize red flags, risco e próximos exames imediatos.`,
+      },
     ]);
 
     const validation = validateClinicalResponse({

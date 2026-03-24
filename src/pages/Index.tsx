@@ -111,7 +111,7 @@ const Index = () => {
     setIsAnalyzing(true);
     setPatientData(data);
     try {
-      const nextDiagnosis = await analyzeClinicalCase(data);
+      const nextDiagnosis = await analyzeClinicalCase(data, { topicId: selectedTopicId, objective: selectedTopic.objective });
       setDiagnosis(nextDiagnosis);
     } finally {
       setIsAnalyzing(false);

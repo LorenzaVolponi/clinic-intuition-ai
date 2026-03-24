@@ -26,6 +26,12 @@ export const MedBotSection = ({
   onInputChange,
   onAskMedBot,
 }: MedBotSectionProps) => {
+  const triggerHaptic = (ms = 10) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(ms);
+    }
+  };
+
   return (
     <section id="medbot" className="container mx-auto max-w-6xl px-4 py-8 pb-[max(env(safe-area-inset-bottom),1rem)]">
       <div className="mb-6">
@@ -50,6 +56,10 @@ export const MedBotSection = ({
               <button
                 key={prompt}
                 onClick={() => onAskMedBot(prompt)}
+                onClick={() => {
+                  triggerHaptic(10);
+                  onAskMedBot(prompt);
+                }}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left text-sm font-medium text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 sm:p-4"
               >
                 {prompt}
@@ -80,12 +90,35 @@ export const MedBotSection = ({
                   <div className="whitespace-pre-line">{message.content}</div>
                   {message.source && message.role === 'assistant' && (
                     <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Fonte: {message.source}</div>
+                    <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Fonte: {message.source === 'local' ? 'Fallback local estruturado' : 'Modelo Groq + validação'}
+                    </div>
+                  )}
+                  {message.role === 'assistant' && message.suggestions?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {message.suggestions.slice(0, 3).map((suggestion) => (
+                        <button
+                          key={`${suggestion}-${index}`}
+                          onClick={() => onInputChange(suggestion)}
+                          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-cyan-400 hover:text-cyan-700"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {message.intent && message.role === 'assistant' && (
+                    <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-violet-400">Intent detectada: {message.intent}</div>
                   )}
                 </div>
               ))}
               {isMedbotLoading && (
                 <div className="max-w-[90%] rounded-3xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
                   MedBot está organizando uma resposta de estudo...
+                  <div className="mb-2 h-3 w-40 animate-pulse rounded bg-slate-200" />
+                  <div className="mb-2 h-3 w-full animate-pulse rounded bg-slate-200" />
+                  <div className="h-3 w-4/5 animate-pulse rounded bg-slate-200" />
+                  <p className="mt-3 text-xs text-slate-500">Pensando como médico...</p>
                 </div>
               )}
             </div>

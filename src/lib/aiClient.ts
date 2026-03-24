@@ -94,11 +94,23 @@ export async function askMedBot(
   topicId: string,
   history: Array<{ role: 'assistant' | 'user'; content: string }> = [],
   context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string },
+  context?: { objective?: string; quickFacts?: string[]; clinicalSummary?: string; userLevel?: 'iniciante' | 'intermediario' | 'avancado' },
 ) {
   const localAnswer = buildLocalStudyResponse(question, topicId);
 
   try {
     const response = await postJson<{ answer: string; source: 'groq' | 'local' }>(resolveApiUrl('/api/medbot'), {
+    const response = await postJson<{
+      answer?: string;
+      source: 'groq' | 'local';
+      suggestions?: string[];
+      intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      response?: {
+        content?: { text?: string };
+        suggestions?: string[];
+        intent?: 'resumo' | 'caso' | 'quiz' | 'medicamento' | 'comparacao' | 'duvida';
+      };
+    }>(resolveApiUrl('/api/medbot'), {
       topicId,
       question,
       history,

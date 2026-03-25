@@ -266,33 +266,32 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
   const base = studyPackLocalLibrary[topicId] ?? studyPackLocalLibrary.emergencias;
   const nonceSuffix = String(nonce || Date.now()).slice(-6);
   const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
-  const shuffle = <T,>(items: T[]) => {
-    const arr = [...items];
-    for (let i = arr.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  };
+  const shift = [...nonceSuffix].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const pickByIndex = <T,>(items: T[], index: number) => items[(index + shift) % items.length];
 
   const lessons = Array.from({ length: 10 }, (_, index) => ({
     title: `Aula ${index + 1} • ${topicId} • ${nonceSuffix}`,
-    content: `${objectiveLine}\n${shuffle(base.lessons)[0]} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
+    content: `${objectiveLine}\n${pickByIndex(base.lessons, index)} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
     topicId,
   }));
 
   const quiz = Array.from({ length: 10 }, (_, index) => {
-    const stem = shuffle(base.questions)[0];
+    const stem = pickByIndex(base.questions, index);
     const correct = 'Priorizar avaliação presencial e conduta baseada em sinais de alarme.';
-    const distractors = shuffle([
+    const distractors = [
       'Aguardar evolução sem monitorização.',
       'Ignorar sinais vitais e focar apenas em exames tardios.',
       'Concluir diagnóstico definitivo sem reavaliação clínica.',
-    ]);
+    ];
+    const orderedDistractors = [
+      pickByIndex(distractors, index),
+      pickByIndex(distractors, index + 1),
+      pickByIndex(distractors, index + 2),
+    ];
 
     return {
       question: `${stem} (Pergunta ${index + 1} • ${nonceSuffix})`,
-      options: shuffle([correct, ...distractors]),
+      options: [correct, ...orderedDistractors].sort((a, b) => (a + nonceSuffix).localeCompare(b + nonceSuffix)),
       answer: correct,
       explanation: 'Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.',
     };
@@ -309,10 +308,10 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
     lessons,
     flashcards: Array.from({ length: 10 }, (_, index) => ({
       id: `${topicId}-flashcard-${index + 1}-${nonceSuffix}`,
-      front: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]} (${nonceSuffix})`,
-      back: shuffle(base.lessons)[0],
-      question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]} (${nonceSuffix})`,
-      answer: shuffle(base.lessons)[0],
+      front: `Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index)} (${nonceSuffix})`,
+      back: pickByIndex(base.lessons, index),
+      question: `Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} (${nonceSuffix})`,
+      answer: pickByIndex(base.lessons, index + 1),
       hint: 'Relacione o conceito com red flags e decisão inicial.',
     })),
     quiz,

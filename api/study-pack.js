@@ -97,21 +97,25 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
   const base = localLibrary[topicId] || localLibrary.emergencias;
   const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
   const nonceSuffix = String(nonce || Date.now()).slice(-6);
+  const shift = [...nonceSuffix].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const pickByIndex = (items, index) => items[(index + shift) % items.length];
   const lessons = Array.from({ length: 10 }, (_, idx) => ({
     title: `Aula ${idx + 1} • ${topicId} • ${nonceSuffix}`,
-    content: `${objectiveLine}\nGancho clínico: ${shuffle(base.lessons)[0]}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nInterativo: faça 1 pergunta de checagem ao final.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
+    content: `${objectiveLine}\nGancho clínico: ${pickByIndex(base.lessons, idx)}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nInterativo: faça 1 pergunta de checagem ao final.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
     topicId,
   }));
 
   const correct = 'Priorizar avaliação clínica, sinais de alarme e exames iniciais.';
   const quiz = Array.from({ length: 10 }, (_, idx) => ({
-    question: `${shuffle(base.stems)[0]} (Q${idx + 1} • ${nonceSuffix})`,
-    options: shuffle([
+    question: `${pickByIndex(base.stems, idx)} (Q${idx + 1} • ${nonceSuffix})`,
+    options: [
       correct,
-      'Aguardar sem monitorização.',
-      'Ignorar sintomas e focar só em exame tardio.',
-      'Confirmar diagnóstico sem reavaliar.',
-    ]),
+      ...[
+        'Aguardar sem monitorização.',
+        'Ignorar sintomas e focar só em exame tardio.',
+        'Confirmar diagnóstico sem reavaliar.',
+      ].sort((a, b) => (a + nonceSuffix + idx).localeCompare(b + nonceSuffix + idx)),
+    ],
     answer: correct,
     explanation: 'A tomada de decisão segura prioriza risco, red flags e confirmação progressiva.',
   }));
@@ -128,10 +132,10 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
     quiz,
     flashcards: Array.from({ length: 10 }, (_, idx) => ({
       id: `${topicId}-flashcard-${idx + 1}-${nonceSuffix}`,
-      front: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]} (${nonceSuffix})`,
-      back: shuffle(base.lessons)[0],
-      question: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]} (${nonceSuffix})`,
-      answer: shuffle(base.lessons)[0],
+      front: `Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx)} (${nonceSuffix})`,
+      back: pickByIndex(base.lessons, idx),
+      question: `Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx + 1)} (${nonceSuffix})`,
+      answer: pickByIndex(base.lessons, idx + 1),
       hint: 'Relacione com red flags e conduta inicial.',
     })),
   };

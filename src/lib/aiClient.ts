@@ -24,6 +24,12 @@ export interface AiHealthStatus {
   model?: string;
 }
 
+export interface StudyPackGenerationOptions {
+  objective?: string;
+  focus?: 'all' | 'flashcards' | 'quiz' | 'lessons';
+  nonce?: string;
+}
+
 const REQUEST_TIMEOUT_MS = 15000;
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 
@@ -136,7 +142,7 @@ export async function askMedBot(
   }
 }
 
-export async function generateStudyPack(topicId: string): Promise<GeneratedStudyPack> {
+export async function generateStudyPack(topicId: string, options?: StudyPackGenerationOptions): Promise<GeneratedStudyPack> {
   const normalizePack = (response: GeneratedStudyPack): GeneratedStudyPack => ({
     ...response,
     flashcards: response.flashcards.map((card, index) => ({
@@ -171,7 +177,12 @@ export async function generateStudyPack(topicId: string): Promise<GeneratedStudy
   });
 
   try {
-    const response = await postJson<GeneratedStudyPack>(resolveApiUrl('/api/study-pack'), { topicId });
+    const response = await postJson<GeneratedStudyPack>(resolveApiUrl('/api/study-pack'), {
+      topicId,
+      objective: options?.objective,
+      focus: options?.focus || 'all',
+      nonce: options?.nonce,
+    });
     if (
       Array.isArray(response.quiz) &&
       Array.isArray(response.lessons) &&

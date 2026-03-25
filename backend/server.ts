@@ -71,6 +71,9 @@ const medbotRequestSchema = z.object({
 
 const studyPackRequestSchema = z.object({
   topicId: z.string().min(1),
+  objective: z.string().max(500).optional(),
+  focus: z.enum(['all', 'flashcards', 'quiz', 'lessons']).optional(),
+  nonce: z.string().max(100).optional(),
 });
 
 type LocalAssessment = z.infer<typeof localAssessmentSchema>;
@@ -259,8 +262,10 @@ const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: stri
   },
 };
 
-function buildLocalStudyPack(topicId: string) {
+function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string) {
   const base = studyPackLocalLibrary[topicId] ?? studyPackLocalLibrary.emergencias;
+  const nonceSuffix = String(nonce || Date.now()).slice(-6);
+  const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
   const shuffle = <T,>(items: T[]) => {
     const arr = [...items];
     for (let i = arr.length - 1; i > 0; i -= 1) {
@@ -271,8 +276,8 @@ function buildLocalStudyPack(topicId: string) {
   };
 
   const lessons = Array.from({ length: 10 }, (_, index) => ({
-    title: `Aula ${index + 1} • ${topicId}`,
-    content: `${shuffle(base.lessons)[0]} Foco: segurança clínica, exames iniciais e tomada de decisão.`,
+    title: `Aula ${index + 1} • ${topicId} • ${nonceSuffix}`,
+    content: `${objectiveLine}\n${shuffle(base.lessons)[0]} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
     topicId,
   }));
 
@@ -286,7 +291,7 @@ function buildLocalStudyPack(topicId: string) {
     ]);
 
     return {
-      question: `${stem} (Pergunta ${index + 1})`,
+      question: `${stem} (Pergunta ${index + 1} • ${nonceSuffix})`,
       options: shuffle([correct, ...distractors]),
       answer: correct,
       explanation: 'Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.',
@@ -303,10 +308,10 @@ function buildLocalStudyPack(topicId: string) {
     generatedAt: new Date().toISOString(),
     lessons,
     flashcards: Array.from({ length: 10 }, (_, index) => ({
-      id: `${topicId}-flashcard-${index + 1}`,
-      front: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
+      id: `${topicId}-flashcard-${index + 1}-${nonceSuffix}`,
+      front: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]} (${nonceSuffix})`,
       back: shuffle(base.lessons)[0],
-      question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
+      question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]} (${nonceSuffix})`,
       answer: shuffle(base.lessons)[0],
       hint: 'Relacione o conceito com red flags e decisão inicial.',
     })),
@@ -894,7 +899,7 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
-      return res.json(buildLocalStudyPack(parsed.data.topicId));
+      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
     }
 
     try {
@@ -905,17 +910,17 @@ export function createApp() {
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Objetivo descrito: ${parsed.data.objective || 'não informado'}. Foco prioritário: ${parsed.data.focus || 'all'}. Nonce de variação: ${parsed.data.nonce || Date.now()}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido. Evite repetição literal.`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
-        return res.json(buildLocalStudyPack(parsed.data.topicId));
+        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
       }
       return res.json(normalizeStudyPackForClient(parsed.data.topicId, response.data));
     } catch (error) {
       console.error('study-pack error', error);
-      return res.json(buildLocalStudyPack(parsed.data.topicId));
+      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
     }
   });
 

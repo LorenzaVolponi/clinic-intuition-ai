@@ -3,6 +3,9 @@ import crypto from 'node:crypto';
 
 const requestSchema = z.object({
   topicId: z.string().min(1),
+  objective: z.string().max(500).optional(),
+  focus: z.enum(['all', 'flashcards', 'quiz', 'lessons']).optional(),
+  nonce: z.string().max(100).optional(),
 });
 
 const localLibrary = {
@@ -28,7 +31,7 @@ const localLibrary = {
   },
 };
 
-async function callGroq(topicId) {
+async function callGroq({ topicId, objective, focus, nonce }) {
   const apiKey = process.env.GROQ_API_KEY;
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
   const models = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
@@ -41,7 +44,14 @@ async function callGroq(topicId) {
       content:
         'Você é um tutor médico sênior para app mobile. Gere SOMENTE JSON válido com meta{topic,generated_at,safety_warning}, lessons[10] (preferencialmente aula_rapida estruturada), flashcards[min5] (id,front,back) e quiz[min7] (id,difficulty,scenario,question,options A-D,correct_option_id,explanation). Sem alucinação e sem texto fora do JSON.',
     },
-    { role: 'user', content: `Tema: ${topicId}. Gere conteúdo didático objetivo, factual e conservador para mobile.` },
+    {
+      role: 'user',
+      content: `Tema: ${topicId}.
+Objetivo descrito pela pessoa: ${objective || 'não informado'}.
+Foco prioritário: ${focus || 'all'}.
+Nonce de variação: ${nonce || Date.now()}.
+Gere conteúdo didático objetivo, factual, prático, rápido e interativo para mobile sem repetição literal.`,
+    },
   ];
 
   for (const model of models) {
@@ -83,17 +93,19 @@ function shuffle(items) {
   return arr;
 }
 
-function buildLocalPack(topicId) {
+function buildLocalPack(topicId, objective = '', nonce = '') {
   const base = localLibrary[topicId] || localLibrary.emergencias;
+  const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
+  const nonceSuffix = String(nonce || Date.now()).slice(-6);
   const lessons = Array.from({ length: 10 }, (_, idx) => ({
-    title: `Aula ${idx + 1} • ${topicId}`,
-    content: `Objetivo: ${shuffle(base.lessons)[0]}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
+    title: `Aula ${idx + 1} • ${topicId} • ${nonceSuffix}`,
+    content: `${objectiveLine}\nGancho clínico: ${shuffle(base.lessons)[0]}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nInterativo: faça 1 pergunta de checagem ao final.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
     topicId,
   }));
 
   const correct = 'Priorizar avaliação clínica, sinais de alarme e exames iniciais.';
   const quiz = Array.from({ length: 10 }, (_, idx) => ({
-    question: `${shuffle(base.stems)[0]} (Q${idx + 1})`,
+    question: `${shuffle(base.stems)[0]} (Q${idx + 1} • ${nonceSuffix})`,
     options: shuffle([
       correct,
       'Aguardar sem monitorização.',
@@ -115,10 +127,10 @@ function buildLocalPack(topicId) {
     lessons,
     quiz,
     flashcards: Array.from({ length: 10 }, (_, idx) => ({
-      id: `${topicId}-flashcard-${idx + 1}`,
-      front: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]}`,
+      id: `${topicId}-flashcard-${idx + 1}-${nonceSuffix}`,
+      front: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]} (${nonceSuffix})`,
       back: shuffle(base.lessons)[0],
-      question: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]}`,
+      question: `Flashcard ${idx + 1}: ${shuffle(base.stems)[0]} (${nonceSuffix})`,
       answer: shuffle(base.lessons)[0],
       hint: 'Relacione com red flags e conduta inicial.',
     })),
@@ -190,7 +202,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
   }
 
-  const aiPack = await callGroq(parsed.data.topicId);
+  const focus = parsed.data.focus || 'all';
+  const aiPack = await callGroq({
+    topicId: parsed.data.topicId,
+    objective: parsed.data.objective,
+    focus,
+    nonce: parsed.data.nonce,
+  });
   if (
     aiPack &&
     Array.isArray(aiPack.lessons) &&
@@ -203,5 +221,5 @@ export default async function handler(req, res) {
     return res.status(200).json(normalizePack(parsed.data.topicId, aiPack));
   }
 
-  return res.status(200).json(buildLocalPack(parsed.data.topicId));
+  return res.status(200).json(buildLocalPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
 }

@@ -44,6 +44,7 @@ const Index = () => {
   const [medbotMessages, setMedbotMessages] = useState<ChatMessage[]>([DEFAULT_MEDBOT_MESSAGE]);
   const [generatedStudyPack, setGeneratedStudyPack] = useState<GeneratedStudyPack | null>(null);
   const [isGeneratingStudyPack, setIsGeneratingStudyPack] = useState(false);
+  const [aiGenerationPrompt, setAiGenerationPrompt] = useState('');
   const [aiFlashcardIndex, setAiFlashcardIndex] = useState(0);
   const [aiFlashcardFlipped, setAiFlashcardFlipped] = useState(false);
   const [aiQuizQuestionIndex, setAiQuizQuestionIndex] = useState(0);
@@ -124,7 +125,11 @@ const Index = () => {
           }
         }
 
-        const pack = await generateStudyPack(selectedTopicId);
+        const pack = await generateStudyPack(selectedTopicId, {
+          objective: selectedTopic.objective,
+          focus: 'all',
+          nonce: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        });
         setGeneratedStudyPack(pack);
         localStorage.setItem(cacheKey, JSON.stringify(pack));
       } finally {
@@ -152,7 +157,26 @@ const Index = () => {
     setAiFlashcardFlipped(false);
     setAiQuizQuestionIndex(0);
     setAiSelectedAnswers({});
+    setAiGenerationPrompt('');
   }, [selectedTopicId]);
+
+  const regenerateAiPack = async (focus: 'flashcards' | 'quiz' | 'lessons') => {
+    setIsGeneratingStudyPack(true);
+    try {
+      const pack = await generateStudyPack(selectedTopicId, {
+        objective: aiGenerationPrompt.trim() || selectedTopic.objective,
+        focus,
+        nonce: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      });
+      setGeneratedStudyPack(pack);
+      setAiFlashcardIndex(0);
+      setAiFlashcardFlipped(false);
+      setAiQuizQuestionIndex(0);
+      setAiSelectedAnswers({});
+    } finally {
+      setIsGeneratingStudyPack(false);
+    }
+  };
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
@@ -350,19 +374,11 @@ const Index = () => {
             if (!total) return;
             setAiQuizQuestionIndex((current) => (current === total - 1 ? 0 : current + 1));
           }}
-          onRegenerateStudyPack={async () => {
-            setIsGeneratingStudyPack(true);
-            try {
-              const pack = await generateStudyPack(selectedTopicId);
-              setGeneratedStudyPack(pack);
-              setAiFlashcardIndex(0);
-              setAiFlashcardFlipped(false);
-              setAiQuizQuestionIndex(0);
-              setAiSelectedAnswers({});
-            } finally {
-              setIsGeneratingStudyPack(false);
-            }
-          }}
+          aiGenerationPrompt={aiGenerationPrompt}
+          onAiGenerationPromptChange={setAiGenerationPrompt}
+          onRegenerateFlashcardsAi={() => regenerateAiPack('flashcards')}
+          onRegenerateQuizAi={() => regenerateAiPack('quiz')}
+          onRegenerateLessonsAi={() => regenerateAiPack('lessons')}
         />
 
         <TimelineSection

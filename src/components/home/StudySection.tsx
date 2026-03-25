@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { GeneratedStudyPack, StudyTopic } from '@/lib/studyContent';
 import { RefreshCcw } from 'lucide-react';
 
@@ -36,7 +37,11 @@ interface StudySectionProps {
   onSelectAiAnswer: (option: string) => void;
   onPrevAiQuestion: () => void;
   onNextAiQuestion: () => void;
-  onRegenerateStudyPack: () => void;
+  aiGenerationPrompt: string;
+  onAiGenerationPromptChange: (value: string) => void;
+  onRegenerateFlashcardsAi: () => void;
+  onRegenerateQuizAi: () => void;
+  onRegenerateLessonsAi: () => void;
 }
 
 export const StudySection = ({
@@ -68,7 +73,11 @@ export const StudySection = ({
   onSelectAiAnswer,
   onPrevAiQuestion,
   onNextAiQuestion,
-  onRegenerateStudyPack,
+  aiGenerationPrompt,
+  onAiGenerationPromptChange,
+  onRegenerateFlashcardsAi,
+  onRegenerateQuizAi,
+  onRegenerateLessonsAi,
 }: StudySectionProps) => {
   const activeFlashcard = selectedTopic.flashcards[flashcardIndex];
   const activeQuestion = selectedTopic.quiz[currentQuestionIndex];
@@ -113,6 +122,18 @@ export const StudySection = ({
       </div>
 
       <Tabs defaultValue="flashcards" className="space-y-6">
+        <Card className="rounded-[24px] border-white/70 bg-white/90 shadow-sm">
+          <CardContent className="space-y-3 p-4">
+            <p className="text-sm font-semibold text-slate-700">Descreva como você quer gerar o conteúdo IA (flashcards, quiz e aulas).</p>
+            <Textarea
+              value={aiGenerationPrompt}
+              onChange={(event) => onAiGenerationPromptChange(event.target.value)}
+              placeholder="Ex.: foco em entorpecentes, nível intermediário, ênfase em red flags, perguntas aplicadas a pronto atendimento."
+              className="min-h-[90px] rounded-2xl bg-white"
+            />
+          </CardContent>
+        </Card>
+
         <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm sm:justify-center sm:rounded-full">
           <TabsTrigger value="flashcards" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Flashcards</TabsTrigger>
           <TabsTrigger value="quiz" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Quiz</TabsTrigger>
@@ -179,7 +200,7 @@ export const StudySection = ({
                 <CardTitle>Flashcards gerados por IA</CardTitle>
                 <CardDescription>10 cartões novos para revisão ativa em cada geração.</CardDescription>
               </div>
-              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
+              <Button onClick={onRegenerateFlashcardsAi} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
                 <RefreshCcw className="mr-2 h-4 w-4" />
                 {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novos'}
               </Button>
@@ -330,7 +351,7 @@ export const StudySection = ({
                 <CardTitle>Quiz IA interativo (10 perguntas)</CardTitle>
                 <CardDescription>Responda uma por vez com feedback imediato e score em tempo real.</CardDescription>
               </div>
-              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} className="rounded-full">
+              <Button onClick={onRegenerateQuizAi} disabled={isGeneratingStudyPack} className="rounded-full">
                 <RefreshCcw className="mr-2 h-4 w-4" />
                 {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novo quiz'}
               </Button>
@@ -399,7 +420,7 @@ export const StudySection = ({
                 <CardTitle>10 aulas rápidas geradas dinamicamente</CardTitle>
                 <CardDescription>Conteúdo curto para revisão guiada e prática clínica.</CardDescription>
               </div>
-              <Button onClick={onRegenerateStudyPack} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
+              <Button onClick={onRegenerateLessonsAi} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
                 <RefreshCcw className="mr-2 h-4 w-4" />
                 {isGeneratingStudyPack ? 'Atualizando...' : 'Atualizar aulas'}
               </Button>

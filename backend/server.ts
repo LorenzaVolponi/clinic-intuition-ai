@@ -204,7 +204,8 @@ const studyPackModelResponseSchema = z.object({
         .refine((item) => Boolean(item.front || item.question), 'flashcard precisa de front/question')
         .refine((item) => Boolean(item.back || item.answer), 'flashcard precisa de back/answer'),
     )
-    .min(1),
+    .min(1)
+    .optional(),
   quiz: z.array(
     z.object({
       id: z.string().optional(),
@@ -216,7 +217,7 @@ const studyPackModelResponseSchema = z.object({
       answer: z.string().optional(),
       explanation: z.string(),
     }),
-  ).min(1),
+  ).min(1).optional(),
 });
 
 const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: string[] }> = {
@@ -329,18 +330,21 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
 
 function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof studyPackModelResponseSchema>) {
   const fallbackPack = buildLocalStudyPack(topicId);
-  const optionsFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+  const rawQuiz = payload.quiz || [];
+  const rawFlashcards = payload.flashcards || [];
+  type QuizItem = NonNullable<z.infer<typeof studyPackModelResponseSchema>['quiz']>[number];
+  const optionsFrom = (item: QuizItem) => {
     return item.options.map((option) => (typeof option === 'string' ? option : option.text));
   };
 
-  const answerFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+  const answerFrom = (item: QuizItem) => {
     if (item.answer) return item.answer;
     if (!item.correct_option_id) return optionsFrom(item)[0] || 'Resposta indisponível';
     const matched = item.options.find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
     return typeof matched === 'string' ? matched : matched?.text || optionsFrom(item)[0] || 'Resposta indisponível';
   };
 
-  const quizItems = payload.quiz
+  const quizItems = rawQuiz
     .map((item, index) => {
       const options = optionsFrom(item);
       const answer = answerFrom(item);
@@ -389,7 +393,7 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     };
   }) || []).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);
 
-  const uniqueFlashcards = payload.flashcards
+  const uniqueFlashcards = rawFlashcards
     .map((card, index) => ({
       id: card.id || `${topicId}-flashcard-${index + 1}`,
       front: sanitizeEducationalText(card.front || card.question || 'Conceito clínico'),
@@ -935,7 +939,22 @@ export function createApp() {
       if (!response.success) {
         return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
       }
-      return res.json(normalizeStudyPackForClient(parsed.data.topicId, response.data));
+      const focus = parsed.data.focus || 'all';
+      const ai = response.data;
+      const hasEnoughForFocus =
+        focus === 'flashcards'
+          ? (ai.flashcards?.length || 0) >= 5
+          : focus === 'quiz'
+            ? (ai.quiz?.length || 0) >= 5
+            : focus === 'lessons'
+              ? (ai.lessons?.length || 0) >= 5
+              : (ai.lessons?.length || 0) >= 5 && (ai.quiz?.length || 0) >= 5 && (ai.flashcards?.length || 0) >= 5;
+
+      if (!hasEnoughForFocus) {
+        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+      }
+
+      return res.json(normalizeStudyPackForClient(parsed.data.topicId, ai));
     } catch (error) {
       console.error('study-pack error', error);
       return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));

@@ -229,15 +229,17 @@ export default async function handler(req, res) {
     focus,
     nonce: parsed.data.nonce,
   });
-  if (
+  const hasEnoughForFocus =
     aiPack &&
-    Array.isArray(aiPack.lessons) &&
-    aiPack.lessons.length >= 10 &&
-    Array.isArray(aiPack.quiz) &&
-    aiPack.quiz.length >= 7 &&
-    Array.isArray(aiPack.flashcards) &&
-    aiPack.flashcards.length >= 5
-  ) {
+    (focus === 'flashcards'
+      ? Array.isArray(aiPack.flashcards) && aiPack.flashcards.length >= 5
+      : focus === 'quiz'
+        ? Array.isArray(aiPack.quiz) && aiPack.quiz.length >= 5
+        : focus === 'lessons'
+          ? Array.isArray(aiPack.lessons) && aiPack.lessons.length >= 5
+          : Array.isArray(aiPack.lessons) && aiPack.lessons.length >= 5 && Array.isArray(aiPack.quiz) && aiPack.quiz.length >= 5 && Array.isArray(aiPack.flashcards) && aiPack.flashcards.length >= 5);
+
+  if (hasEnoughForFocus) {
     return res.status(200).json(normalizePack(parsed.data.topicId, aiPack));
   }
 

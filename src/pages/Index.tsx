@@ -168,7 +168,17 @@ const Index = () => {
         focus,
         nonce: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       });
-      setGeneratedStudyPack(pack);
+      setGeneratedStudyPack((current) => {
+        if (!current) return pack;
+        return {
+          ...current,
+          generatedAt: pack.generatedAt,
+          meta: pack.meta,
+          flashcards: focus === 'flashcards' ? pack.flashcards : current.flashcards,
+          quiz: focus === 'quiz' ? pack.quiz : current.quiz,
+          lessons: focus === 'lessons' ? pack.lessons : current.lessons,
+        };
+      });
       setAiFlashcardIndex(0);
       setAiFlashcardFlipped(false);
       setAiQuizQuestionIndex(0);

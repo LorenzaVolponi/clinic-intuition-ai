@@ -49,13 +49,28 @@ curl http://localhost:8080/api/health
 curl -X POST http://localhost:8787/api/medbot \
   -H "content-type: application/json" \
   -d '{"topicId":"cardiologia","question":"resuma IAM"}'
+
+# geração por foco (flashcards, quiz, aulas) com objetivo + nonce
+curl -X POST http://localhost:8787/api/study-pack \
+  -H "content-type: application/json" \
+  -d '{"topicId":"neurologia","focus":"flashcards","objective":"revisão prática de déficit focal","nonce":"smoke-a1"}'
+
+curl -X POST http://localhost:8787/api/study-pack \
+  -H "content-type: application/json" \
+  -d '{"topicId":"infectologia","focus":"lessons","objective":"treino rápido para pronto atendimento","nonce":"smoke-b2"}'
 ```
+
+Verifique no retorno:
+- `flashcards`, `quiz` e `lessons` sempre preenchidos;
+- variação de conteúdo ao trocar `nonce`;
+- ausência de dose explícita (ex.: `500mg`) em conteúdo educacional.
 
 ## 4) Checklist UX/UI (mobile e web)
 
 - Hero sem overflow horizontal no mobile.
 - Botões principais clicáveis e com largura adequada no mobile.
 - Tabs de estudo com rolagem horizontal funcionando.
+- Geração IA por aba atualiza somente a seção pedida (flashcards/quiz/aulas).
 - MedBot mostrando status claro de IA ativa vs fallback local.
 - Scroll da conversa MedBot sem quebrar layout.
 

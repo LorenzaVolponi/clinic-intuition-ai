@@ -29,16 +29,23 @@ function getSessionState(sessionId) {
   return next;
 }
 
-function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'intermediario' }) {
+function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario' }) {
   const intent = detectIntent(question);
   const interactionId = crypto.randomUUID();
   const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
   const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(question);
+  const askedTopicMatch = question.match(/(?:sobre|entender|estudar|revisar)\s+(.+)$/i) || question.match(/quero ajuda(?: para)?\s+(.+)$/i);
+  const askedTopic = askedTopicMatch?.[1]?.trim().replace(/[?.!]+$/, '') || '';
+  const hasRecentHistory = history.length > 0;
   const levelLabel = userLevel === 'iniciante' ? 'iniciante' : userLevel === 'avancado' ? 'avançado' : 'intermediário';
 
   const text =
     isHelpIntent
-      ? `Claro! Posso te ajudar como um tutor de estudo médico 🤝\n\nConsigo:\n• resumir temas em pontos-chave\n• montar casos clínicos para treino\n• aplicar quiz interativo com feedback\n• revisar farmacologia com segurança\n\nVou adaptar a conversa ao seu nível (${levelLabel}).\nMe diga o tema que você quer dominar agora e já começamos.`
+      ? askedTopic
+        ? `Boa! Vamos estudar **${askedTopic}** sem enrolação.\n\n1) fundamento em 30s\n2) aplicação clínica prática\n3) quiz curto de fixação\n\nSe quiser, começo agora pelo item 1.`
+        : `Fechado 🤝 eu sigo o seu fluxo e respondo do jeito que você pedir (resumo, caso, quiz ou comparação), em linguagem ${levelLabel}.\n\nMe diga o tema e já começo.`
+      : hasRecentHistory
+        ? `Continuando de onde paramos em **${topicId}**:\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, transformo isso em caso clínico curto agora.`
       : intent === 'medicamento'
       ? `💊 **FARMACOLOGIA: foco em ${topicId}**\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• benefício clínico com evidência\n• contexto de urgência sob supervisão\n• manutenção após estabilização\n\n⚠️ **SEGURANÇA:**\n• validar contraindicações\n• não usar dose sem protocolo local\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n→ interações\n→ alternativas\n→ caso clínico`
       : `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura (nível ${levelLabel}).\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
@@ -60,7 +67,11 @@ function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'inter
           estimated_read_time: 90,
         },
       },
-      suggestions: isHelpIntent ? ['resumo sepse', 'caso clínico IAM', 'quiz AVC'] : ['caso clínico', 'quiz', 'red flags'],
+      suggestions: isHelpIntent
+        ? askedTopic
+          ? [`resumo ${askedTopic}`, `caso clínico ${askedTopic}`, `quiz ${askedTopic}`]
+          : ['resumo do tema', 'caso clínico curto', 'quiz de 3 perguntas']
+        : ['caso clínico', 'quiz', 'red flags'],
       session_state: { total_interactions: 1, topics_covered: [topicId], used_ids: [interactionId] },
     },
   };
@@ -111,7 +122,7 @@ export default async function handler(req, res) {
   sessionState.userLevel = userLevel;
   sessionState.topics.add(topicId);
 
-  const fallback = buildLocalResponse({ topicId, question, sessionUuid, userLevel });
+  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel });
   sessionState.interactions.push(fallback.response.interaction_id);
   sessionState.usedIds.add(fallback.response.interaction_id);
   fallback.response.session_state = {

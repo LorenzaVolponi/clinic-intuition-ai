@@ -71,6 +71,9 @@ const medbotRequestSchema = z.object({
 
 const studyPackRequestSchema = z.object({
   topicId: z.string().min(1),
+  objective: z.string().max(500).optional(),
+  focus: z.enum(['all', 'flashcards', 'quiz', 'lessons']).optional(),
+  nonce: z.string().max(100).optional(),
 });
 
 type LocalAssessment = z.infer<typeof localAssessmentSchema>;
@@ -201,7 +204,8 @@ const studyPackModelResponseSchema = z.object({
         .refine((item) => Boolean(item.front || item.question), 'flashcard precisa de front/question')
         .refine((item) => Boolean(item.back || item.answer), 'flashcard precisa de back/answer'),
     )
-    .min(1),
+    .min(1)
+    .optional(),
   quiz: z.array(
     z.object({
       id: z.string().optional(),
@@ -213,7 +217,7 @@ const studyPackModelResponseSchema = z.object({
       answer: z.string().optional(),
       explanation: z.string(),
     }),
-  ).min(1),
+  ).min(1).optional(),
 });
 
 const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: string[] }> = {
@@ -259,37 +263,47 @@ const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: stri
   },
 };
 
-function buildLocalStudyPack(topicId: string) {
+function sanitizeEducationalText(text: string) {
+  return text
+    .replace(/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/gi, '[dose conforme protocolo]')
+    .replace(/\b\d+\s?\/\s?\d+\s?h\b/gi, '[intervalo conforme protocolo]')
+    .trim();
+}
+
+function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string) {
   const base = studyPackLocalLibrary[topicId] ?? studyPackLocalLibrary.emergencias;
-  const shuffle = <T,>(items: T[]) => {
-    const arr = [...items];
-    for (let i = arr.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  };
+  const nonceSuffix = String(nonce || Date.now()).slice(-6);
+  const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
+  const shift = [...nonceSuffix].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const pickByIndex = <T,>(items: T[], index: number) => items[(index + shift) % items.length];
 
   const lessons = Array.from({ length: 10 }, (_, index) => ({
-    title: `Aula ${index + 1} • ${topicId}`,
-    content: `${shuffle(base.lessons)[0]} Foco: segurança clínica, exames iniciais e tomada de decisão.`,
+    title: `Aula ${index + 1} • ${topicId} • ${nonceSuffix}`,
+    content: sanitizeEducationalText(
+      `${objectiveLine}\n${pickByIndex(base.lessons, index)} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
+    ),
     topicId,
   }));
 
   const quiz = Array.from({ length: 10 }, (_, index) => {
-    const stem = shuffle(base.questions)[0];
+    const stem = pickByIndex(base.questions, index);
     const correct = 'Priorizar avaliação presencial e conduta baseada em sinais de alarme.';
-    const distractors = shuffle([
+    const distractors = [
       'Aguardar evolução sem monitorização.',
       'Ignorar sinais vitais e focar apenas em exames tardios.',
       'Concluir diagnóstico definitivo sem reavaliação clínica.',
-    ]);
+    ];
+    const orderedDistractors = [
+      pickByIndex(distractors, index),
+      pickByIndex(distractors, index + 1),
+      pickByIndex(distractors, index + 2),
+    ];
 
     return {
-      question: `${stem} (Pergunta ${index + 1})`,
-      options: shuffle([correct, ...distractors]),
+      question: `${stem} (Pergunta ${index + 1} • ${nonceSuffix})`,
+      options: [correct, ...orderedDistractors].sort((a, b) => (a + nonceSuffix).localeCompare(b + nonceSuffix)),
       answer: correct,
-      explanation: 'Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.',
+      explanation: sanitizeEducationalText('Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.'),
     };
   });
 
@@ -303,11 +317,11 @@ function buildLocalStudyPack(topicId: string) {
     generatedAt: new Date().toISOString(),
     lessons,
     flashcards: Array.from({ length: 10 }, (_, index) => ({
-      id: `${topicId}-flashcard-${index + 1}`,
-      front: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
-      back: shuffle(base.lessons)[0],
-      question: `Flashcard ${index + 1} • ${topicId}: ${shuffle(base.questions)[0]}`,
-      answer: shuffle(base.lessons)[0],
+      id: `${topicId}-flashcard-${index + 1}-${nonceSuffix}`,
+      front: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index)} (${nonceSuffix})`),
+      back: sanitizeEducationalText(pickByIndex(base.lessons, index)),
+      question: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} (${nonceSuffix})`),
+      answer: sanitizeEducationalText(pickByIndex(base.lessons, index + 1)),
       hint: 'Relacione o conceito com red flags e decisão inicial.',
     })),
     quiz,
@@ -315,18 +329,22 @@ function buildLocalStudyPack(topicId: string) {
 }
 
 function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof studyPackModelResponseSchema>) {
-  const optionsFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+  const fallbackPack = buildLocalStudyPack(topicId);
+  const rawQuiz = payload.quiz || [];
+  const rawFlashcards = payload.flashcards || [];
+  type QuizItem = NonNullable<z.infer<typeof studyPackModelResponseSchema>['quiz']>[number];
+  const optionsFrom = (item: QuizItem) => {
     return item.options.map((option) => (typeof option === 'string' ? option : option.text));
   };
 
-  const answerFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
+  const answerFrom = (item: QuizItem) => {
     if (item.answer) return item.answer;
     if (!item.correct_option_id) return optionsFrom(item)[0] || 'Resposta indisponível';
     const matched = item.options.find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
     return typeof matched === 'string' ? matched : matched?.text || optionsFrom(item)[0] || 'Resposta indisponível';
   };
 
-  const quizItems = payload.quiz
+  const quizItems = rawQuiz
     .map((item, index) => {
       const options = optionsFrom(item);
       const answer = answerFrom(item);
@@ -339,7 +357,7 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
         difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
         scenario,
         question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
-        options,
+        options: options.map((option) => sanitizeEducationalText(option)),
         optionObjects: item.options.map((opt, idx) =>
           typeof opt === 'string' ? { id: String.fromCharCode(65 + idx) as 'A' | 'B' | 'C' | 'D', text: opt } : opt,
         ),
@@ -348,12 +366,47 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
           (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) &&
             (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) as { id?: 'A' | 'B' | 'C' | 'D' }).id) ||
           'A',
-        answer,
-        explanation: item.explanation,
+        answer: sanitizeEducationalText(answer),
+        explanation: sanitizeEducationalText(item.explanation),
       };
     })
     .filter((item, index, arr) => arr.findIndex((other) => other.hash === item.hash) === index)
     .map(({ hash: _hash, ...rest }) => rest);
+
+  const uniqueLessons = (payload.lessons?.map((lesson, index) => {
+    if ('title' in lesson) {
+      return {
+        title: lesson.title,
+        content: lesson.content,
+        topicId: lesson.topicId || topicId,
+      };
+    }
+    const aula = lesson.aula_rapida;
+    return {
+        title: `Aula rápida ${index + 1} • ${aula.topico}`,
+      content: sanitizeEducationalText(`Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
+        aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
+      }\nRed flags: ${
+        aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
+      }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`),
+      topicId,
+    };
+  }) || []).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);
+
+  const uniqueFlashcards = rawFlashcards
+    .map((card, index) => ({
+      id: card.id || `${topicId}-flashcard-${index + 1}`,
+      front: sanitizeEducationalText(card.front || card.question || 'Conceito clínico'),
+      back: sanitizeEducationalText(card.back || card.answer || 'Revisar protocolos e red flags.'),
+      question: sanitizeEducationalText(card.question || card.front || 'Conceito clínico'),
+      answer: sanitizeEducationalText(card.answer || card.back || 'Revisar protocolos e red flags.'),
+      hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
+    }))
+    .filter((card, index, arr) => arr.findIndex((other) => other.question === card.question && other.answer === card.answer) === index);
+
+  const mergedLessons = [...uniqueLessons, ...fallbackPack.lessons].slice(0, 10);
+  const mergedFlashcards = [...uniqueFlashcards, ...fallbackPack.flashcards].slice(0, 10);
+  const mergedQuiz = [...quizItems, ...fallbackPack.quiz].slice(0, 10);
 
   return {
     meta: payload.meta ?? {
@@ -363,35 +416,9 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     },
     topicId: payload.topicId || payload.meta?.topic || topicId,
     generatedAt: payload.generatedAt || payload.meta?.generated_at || new Date().toISOString(),
-    lessons:
-      payload.lessons?.map((lesson, index) => {
-        if ('title' in lesson) {
-          return {
-            title: lesson.title,
-            content: lesson.content,
-            topicId: lesson.topicId || topicId,
-          };
-        }
-        const aula = lesson.aula_rapida;
-        return {
-          title: `Aula rápida ${index + 1} • ${aula.topico}`,
-          content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
-            aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
-          }\nRed flags: ${
-            aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
-          }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
-          topicId,
-        };
-      }) || [],
-    flashcards: payload.flashcards.map((card, index) => ({
-      id: card.id || `${topicId}-flashcard-${index + 1}`,
-      front: card.front || card.question || 'Conceito clínico',
-      back: card.back || card.answer || 'Revisar protocolos e red flags.',
-      question: card.question || card.front || 'Conceito clínico',
-      answer: card.answer || card.back || 'Revisar protocolos e red flags.',
-      hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
-    })),
-    quiz: quizItems,
+    lessons: mergedLessons,
+    flashcards: mergedFlashcards,
+    quiz: mergedQuiz,
   };
 }
 
@@ -541,6 +568,7 @@ function updateSessionState(sessionId: string, partial: Partial<SessionState>) {
 function buildLocalMedbotAnswer(params: {
   topicId: string;
   question: string;
+  history?: Array<{ role: 'assistant' | 'user'; content: string }>;
   objective?: string;
   quickFacts?: string[];
   clinicalSummary?: string;
@@ -556,6 +584,11 @@ function buildLocalMedbotAnswer(params: {
   const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
   const sourceLabel = params.source === 'local' ? 'Consenso educacional local (atualização recomendada)' : 'Modelo Groq';
   const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(params.question);
+  const askedTopicMatch =
+    params.question.match(/(?:sobre|entender|estudar|revisar)\s+(.+)$/i) ||
+    params.question.match(/quero ajuda(?: para)?\s+(.+)$/i);
+  const askedTopic = askedTopicMatch?.[1]?.trim().replace(/[?.!]+$/, '') || '';
+  const hasRecentHistory = (params.history || []).length > 0;
   const levelLabel =
     params.userLevel === 'iniciante'
       ? 'iniciante'
@@ -563,10 +596,14 @@ function buildLocalMedbotAnswer(params: {
         ? 'avançado'
         : 'intermediário';
 
-  let text = `Ótima pergunta 👋\n\nSe quiser, eu posso te ajudar no tema **${params.topicId}** de forma bem prática (nível ${levelLabel}).\n\nPosso montar:\n• um resumo em 3 pontos\n• um caso clínico guiado\n• um mini quiz para testar fixação\n\nSe você preferir, já me diz seu objetivo agora (prova, plantão ou revisão rápida) e eu te respondo direto no formato ideal.`;
+  let text = `Perfeito — vamos direto ao ponto em **${params.topicId}** (nível ${levelLabel}).\n\n📌 **Resumo rápido**\n• conceito central\n• decisão clínica que mais cai\n• principal red flag\n\nSe quiser, no próximo passo eu transformo isso em caso clínico ou quiz.`;
 
   if (isHelpIntent) {
-    text = `Claro! Eu posso te ajudar de forma bem direta e sem enrolação 🤝\n\nNo momento, consigo:\n• resumir temas (ex.: “resuma sepse em 3 pontos”)\n• montar caso clínico para treino\n• fazer quiz interativo com feedback\n• revisar farmacologia com alertas de segurança\n\nVou adaptar a explicação ao seu nível (${levelLabel}) e objetivo.\nMe diz: **qual tema você quer dominar hoje?**`;
+    text = askedTopic
+      ? `Boa! Vamos estudar **${askedTopic}** de forma prática.\n\n1) **Fundamento em 30s**: definição + mecanismo principal.\n2) **Aplicação clínica**: quando suspeitar e o que não pode faltar.\n3) **Fixação rápida**: 3 perguntas objetivas com feedback.\n\nSe preferir, começamos agora pelo item 1.`
+      : `Fechado 🤝 eu sigo o seu ritmo e respondo no formato que você pedir (resumo, caso, quiz ou comparação), sem enrolação.\n\nMe diga o tema e eu já começo com uma explicação objetiva em linguagem ${levelLabel}.`;
+  } else if (hasRecentHistory) {
+    text = `Continuando de onde paramos em **${params.topicId}**:\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
   }
 
   if (intent === 'caso') {
@@ -582,7 +619,9 @@ function buildLocalMedbotAnswer(params: {
   }
 
   const suggestions = isHelpIntent
-    ? ['resumo sepse', 'caso clínico IAM', 'quiz AVC']
+    ? askedTopic
+      ? [`resumo ${askedTopic}`, `caso clínico ${askedTopic}`, `quiz ${askedTopic}`]
+      : ['resumo do tema', 'caso clínico curto', 'quiz de 3 perguntas']
     : intent === 'quiz'
       ? ['próxima', 'resumo', 'caso clínico']
       : intent === 'caso'
@@ -768,6 +807,7 @@ export function createApp() {
       const fallback = buildLocalMedbotAnswer({
         topicId: parsed.data.topicId,
         question: sanitized.sanitized,
+        history: parsed.data.history,
         objective: parsed.data.context?.objective,
         quickFacts: parsed.data.context?.quickFacts,
         clinicalSummary: parsed.data.context?.clinicalSummary,
@@ -812,6 +852,7 @@ export function createApp() {
       const fallback = buildLocalMedbotAnswer({
         topicId: parsed.data.topicId,
         question: sanitized.sanitized,
+        history: parsed.data.history,
         objective: parsed.data.context?.objective,
         quickFacts: parsed.data.context?.quickFacts,
         clinicalSummary: parsed.data.context?.clinicalSummary,
@@ -844,6 +885,7 @@ export function createApp() {
       const fallback = buildLocalMedbotAnswer({
         topicId: parsed.data.topicId,
         question: sanitized.sanitized,
+        history: parsed.data.history,
         objective: parsed.data.context?.objective,
         quickFacts: parsed.data.context?.quickFacts,
         clinicalSummary: parsed.data.context?.clinicalSummary,
@@ -879,7 +921,7 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
-      return res.json(buildLocalStudyPack(parsed.data.topicId));
+      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
     }
 
     try {
@@ -890,17 +932,32 @@ export function createApp() {
         },
         {
           role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido.`,
+          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Objetivo descrito: ${parsed.data.objective || 'não informado'}. Foco prioritário: ${parsed.data.focus || 'all'}. Nonce de variação: ${parsed.data.nonce || Date.now()}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido. Evite repetição literal.`,
         },
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
-        return res.json(buildLocalStudyPack(parsed.data.topicId));
+        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
       }
-      return res.json(normalizeStudyPackForClient(parsed.data.topicId, response.data));
+      const focus = parsed.data.focus || 'all';
+      const ai = response.data;
+      const hasEnoughForFocus =
+        focus === 'flashcards'
+          ? (ai.flashcards?.length || 0) >= 5
+          : focus === 'quiz'
+            ? (ai.quiz?.length || 0) >= 5
+            : focus === 'lessons'
+              ? (ai.lessons?.length || 0) >= 5
+              : (ai.lessons?.length || 0) >= 5 && (ai.quiz?.length || 0) >= 5 && (ai.flashcards?.length || 0) >= 5;
+
+      if (!hasEnoughForFocus) {
+        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+      }
+
+      return res.json(normalizeStudyPackForClient(parsed.data.topicId, ai));
     } catch (error) {
       console.error('study-pack error', error);
-      return res.json(buildLocalStudyPack(parsed.data.topicId));
+      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
     }
   });
 

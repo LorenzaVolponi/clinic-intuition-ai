@@ -87,6 +87,14 @@ const RED_FLAG_PATTERNS = [
   'sudorese profusa',
 ];
 
+const CLINICAL_CONTEXT_PATTERNS = {
+  severeHypotension: ['pa 8', 'pa baixa', 'hipotensao', 'hipotensão', 'choque'],
+  hypoxia: ['sat 8', 'sat < 90', 'saturacao 8', 'saturação 8', 'hipoxemia', 'cianose'],
+  fever: ['febre', '38.', '39.', 'temperatura alta'],
+  severeTachycardia: ['fc 12', 'fc > 12', 'taquicardia', 'pulso rapido'],
+  focalDeficit: ['deficit focal', 'déficit focal', 'afasia', 'hemiparesia', 'paresia'],
+};
+
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
     name: 'Síndrome Coronariana Aguda',
@@ -97,7 +105,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ['adulto', 'idoso'],
     genderPreference: 'masculino',
     urgencyLevel: 'emergencia',
-    treatments: ['AAS 200mg', 'Clopidogrel 300-600mg', 'Atorvastatina 80mg', 'Metoprolol'],
+    treatments: ['Antiagregação plaquetária conforme protocolo', 'Estatina de alta potência conforme protocolo', 'Controle de sintomas e monitorização', 'Avaliação de reperfusão pela equipe'],
     differentials: ['Pericardite', 'Embolia pulmonar', 'Pneumotórax', 'Dissecção aórtica'],
     redFlags: ['dor em aperto/peso', 'irradiação para braço esquerdo', 'sudorese profusa'],
     clinicalPearls: ['ECG em até 10min', 'Troponinas seriadas', 'Score TIMI/GRACE'],
@@ -112,7 +120,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['hipertensão', 'diabetes', 'cardiopatia isquêmica', 'idade > 65'],
     ageGroups: ['adulto', 'idoso'],
     urgencyLevel: 'alta',
-    treatments: ['Furosemida 40-80mg', 'Captopril 6,25-25mg', 'Carvedilol 3,125mg'],
+    treatments: ['Diurético de alça conforme protocolo', 'Vasodilatador/inibidor do SRAA conforme protocolo', 'Ajuste de terapia de insuficiência cardíaca'],
     differentials: ['Pneumonia', 'DPOC', 'Embolia pulmonar'],
     redFlags: ['sat O2 < 90%', 'crepitantes bibasais', 'B3 audível'],
     clinicalPearls: ['BNP/NT-proBNP', 'Ecocardiograma', 'Classificação NYHA'],
@@ -127,7 +135,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['idade > 65', 'DPOC', 'diabetes', 'etilismo', 'tabagismo'],
     ageGroups: ['adulto', 'idoso'],
     urgencyLevel: 'moderada',
-    treatments: ['Amoxicilina 875mg 8/8h', 'Azitromicina 500mg/dia', 'Levofloxacino 750mg'],
+    treatments: ['Antibioticoterapia empírica guiada por gravidade e perfil local', 'Suporte respiratório conforme necessidade', 'Reavaliação clínica seriada'],
     differentials: ['Bronquite aguda', 'COVID-19', 'Tuberculose'],
     redFlags: ['sat O2 < 90%', 'confusão mental', 'hipotensão'],
     clinicalPearls: ['Score CURB-65', 'RX tórax', 'Procalcitonina se disponível'],
@@ -142,7 +150,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['história pessoal/familiar', 'alergens', 'infecções respiratórias'],
     ageGroups: ['crianca', 'adolescente', 'adulto'],
     urgencyLevel: 'moderada',
-    treatments: ['Salbutamol spray', 'Budesonida inalatória', 'Prednisolona 40mg'],
+    treatments: ['Broncodilatador de resgate conforme protocolo', 'Corticoterapia conforme gravidade', 'Monitorização de resposta clínica'],
     differentials: ['DPOC', 'Pneumonia', 'Pneumotórax'],
     redFlags: ['uso de musculatura acessória', 'cianose', 'silêncio auscultatório'],
     clinicalPearls: ['Peak flow', 'Saturação O2', 'Resposta ao broncodilatador'],
@@ -157,7 +165,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['idade 10-30 anos', 'sexo masculino'],
     ageGroups: ['crianca', 'adolescente', 'adulto'],
     urgencyLevel: 'alta',
-    treatments: ['Ceftriaxona 2g', 'Metronidazol 500mg', 'Dipirona 500mg'],
+    treatments: ['Analgesia e hidratação conforme protocolo', 'Antibioticoprofilaxia perioperatória conforme protocolo', 'Avaliação cirúrgica imediata'],
     differentials: ['Gastroenterite', 'DIP', 'Litíase urinária', 'Gravidez ectópica'],
     redFlags: ['sinal de Blumberg', 'migração da dor', 'leucocitose com desvio'],
     clinicalPearls: ['Score de Alvarado', 'TC abdome se dúvida', 'Cirurgia urgente'],
@@ -187,7 +195,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['estresse', 'ansiedade', 'má postura', 'sono inadequado'],
     ageGroups: ['adolescente', 'adulto'],
     urgencyLevel: 'baixa',
-    treatments: ['Dipirona 500mg', 'Paracetamol 750mg', 'Relaxantes musculares'],
+    treatments: ['Analgésico simples conforme protocolo', 'Medidas não farmacológicas (sono, postura, manejo de estresse)', 'Acompanhamento ambulatorial'],
     differentials: ['Enxaqueca', 'Cefaleia em salvas', 'Hipertensão intracraniana'],
     redFlags: ['início súbito', 'febre + rigidez nucal', 'alterações neurológicas'],
     clinicalPearls: ['História é fundamental', 'Sinais de alarme', 'Diário da cefaleia'],
@@ -202,7 +210,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     riskFactors: ['hipertensão', 'diabetes', 'FA', 'idade > 55', 'tabagismo'],
     ageGroups: ['adulto', 'idoso'],
     urgencyLevel: 'emergencia',
-    treatments: ['AAS 300mg', 'Atorvastatina 80mg', 'Trombólise se indicada'],
+    treatments: ['Protocolo AVC agudo e monitorização neurológica', 'Terapia antitrombótica conforme imagem e protocolo', 'Avaliação para reperfusão em janela terapêutica'],
     differentials: ['Hipoglicemia', 'Enxaqueca com aura', 'Convulsão'],
     redFlags: ['déficit focal súbito', 'NIHSS > 4', '< 4,5h de início'],
     clinicalPearls: ['Janela terapêutica', 'TC crânio urgente', 'Scale NIHSS/ABCD2'],
@@ -218,7 +226,7 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     ageGroups: ['adulto'],
     genderPreference: 'feminino',
     urgencyLevel: 'baixa',
-    treatments: ['Nitrofurantoína 100mg', 'Sulfametoxazol+Trimetoprim', 'Fosfomicina 3g'],
+    treatments: ['Antibiótico de primeira linha conforme diretriz local', 'Hidratação e analgesia conforme necessidade', 'Reavaliação com cultura quando indicado'],
     differentials: ['Vaginite', 'Uretrite', 'Pielonefrite'],
     redFlags: ['febre + dor lombar', 'náuseas/vômitos', 'hematúria macroscópica'],
     clinicalPearls: ['EAS + urocultura', 'Tratamento empírico inicial', 'Seguimento clínico'],
@@ -317,9 +325,29 @@ function matchesTerm(text: string, term: string) {
   return variants.some((variant) => normalizedText.includes(variant));
 }
 
+function inferClinicalContext(text: string) {
+  const normalizedText = normalizeText(text);
+  return {
+    severeHypotension: CLINICAL_CONTEXT_PATTERNS.severeHypotension.some((term) => normalizedText.includes(normalizeText(term))),
+    hypoxia: CLINICAL_CONTEXT_PATTERNS.hypoxia.some((term) => normalizedText.includes(normalizeText(term))),
+    fever: CLINICAL_CONTEXT_PATTERNS.fever.some((term) => normalizedText.includes(normalizeText(term))),
+    severeTachycardia: CLINICAL_CONTEXT_PATTERNS.severeTachycardia.some((term) => normalizedText.includes(normalizeText(term))),
+    focalDeficit: CLINICAL_CONTEXT_PATTERNS.focalDeficit.some((term) => normalizedText.includes(normalizeText(term))),
+  };
+}
+
+function normalizeGender(gender: string): MedicalCondition['genderPreference'] | 'both' {
+  const normalized = normalizeText(gender);
+  if (normalized.includes('femin')) return 'feminino';
+  if (normalized.includes('mascul')) return 'masculino';
+  return 'both';
+}
+
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const ageGroup = getAgeGroup(patientData.age);
   const durationProfile = getDurationProfile(patientData.duration);
+  const context = inferClinicalContext(patientData.symptoms);
+  const normalizedGender = normalizeGender(patientData.gender);
   const symptomHits = condition.commonSymptoms.filter((symptom) => matchesTerm(patientData.symptoms, symptom)).length;
   const redFlagHits = condition.redFlags.filter((flag) => matchesTerm(patientData.symptoms, flag)).length;
 
@@ -327,12 +355,20 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
 
   if (condition.ageGroups.includes(ageGroup)) score += 10;
   if (!condition.durationProfile || condition.durationProfile.includes(durationProfile)) score += 8;
-  if (!condition.genderPreference || condition.genderPreference === patientData.gender || condition.genderPreference === 'both') {
+  if (!condition.genderPreference || condition.genderPreference === normalizedGender || condition.genderPreference === 'both') {
     score += 6;
   }
 
   if (condition.urgencyLevel === 'emergencia' && redFlagHits > 0) score += 12;
   if (condition.urgencyLevel === 'alta' && symptomHits > 1) score += 6;
+
+  if ((context.severeHypotension || context.hypoxia) && (condition.urgencyLevel === 'emergencia' || condition.urgencyLevel === 'alta')) {
+    score += 10;
+  }
+  if (context.fever && condition.category === 'infeccioso') score += 8;
+  if (context.fever && condition.category === 'respiratorio') score += 5;
+  if (context.focalDeficit && condition.category === 'neurologico') score += 12;
+  if (context.severeTachycardia && condition.category === 'cardiovascular') score += 6;
 
   return Math.min(score, 100);
 }
@@ -390,7 +426,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   const hypotheses = topMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
-    treatment: `${condition.treatments.slice(0, 3).join(', ')} (exemplos educacionais; validar com protocolo institucional).`,
+    treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
     explanation: `${condition.clinicalPearls[0] ?? 'Raciocínio clínico guiado pelos sintomas predominantes.'} Compatibilidade baseada em ${condition.commonSymptoms.slice(0, 3).join(', ')} e contexto clínico informado.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),

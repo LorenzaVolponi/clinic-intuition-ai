@@ -64,6 +64,23 @@ describe('backend server routes', () => {
     expect(blob).toContain('[dose conforme protocolo]');
   });
 
+  it('POST /api/study-pack com nonces diferentes gera variação real de conteúdo', async () => {
+    const app = createApp();
+    const payloadBase = {
+      topicId: 'neurologia',
+      objective: 'revisão prática de déficit focal',
+      focus: 'flashcards',
+    };
+
+    const first = await request(app).post('/api/study-pack').send({ ...payloadBase, nonce: 'nonceA1' });
+    const second = await request(app).post('/api/study-pack').send({ ...payloadBase, nonce: 'nonceB2' });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.flashcards[0].question).not.toBe(second.body.flashcards[0].question);
+    expect(first.body.lessons[0].title).not.toBe(second.body.lessons[0].title);
+  });
+
   it('POST /api/medbot sem provedor retorna fallback local', async () => {
     const app = createApp();
     const response = await request(app).post('/api/medbot').send({ topicId: 'cardiologia', question: 'como estudar?' });

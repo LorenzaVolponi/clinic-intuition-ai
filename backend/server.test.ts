@@ -49,6 +49,21 @@ describe('backend server routes', () => {
     expect(response.body.lessons[0].title).toContain('abc123');
   });
 
+  it('POST /api/study-pack sanitiza dosagens explícitas no conteúdo educacional', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/study-pack').send({
+      topicId: 'cardiologia',
+      objective: 'explicar quando usar 500mg de forma didática',
+      focus: 'all',
+      nonce: 'dose99',
+    });
+
+    expect(response.status).toBe(200);
+    const blob = JSON.stringify(response.body);
+    expect(blob).not.toMatch(/\b500mg\b/i);
+    expect(blob).toContain('[dose conforme protocolo]');
+  });
+
   it('POST /api/medbot sem provedor retorna fallback local', async () => {
     const app = createApp();
     const response = await request(app).post('/api/medbot').send({ topicId: 'cardiologia', question: 'como estudar?' });

@@ -31,6 +31,13 @@ const localLibrary = {
   },
 };
 
+function sanitizeEducationalText(text) {
+  return String(text || '')
+    .replace(/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/gi, '[dose conforme protocolo]')
+    .replace(/\b\d+\s?\/\s?\d+\s?h\b/gi, '[intervalo conforme protocolo]')
+    .trim();
+}
+
 async function callGroq({ topicId, objective, focus, nonce }) {
   const apiKey = process.env.GROQ_API_KEY;
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -101,7 +108,9 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
   const pickByIndex = (items, index) => items[(index + shift) % items.length];
   const lessons = Array.from({ length: 10 }, (_, idx) => ({
     title: `Aula ${idx + 1} • ${topicId} • ${nonceSuffix}`,
-    content: `${objectiveLine}\nGancho clínico: ${pickByIndex(base.lessons, idx)}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nInterativo: faça 1 pergunta de checagem ao final.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
+    content: sanitizeEducationalText(
+      `${objectiveLine}\nGancho clínico: ${pickByIndex(base.lessons, idx)}\nConceitos-chave: red flags, hipótese principal, diferenciais críticos.\nInterativo: faça 1 pergunta de checagem ao final.\nChecklist: sinais vitais, exame físico dirigido, exames iniciais e reavaliação.`,
+    ),
     topicId,
   }));
 
@@ -117,7 +126,7 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
       ].sort((a, b) => (a + nonceSuffix + idx).localeCompare(b + nonceSuffix + idx)),
     ],
     answer: correct,
-    explanation: 'A tomada de decisão segura prioriza risco, red flags e confirmação progressiva.',
+    explanation: sanitizeEducationalText('A tomada de decisão segura prioriza risco, red flags e confirmação progressiva.'),
   }));
 
   return {
@@ -132,10 +141,10 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
     quiz,
     flashcards: Array.from({ length: 10 }, (_, idx) => ({
       id: `${topicId}-flashcard-${idx + 1}-${nonceSuffix}`,
-      front: `Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx)} (${nonceSuffix})`,
-      back: pickByIndex(base.lessons, idx),
-      question: `Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx + 1)} (${nonceSuffix})`,
-      answer: pickByIndex(base.lessons, idx + 1),
+      front: sanitizeEducationalText(`Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx)} (${nonceSuffix})`),
+      back: sanitizeEducationalText(pickByIndex(base.lessons, idx)),
+      question: sanitizeEducationalText(`Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx + 1)} (${nonceSuffix})`),
+      answer: sanitizeEducationalText(pickByIndex(base.lessons, idx + 1)),
       hint: 'Relacione com red flags e conduta inicial.',
     })),
   };
@@ -155,21 +164,21 @@ function normalizePack(topicId, aiPack) {
       difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
       scenario,
       question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
-      options,
+      options: options.map((opt) => sanitizeEducationalText(opt)),
       optionObjects: (item.options || []).map((opt, idx) => (typeof opt === 'string' ? { id: ['A', 'B', 'C', 'D'][idx], text: opt } : opt)),
       correct_option_id: item.correct_option_id || 'A',
-      answer,
-      explanation: item.explanation,
+      answer: sanitizeEducationalText(answer),
+      explanation: sanitizeEducationalText(item.explanation),
     };
   }).filter((item, index, arr) => arr.findIndex((other) => other.hash === item.hash) === index)
     .map(({ hash: _hash, ...rest }) => rest);
 
   const flashcards = (aiPack.flashcards || []).map((card, index) => ({
     id: card.id || `${topicId}-flashcard-${index + 1}`,
-    front: card.front || card.question || 'Conceito clínico',
-    back: card.back || card.answer || 'Revisar protocolos e red flags.',
-    question: card.question || card.front || 'Conceito clínico',
-    answer: card.answer || card.back || 'Revisar protocolos e red flags.',
+    front: sanitizeEducationalText(card.front || card.question || 'Conceito clínico'),
+    back: sanitizeEducationalText(card.back || card.answer || 'Revisar protocolos e red flags.'),
+    question: sanitizeEducationalText(card.question || card.front || 'Conceito clínico'),
+    answer: sanitizeEducationalText(card.answer || card.back || 'Revisar protocolos e red flags.'),
     hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
   })).filter((card, index, arr) => arr.findIndex((other) => other.question === card.question && other.answer === card.answer) === index);
 
@@ -184,7 +193,7 @@ function normalizePack(topicId, aiPack) {
     const aula = lesson.aula_rapida || {};
     return {
       title: `Aula rápida ${index + 1} • ${aula.topico || topicId}`,
-      content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+      content: sanitizeEducationalText(`Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`),
       topicId,
     };
   }).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);

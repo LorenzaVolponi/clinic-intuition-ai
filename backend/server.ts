@@ -262,6 +262,13 @@ const studyPackLocalLibrary: Record<string, { lessons: string[]; questions: stri
   },
 };
 
+function sanitizeEducationalText(text: string) {
+  return text
+    .replace(/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/gi, '[dose conforme protocolo]')
+    .replace(/\b\d+\s?\/\s?\d+\s?h\b/gi, '[intervalo conforme protocolo]')
+    .trim();
+}
+
 function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string) {
   const base = studyPackLocalLibrary[topicId] ?? studyPackLocalLibrary.emergencias;
   const nonceSuffix = String(nonce || Date.now()).slice(-6);
@@ -271,7 +278,9 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
 
   const lessons = Array.from({ length: 10 }, (_, index) => ({
     title: `Aula ${index + 1} • ${topicId} • ${nonceSuffix}`,
-    content: `${objectiveLine}\n${pickByIndex(base.lessons, index)} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
+    content: sanitizeEducationalText(
+      `${objectiveLine}\n${pickByIndex(base.lessons, index)} Foco: segurança clínica, exames iniciais e tomada de decisão.\nInterativo: finalize com uma pergunta de checagem.`,
+    ),
     topicId,
   }));
 
@@ -293,7 +302,7 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
       question: `${stem} (Pergunta ${index + 1} • ${nonceSuffix})`,
       options: [correct, ...orderedDistractors].sort((a, b) => (a + nonceSuffix).localeCompare(b + nonceSuffix)),
       answer: correct,
-      explanation: 'Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.',
+      explanation: sanitizeEducationalText('Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.'),
     };
   });
 
@@ -308,10 +317,10 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
     lessons,
     flashcards: Array.from({ length: 10 }, (_, index) => ({
       id: `${topicId}-flashcard-${index + 1}-${nonceSuffix}`,
-      front: `Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index)} (${nonceSuffix})`,
-      back: pickByIndex(base.lessons, index),
-      question: `Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} (${nonceSuffix})`,
-      answer: pickByIndex(base.lessons, index + 1),
+      front: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index)} (${nonceSuffix})`),
+      back: sanitizeEducationalText(pickByIndex(base.lessons, index)),
+      question: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} (${nonceSuffix})`),
+      answer: sanitizeEducationalText(pickByIndex(base.lessons, index + 1)),
       hint: 'Relacione o conceito com red flags e decisão inicial.',
     })),
     quiz,
@@ -344,7 +353,7 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
         difficulty: item.difficulty || (index % 3 === 0 ? 'easy' : index % 3 === 1 ? 'medium' : 'hard'),
         scenario,
         question: item.scenario ? `${item.scenario}\n\n${item.question}` : item.question,
-        options,
+        options: options.map((option) => sanitizeEducationalText(option)),
         optionObjects: item.options.map((opt, idx) =>
           typeof opt === 'string' ? { id: String.fromCharCode(65 + idx) as 'A' | 'B' | 'C' | 'D', text: opt } : opt,
         ),
@@ -353,8 +362,8 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
           (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) &&
             (item.options.find((opt) => (typeof opt === 'string' ? opt === answer : opt.text === answer)) as { id?: 'A' | 'B' | 'C' | 'D' }).id) ||
           'A',
-        answer,
-        explanation: item.explanation,
+        answer: sanitizeEducationalText(answer),
+        explanation: sanitizeEducationalText(item.explanation),
       };
     })
     .filter((item, index, arr) => arr.findIndex((other) => other.hash === item.hash) === index)
@@ -370,12 +379,12 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     }
     const aula = lesson.aula_rapida;
     return {
-      title: `Aula rápida ${index + 1} • ${aula.topico}`,
-      content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
+        title: `Aula rápida ${index + 1} • ${aula.topico}`,
+      content: sanitizeEducationalText(`Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
         aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
       }\nRed flags: ${
         aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
-      }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+      }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`),
       topicId,
     };
   }) || []).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);
@@ -383,10 +392,10 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
   const uniqueFlashcards = payload.flashcards
     .map((card, index) => ({
       id: card.id || `${topicId}-flashcard-${index + 1}`,
-      front: card.front || card.question || 'Conceito clínico',
-      back: card.back || card.answer || 'Revisar protocolos e red flags.',
-      question: card.question || card.front || 'Conceito clínico',
-      answer: card.answer || card.back || 'Revisar protocolos e red flags.',
+      front: sanitizeEducationalText(card.front || card.question || 'Conceito clínico'),
+      back: sanitizeEducationalText(card.back || card.answer || 'Revisar protocolos e red flags.'),
+      question: sanitizeEducationalText(card.question || card.front || 'Conceito clínico'),
+      answer: sanitizeEducationalText(card.answer || card.back || 'Revisar protocolos e red flags.'),
       hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
     }))
     .filter((card, index, arr) => arr.findIndex((other) => other.question === card.question && other.answer === card.answer) === index);

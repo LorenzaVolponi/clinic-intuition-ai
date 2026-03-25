@@ -391,31 +391,47 @@ function buildQuizPool() {
   );
 }
 
-export function generateRandomStudyPack(topicId: string): GeneratedStudyPack {
+export function generateRandomStudyPack(
+  topicId: string,
+  options?: { objective?: string; focus?: 'all' | 'flashcards' | 'quiz' | 'lessons'; nonce?: string },
+): GeneratedStudyPack {
   const topic = getTopicById(topicId);
+  const objective = options?.objective?.trim() || topic.objective;
+  const objectiveSnippet = objective.slice(0, 120);
+  const nonce = (options?.nonce || Date.now().toString()).slice(-5);
   const lessons = shuffleArray(
     buildLessonPool().map((lesson) => ({
       ...lesson,
-      content: `${lesson.content}\nAplicação prática em ${topic.title}: conecte com red flags e exames iniciais.`,
+      title: `${lesson.title} • ${nonce}`,
+      content: `${lesson.content}\nObjetivo personalizado: ${objectiveSnippet}.\nAplicação prática em ${topic.title}: conecte com red flags e exames iniciais.`,
     })),
   ).slice(0, 10);
 
-  const quiz = shuffleArray(buildQuizPool()).slice(0, 10);
+  const quiz = shuffleArray(buildQuizPool())
+    .map((item, index) => ({
+      ...item,
+      question: `${item.question} [${objectiveSnippet}] (${nonce}-${index + 1})`,
+    }))
+    .slice(0, 10);
   const flashcards = shuffleArray(
     STUDY_TOPICS.flatMap((item) =>
       item.flashcards.map((card) => ({
-        question: `[${item.title}] ${card.question}`,
-        answer: card.answer,
-        hint: card.hint,
+        question: `[${item.title}] ${card.question} • foco: ${objectiveSnippet} • ${nonce}`,
+        answer: `${card.answer} | Contexto de estudo: ${objectiveSnippet}.`,
+        hint: `${card.hint} (Objetivo atual: ${objectiveSnippet})`,
       })),
     ),
   ).slice(0, 10);
 
+  const selectedLessons = options?.focus === 'quiz' || options?.focus === 'flashcards' ? [] : lessons;
+  const selectedQuiz = options?.focus === 'lessons' || options?.focus === 'flashcards' ? [] : quiz;
+  const selectedFlashcards = options?.focus === 'lessons' || options?.focus === 'quiz' ? [] : flashcards;
+
   return {
     topicId: topic.id,
     generatedAt: new Date().toISOString(),
-    lessons,
-    quiz,
-    flashcards,
+    lessons: selectedLessons,
+    quiz: selectedQuiz,
+    flashcards: selectedFlashcards,
   };
 }

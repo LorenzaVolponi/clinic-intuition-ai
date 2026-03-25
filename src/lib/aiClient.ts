@@ -193,10 +193,10 @@ export async function generateStudyPack(topicId: string, options?: StudyPackGene
     ) {
       return normalizePack(response);
     }
-    return generateRandomStudyPack(topicId);
+    return normalizePack(generateRandomStudyPack(topicId, options));
   } catch (error) {
     console.warn('Falha ao gerar estudo no backend. Mantendo geração local.', error);
-    return generateRandomStudyPack(topicId);
+    return normalizePack(generateRandomStudyPack(topicId, options));
   }
 }
 

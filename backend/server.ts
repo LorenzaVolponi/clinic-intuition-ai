@@ -320,6 +320,7 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
 }
 
 function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof studyPackModelResponseSchema>) {
+  const fallbackPack = buildLocalStudyPack(topicId);
   const optionsFrom = (item: z.infer<typeof studyPackModelResponseSchema>['quiz'][number]) => {
     return item.options.map((option) => (typeof option === 'string' ? option : option.text));
   };
@@ -360,6 +361,41 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     .filter((item, index, arr) => arr.findIndex((other) => other.hash === item.hash) === index)
     .map(({ hash: _hash, ...rest }) => rest);
 
+  const uniqueLessons = (payload.lessons?.map((lesson, index) => {
+    if ('title' in lesson) {
+      return {
+        title: lesson.title,
+        content: lesson.content,
+        topicId: lesson.topicId || topicId,
+      };
+    }
+    const aula = lesson.aula_rapida;
+    return {
+      title: `Aula rápida ${index + 1} • ${aula.topico}`,
+      content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
+        aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
+      }\nRed flags: ${
+        aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
+      }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+      topicId,
+    };
+  }) || []).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);
+
+  const uniqueFlashcards = payload.flashcards
+    .map((card, index) => ({
+      id: card.id || `${topicId}-flashcard-${index + 1}`,
+      front: card.front || card.question || 'Conceito clínico',
+      back: card.back || card.answer || 'Revisar protocolos e red flags.',
+      question: card.question || card.front || 'Conceito clínico',
+      answer: card.answer || card.back || 'Revisar protocolos e red flags.',
+      hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
+    }))
+    .filter((card, index, arr) => arr.findIndex((other) => other.question === card.question && other.answer === card.answer) === index);
+
+  const mergedLessons = [...uniqueLessons, ...fallbackPack.lessons].slice(0, 10);
+  const mergedFlashcards = [...uniqueFlashcards, ...fallbackPack.flashcards].slice(0, 10);
+  const mergedQuiz = [...quizItems, ...fallbackPack.quiz].slice(0, 10);
+
   return {
     meta: payload.meta ?? {
       topic: topicId,
@@ -368,35 +404,9 @@ function normalizeStudyPackForClient(topicId: string, payload: z.infer<typeof st
     },
     topicId: payload.topicId || payload.meta?.topic || topicId,
     generatedAt: payload.generatedAt || payload.meta?.generated_at || new Date().toISOString(),
-    lessons:
-      payload.lessons?.map((lesson, index) => {
-        if ('title' in lesson) {
-          return {
-            title: lesson.title,
-            content: lesson.content,
-            topicId: lesson.topicId || topicId,
-          };
-        }
-        const aula = lesson.aula_rapida;
-        return {
-          title: `Aula rápida ${index + 1} • ${aula.topico}`,
-          content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nPontos essenciais: ${
-            aula['2_explicacao_direta']?.pontos_essenciais?.join(' | ') || 'Sem pontos adicionais.'
-          }\nRed flags: ${
-            aula['5_red_flags']?.flags?.map((flag) => `${flag.sinal} (${flag.conduta_imediata})`).join(' | ') || 'Sem red flags destacadas.'
-          }\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
-          topicId,
-        };
-      }) || [],
-    flashcards: payload.flashcards.map((card, index) => ({
-      id: card.id || `${topicId}-flashcard-${index + 1}`,
-      front: card.front || card.question || 'Conceito clínico',
-      back: card.back || card.answer || 'Revisar protocolos e red flags.',
-      question: card.question || card.front || 'Conceito clínico',
-      answer: card.answer || card.back || 'Revisar protocolos e red flags.',
-      hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
-    })),
-    quiz: quizItems,
+    lessons: mergedLessons,
+    flashcards: mergedFlashcards,
+    quiz: mergedQuiz,
   };
 }
 

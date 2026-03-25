@@ -138,6 +138,7 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
 }
 
 function normalizePack(topicId, aiPack) {
+  const fallbackPack = buildLocalPack(topicId);
   const quiz = (aiPack.quiz || []).map((item, index) => {
     const options = (item.options || []).map((opt) => (typeof opt === 'string' ? opt : opt.text));
     const correctOption = (item.options || []).find((opt) => typeof opt !== 'string' && opt.id === item.correct_option_id);
@@ -166,29 +167,35 @@ function normalizePack(topicId, aiPack) {
     question: card.question || card.front || 'Conceito clínico',
     answer: card.answer || card.back || 'Revisar protocolos e red flags.',
     hint: card.hint || 'Associe com sinais de gravidade e conduta inicial.',
-  }));
+  })).filter((card, index, arr) => arr.findIndex((other) => other.question === card.question && other.answer === card.answer) === index);
+
+  const lessons = (aiPack.lessons || []).map((lesson, index) => {
+    if (lesson.title && lesson.content) {
+      return {
+        title: lesson.title,
+        content: lesson.content,
+        topicId: lesson.topicId || topicId,
+      };
+    }
+    const aula = lesson.aula_rapida || {};
+    return {
+      title: `Aula rápida ${index + 1} • ${aula.topico || topicId}`,
+      content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
+      topicId,
+    };
+  }).filter((lesson, index, arr) => arr.findIndex((other) => other.title === lesson.title && other.content === lesson.content) === index);
+
+  const mergedLessons = [...lessons, ...fallbackPack.lessons].slice(0, 10);
+  const mergedFlashcards = [...flashcards, ...fallbackPack.flashcards].slice(0, 10);
+  const mergedQuiz = [...quiz, ...fallbackPack.quiz].slice(0, 10);
 
   return {
     meta: aiPack.meta || { topic: topicId, generated_at: new Date().toISOString(), safety_warning: topicId === 'emergencias' },
     topicId: aiPack.topicId || aiPack.meta?.topic || topicId,
     generatedAt: aiPack.generatedAt || aiPack.meta?.generated_at || new Date().toISOString(),
-    lessons: (aiPack.lessons || []).map((lesson, index) => {
-      if (lesson.title && lesson.content) {
-        return {
-          title: lesson.title,
-          content: lesson.content,
-          topicId: lesson.topicId || topicId,
-        };
-      }
-      const aula = lesson.aula_rapida || {};
-      return {
-        title: `Aula rápida ${index + 1} • ${aula.topico || topicId}`,
-        content: `Gancho: ${aula['1_gancho_clinico']?.descricao || 'Caso clínico rápido.'}\nConceito: ${aula['2_explicacao_direta']?.conceito_chave || 'Revisão objetiva.'}\nResumo de bolso: ${aula['7_resumo_bolso']?.frase_unico || 'Aplicar raciocínio clínico seguro.'}`,
-        topicId,
-      };
-    }),
-    quiz,
-    flashcards,
+    lessons: mergedLessons,
+    quiz: mergedQuiz,
+    flashcards: mergedFlashcards,
   };
 }
 

@@ -34,6 +34,21 @@ describe('backend server routes', () => {
     expect(response.body.flashcards).toHaveLength(10);
   });
 
+  it('POST /api/study-pack aceita objetivo/foco/nonce e reflete objetivo nas aulas locais', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/study-pack').send({
+      topicId: 'infectologia',
+      objective: 'foco em sepse no pronto atendimento',
+      focus: 'lessons',
+      nonce: 'abc123',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.lessons).toHaveLength(10);
+    expect(response.body.lessons[0].content).toContain('foco em sepse no pronto atendimento');
+    expect(response.body.lessons[0].title).toContain('abc123');
+  });
+
   it('POST /api/medbot sem provedor retorna fallback local', async () => {
     const app = createApp();
     const response = await request(app).post('/api/medbot').send({ topicId: 'cardiologia', question: 'como estudar?' });

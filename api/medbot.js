@@ -33,11 +33,15 @@ function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'inter
   const intent = detectIntent(question);
   const interactionId = crypto.randomUUID();
   const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
+  const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(question);
+  const levelLabel = userLevel === 'iniciante' ? 'iniciante' : userLevel === 'avancado' ? 'avançado' : 'intermediário';
 
   const text =
-    intent === 'medicamento'
+    isHelpIntent
+      ? `Claro! Posso te ajudar como um tutor de estudo médico 🤝\n\nConsigo:\n• resumir temas em pontos-chave\n• montar casos clínicos para treino\n• aplicar quiz interativo com feedback\n• revisar farmacologia com segurança\n\nVou adaptar a conversa ao seu nível (${levelLabel}).\nMe diga o tema que você quer dominar agora e já começamos.`
+      : intent === 'medicamento'
       ? `💊 **FARMACOLOGIA: foco em ${topicId}**\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• benefício clínico com evidência\n• contexto de urgência sob supervisão\n• manutenção após estabilização\n\n⚠️ **SEGURANÇA:**\n• validar contraindicações\n• não usar dose sem protocolo local\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n→ interações\n→ alternativas\n→ caso clínico`
-      : `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura.\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
+      : `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura (nível ${levelLabel}).\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
 
   return {
     response: {
@@ -56,7 +60,7 @@ function buildLocalResponse({ topicId, question, sessionUuid, userLevel = 'inter
           estimated_read_time: 90,
         },
       },
-      suggestions: ['caso clínico', 'quiz', 'red flags'],
+      suggestions: isHelpIntent ? ['resumo sepse', 'caso clínico IAM', 'quiz AVC'] : ['caso clínico', 'quiz', 'red flags'],
       session_state: { total_interactions: 1, topics_covered: [topicId], used_ids: [interactionId] },
     },
   };

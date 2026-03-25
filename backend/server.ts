@@ -555,8 +555,19 @@ function buildLocalMedbotAnswer(params: {
   const interactionId = crypto.randomUUID();
   const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
   const sourceLabel = params.source === 'local' ? 'Consenso educacional local (atualização recomendada)' : 'Modelo Groq';
+  const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(params.question);
+  const levelLabel =
+    params.userLevel === 'iniciante'
+      ? 'iniciante'
+      : params.userLevel === 'avancado'
+        ? 'avançado'
+        : 'intermediário';
 
-  let text = `📌 **TÓPICO: ${params.topicId}**\n\n🎯 **EM UMA FRASE:**\n${objective}\n\n🔑 **PONTOS-CHAVE:**\n• ${facts[0] || 'Defina hipótese principal com base em história e exame.'}\n• ${facts[1] || 'Priorize exames que mudam conduta nas próximas horas.'}\n• ${facts[2] || 'Reavalie sinais vitais e red flags continuamente.'}\n\n🚨 **RED FLAGS (NÃO IGNORE!):**\n⚠️ Rebaixamento de consciência → encaminhar emergência\n⚠️ Instabilidade hemodinâmica → suporte imediato + supervisão presencial\n\n📖 **BASEADO EM:** ${sourceLabel}\n\n---\n💡 **QUER APROFUNDAR?**\n→ Digite "caso clínico"\n→ Digite "quiz"\n→ Digite "medicamentos"`;
+  let text = `Ótima pergunta 👋\n\nSe quiser, eu posso te ajudar no tema **${params.topicId}** de forma bem prática (nível ${levelLabel}).\n\nPosso montar:\n• um resumo em 3 pontos\n• um caso clínico guiado\n• um mini quiz para testar fixação\n\nSe você preferir, já me diz seu objetivo agora (prova, plantão ou revisão rápida) e eu te respondo direto no formato ideal.`;
+
+  if (isHelpIntent) {
+    text = `Claro! Eu posso te ajudar de forma bem direta e sem enrolação 🤝\n\nNo momento, consigo:\n• resumir temas (ex.: “resuma sepse em 3 pontos”)\n• montar caso clínico para treino\n• fazer quiz interativo com feedback\n• revisar farmacologia com alertas de segurança\n\nVou adaptar a explicação ao seu nível (${levelLabel}) e objetivo.\nMe diz: **qual tema você quer dominar hoje?**`;
+  }
 
   if (intent === 'caso') {
     text = `🏥 **CASO CLÍNICO #${interactionId.slice(0, 8).toUpperCase()}**\n\n👤 **PACIENTE:** Adulto com foco em ${params.topicId}\n\n📋 **HISTÓRIA:**\nQueixa principal e evolução temporal objetiva.\n\n🔍 **EXAME FÍSICO:**\n• Priorize sinais vitais e achados focais.\n\n❓ **PERGUNTA:**\nQual hipótese principal e qual conduta imediata?\n\n✅ **CONDUTA CORRETA:**\nEstratificar gravidade, excluir diagnóstico letal e iniciar suporte.\n\n📚 **POR QUÊ:**\n${params.clinicalSummary || 'A conduta inicial deve ser guiada por risco e tempo-dependência.'}\n\n---\n🎯 **QUER MAIS?**\n→ "outro caso"\n→ "mais difícil"\n→ "quiz"`;
@@ -570,8 +581,13 @@ function buildLocalMedbotAnswer(params: {
     text = `💊 **FARMACOLOGIA: foco em ${params.topicId}**\n\n📋 **CLASSE:** revisar por mecanismo e contexto clínico.\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• Situações com benefício comprovado em diretriz\n• Cenários de urgência com supervisão clínica\n• Estratégia de manutenção quando estabilizado\n\n⚠️ **SEGURANÇA:**\n• Não usar dose definitiva sem protocolo local\n• Confirmar contraindicações e função renal/hepática\n\n📖 **BASEADO EM:** ${sourceLabel}\n\n---\n→ Digite "interações"\n→ Digite "alternativas"\n→ Digite "caso clínico"`;
   }
 
-  const suggestions =
-    intent === 'quiz' ? ['próxima', 'resumo', 'caso clínico'] : intent === 'caso' ? ['outro caso', 'mais difícil', 'quiz'] : ['medicamentos', 'caso clínico', 'quiz'];
+  const suggestions = isHelpIntent
+    ? ['resumo sepse', 'caso clínico IAM', 'quiz AVC']
+    : intent === 'quiz'
+      ? ['próxima', 'resumo', 'caso clínico']
+      : intent === 'caso'
+        ? ['outro caso', 'mais difícil', 'quiz']
+        : ['medicamentos', 'caso clínico', 'quiz'];
 
   return {
     response: {

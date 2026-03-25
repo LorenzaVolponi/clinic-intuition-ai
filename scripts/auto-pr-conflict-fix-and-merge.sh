@@ -35,6 +35,9 @@ fi
 
 echo "[auto-pr] base=$BASE_REF head=$HEAD_REF"
 
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
+
 git fetch origin "$BASE_REF" "$HEAD_REF"
 git checkout -B "auto-merge/$PR_NUMBER" "origin/$HEAD_REF"
 
@@ -44,7 +47,7 @@ MERGE_STATUS=$?
 set -e
 
 if [[ $MERGE_STATUS -ne 0 ]]; then
-  echo "[auto-pr] conflito detectado. aplicando resolução automática preferindo alterações da PR (--theirs)."
+  echo "[auto-pr] conflito detectado. aplicando resolução automática preferindo alterações da PR (--ours)."
   mapfile -t CONFLICT_FILES < <(git diff --name-only --diff-filter=U)
 
   if [[ ${#CONFLICT_FILES[@]} -eq 0 ]]; then
@@ -53,7 +56,7 @@ if [[ $MERGE_STATUS -ne 0 ]]; then
   fi
 
   for file in "${CONFLICT_FILES[@]}"; do
-    git checkout --theirs "$file"
+    git checkout --ours "$file"
     git add "$file"
   done
 

@@ -45,8 +45,25 @@ describe('backend server routes', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.lessons).toHaveLength(10);
+    expect(response.body.quiz).toEqual([]);
+    expect(response.body.flashcards).toEqual([]);
     expect(response.body.lessons[0].content).toContain('foco em sepse no pronto atendimento');
     expect(response.body.lessons[0].title).toContain('abc123');
+  });
+
+  it('POST /api/study-pack injeta objetivo em quiz e flashcards no fallback local', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/study-pack').send({
+      topicId: 'infectologia',
+      objective: 'separar choque séptico de infecção sem disfunção orgânica',
+      focus: 'all',
+      nonce: 'obj77',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.quiz[0].question).toContain('separar choque séptico');
+    expect(response.body.flashcards[0].hint).toContain('separar choque séptico');
+    expect(response.body.flashcards[0].question).toContain('obj77');
   });
 
   it('POST /api/study-pack sanitiza dosagens explícitas no conteúdo educacional', async () => {
@@ -78,7 +95,8 @@ describe('backend server routes', () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(first.body.flashcards[0].question).not.toBe(second.body.flashcards[0].question);
-    expect(first.body.lessons[0].title).not.toBe(second.body.lessons[0].title);
+    expect(first.body.lessons).toEqual([]);
+    expect(second.body.lessons).toEqual([]);
   });
 
   it('POST /api/medbot sem provedor retorna fallback local', async () => {

@@ -270,10 +270,21 @@ function sanitizeEducationalText(text: string) {
     .trim();
 }
 
+function applyStudyPackFocus(
+  pack: ReturnType<typeof buildLocalStudyPack>,
+  focus: 'all' | 'flashcards' | 'quiz' | 'lessons' = 'all',
+) {
+  if (focus === 'flashcards') return { ...pack, lessons: [], quiz: [] };
+  if (focus === 'quiz') return { ...pack, lessons: [], flashcards: [] };
+  if (focus === 'lessons') return { ...pack, quiz: [], flashcards: [] };
+  return pack;
+}
+
 function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string) {
   const base = studyPackLocalLibrary[topicId] ?? studyPackLocalLibrary.emergencias;
   const nonceSuffix = String(nonce || Date.now()).slice(-6);
   const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
+  const objectiveSnippet = sanitizeEducationalText(objectiveLine.replace('Objetivo da pessoa: ', '').slice(0, 120));
   const shift = [...nonceSuffix].reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const pickByIndex = <T,>(items: T[], index: number) => items[(index + shift) % items.length];
 
@@ -300,10 +311,12 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
     ];
 
     return {
-      question: `${stem} (Pergunta ${index + 1} • ${nonceSuffix})`,
+      question: `${stem} • foco: ${objectiveSnippet} (Pergunta ${index + 1} • ${nonceSuffix})`,
       options: [correct, ...orderedDistractors].sort((a, b) => (a + nonceSuffix).localeCompare(b + nonceSuffix)),
       answer: correct,
-      explanation: sanitizeEducationalText('Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva.'),
+      explanation: sanitizeEducationalText(
+        `Condutas clínicas devem priorizar estabilidade, red flags e confirmação diagnóstica progressiva. Contexto do objetivo: ${objectiveSnippet}.`,
+      ),
     };
   });
 
@@ -319,10 +332,10 @@ function buildLocalStudyPack(topicId: string, objective?: string, nonce?: string
     flashcards: Array.from({ length: 10 }, (_, index) => ({
       id: `${topicId}-flashcard-${index + 1}-${nonceSuffix}`,
       front: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index)} (${nonceSuffix})`),
-      back: sanitizeEducationalText(pickByIndex(base.lessons, index)),
-      question: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} (${nonceSuffix})`),
-      answer: sanitizeEducationalText(pickByIndex(base.lessons, index + 1)),
-      hint: 'Relacione o conceito com red flags e decisão inicial.',
+      back: sanitizeEducationalText(`${pickByIndex(base.lessons, index)}\nObjetivo aplicado: ${objectiveSnippet}.`),
+      question: sanitizeEducationalText(`Flashcard ${index + 1} • ${topicId}: ${pickByIndex(base.questions, index + 1)} • foco ${objectiveSnippet} (${nonceSuffix})`),
+      answer: sanitizeEducationalText(`${pickByIndex(base.lessons, index + 1)}\nContexto de estudo: ${objectiveSnippet}.`),
+      hint: `Relacione o conceito com red flags e decisão inicial. Objetivo atual: ${objectiveSnippet}.`,
     })),
     quiz,
   };
@@ -921,7 +934,7 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
-      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+      return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
     }
 
     try {
@@ -937,7 +950,7 @@ export function createApp() {
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
-        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+        return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
       }
       const focus = parsed.data.focus || 'all';
       const ai = response.data;
@@ -951,13 +964,13 @@ export function createApp() {
               : (ai.lessons?.length || 0) >= 5 && (ai.quiz?.length || 0) >= 5 && (ai.flashcards?.length || 0) >= 5;
 
       if (!hasEnoughForFocus) {
-        return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+        return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
       }
 
-      return res.json(normalizeStudyPackForClient(parsed.data.topicId, ai));
+      return res.json(applyStudyPackFocus(normalizeStudyPackForClient(parsed.data.topicId, ai), parsed.data.focus || 'all'));
     } catch (error) {
       console.error('study-pack error', error);
-      return res.json(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+      return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
     }
   });
 

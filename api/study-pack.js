@@ -38,6 +38,13 @@ function sanitizeEducationalText(text) {
     .trim();
 }
 
+function applyPackFocus(pack, focus = 'all') {
+  if (focus === 'flashcards') return { ...pack, lessons: [], quiz: [] };
+  if (focus === 'quiz') return { ...pack, lessons: [], flashcards: [] };
+  if (focus === 'lessons') return { ...pack, quiz: [], flashcards: [] };
+  return pack;
+}
+
 async function callGroq({ topicId, objective, focus, nonce }) {
   const apiKey = process.env.GROQ_API_KEY;
   const preferredModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -94,6 +101,7 @@ Gere conteúdo didático objetivo, factual, prático, rápido e interativo para 
 function buildLocalPack(topicId, objective = '', nonce = '') {
   const base = localLibrary[topicId] || localLibrary.emergencias;
   const objectiveLine = objective ? `Objetivo da pessoa: ${objective}` : 'Objetivo da pessoa: revisão prática guiada.';
+  const objectiveSnippet = sanitizeEducationalText(objectiveLine.replace('Objetivo da pessoa: ', '').slice(0, 120));
   const nonceSuffix = String(nonce || Date.now()).slice(-6);
   const shift = [...nonceSuffix].reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const pickByIndex = (items, index) => items[(index + shift) % items.length];
@@ -107,7 +115,7 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
 
   const correct = 'Priorizar avaliação clínica, sinais de alarme e exames iniciais.';
   const quiz = Array.from({ length: 10 }, (_, idx) => ({
-    question: `${pickByIndex(base.stems, idx)} (Q${idx + 1} • ${nonceSuffix})`,
+    question: `${pickByIndex(base.stems, idx)} • foco: ${objectiveSnippet} (Q${idx + 1} • ${nonceSuffix})`,
     options: [
       correct,
       ...[
@@ -117,7 +125,9 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
       ].sort((a, b) => (a + nonceSuffix + idx).localeCompare(b + nonceSuffix + idx)),
     ],
     answer: correct,
-    explanation: sanitizeEducationalText('A tomada de decisão segura prioriza risco, red flags e confirmação progressiva.'),
+    explanation: sanitizeEducationalText(
+      `A tomada de decisão segura prioriza risco, red flags e confirmação progressiva. Contexto do objetivo: ${objectiveSnippet}.`,
+    ),
   }));
 
   return {
@@ -133,10 +143,10 @@ function buildLocalPack(topicId, objective = '', nonce = '') {
     flashcards: Array.from({ length: 10 }, (_, idx) => ({
       id: `${topicId}-flashcard-${idx + 1}-${nonceSuffix}`,
       front: sanitizeEducationalText(`Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx)} (${nonceSuffix})`),
-      back: sanitizeEducationalText(pickByIndex(base.lessons, idx)),
-      question: sanitizeEducationalText(`Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx + 1)} (${nonceSuffix})`),
-      answer: sanitizeEducationalText(pickByIndex(base.lessons, idx + 1)),
-      hint: 'Relacione com red flags e conduta inicial.',
+      back: sanitizeEducationalText(`${pickByIndex(base.lessons, idx)}\nObjetivo aplicado: ${objectiveSnippet}.`),
+      question: sanitizeEducationalText(`Flashcard ${idx + 1}: ${pickByIndex(base.stems, idx + 1)} • foco ${objectiveSnippet} (${nonceSuffix})`),
+      answer: sanitizeEducationalText(`${pickByIndex(base.lessons, idx + 1)}\nContexto de estudo: ${objectiveSnippet}.`),
+      hint: `Relacione com red flags e conduta inicial. Objetivo atual: ${objectiveSnippet}.`,
     })),
   };
 }
@@ -231,8 +241,8 @@ export default async function handler(req, res) {
           : Array.isArray(aiPack.lessons) && aiPack.lessons.length >= 5 && Array.isArray(aiPack.quiz) && aiPack.quiz.length >= 5 && Array.isArray(aiPack.flashcards) && aiPack.flashcards.length >= 5);
 
   if (hasEnoughForFocus) {
-    return res.status(200).json(normalizePack(parsed.data.topicId, aiPack));
+    return res.status(200).json(applyPackFocus(normalizePack(parsed.data.topicId, aiPack), focus));
   }
 
-  return res.status(200).json(buildLocalPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce));
+  return res.status(200).json(applyPackFocus(buildLocalPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), focus));
 }

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 
 const MEDBOT_SYSTEM_PROMPT = `# ⚕️ MEDBOT
 Responda APENAS em JSON no formato:
@@ -6,16 +7,6 @@ Responda APENAS em JSON no formato:
 
 const sessionCache = new Map();
 const TTL_MS = 24 * 60 * 60 * 1000;
-
-function detectIntent(question) {
-  const q = String(question || '').toLowerCase();
-  if (/(quiz|pergunta|quest)/i.test(q)) return 'quiz';
-  if (/(caso|anamnese|simulado)/i.test(q)) return 'caso';
-  if (/(medicamento|dose|farmaco)/i.test(q)) return 'medicamento';
-  if (/(comparar|vs|versus|diferen)/i.test(q)) return 'comparacao';
-  if (/(resumo|resuma|resumir|revis|red flag)/i.test(q)) return 'resumo';
-  return 'duvida';
-}
 
 function getSessionState(sessionId) {
   const now = Date.now();
@@ -30,31 +21,17 @@ function getSessionState(sessionId) {
 }
 
 function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {} }) {
-  const intent = detectIntent(question);
   const interactionId = crypto.randomUUID();
-  const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
-  const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(question);
-  const askedTopicMatch = question.match(/(?:sobre|entender|estudar|revisar)\s+(.+)$/i) || question.match(/quero ajuda(?: para)?\s+(.+)$/i);
-  const askedTopic = askedTopicMatch?.[1]?.trim().replace(/[?.!]+$/, '') || '';
-  const hasRecentHistory = history.length > 0;
-  const lastUserMessage = [...history].reverse().find((item) => item.role === 'user')?.content;
-  const continuityHook = lastUserMessage ? `Último ponto citado: "${String(lastUserMessage).slice(0, 120)}".` : '';
-  const objective = context?.objective || 'Revisar raciocínio clínico e priorização de risco.';
-  const objectiveHook = `Objetivo atual: ${objective}.`;
-  const quickFacts = Array.isArray(context?.quickFacts) ? context.quickFacts.slice(0, 3) : [];
-  const factsHook = quickFacts.length ? `Pontos-chave: ${quickFacts.join(' • ')}.` : '';
-  const levelLabel = userLevel === 'iniciante' ? 'iniciante' : userLevel === 'avancado' ? 'avançado' : 'intermediário';
-
-  const text =
-    isHelpIntent
-      ? askedTopic
-        ? `Boa! Vamos estudar **${askedTopic}** sem enrolação.\n\n1) fundamento em 30s\n2) aplicação clínica prática\n3) quiz curto de fixação\n\nSe quiser, começo agora pelo item 1.`
-        : `Fechado 🤝 eu sigo o seu fluxo e respondo do jeito que você pedir (resumo, caso, quiz ou comparação), em linguagem ${levelLabel}.\n\nMe diga o tema e já começo.`
-      : hasRecentHistory
-        ? `Continuando de onde paramos em **${topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, transformo isso em caso clínico curto agora.`
-      : intent === 'medicamento'
-      ? `💊 **FARMACOLOGIA: foco em ${topicId}**\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• benefício clínico com evidência\n• contexto de urgência sob supervisão\n• manutenção após estabilização\n\n⚠️ **SEGURANÇA:**\n• validar contraindicações\n• não usar dose sem protocolo local\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n→ interações\n→ alternativas\n→ caso clínico`
-      : `📌 **TÓPICO: ${topicId}**\n\n${objectiveHook}\n${factsHook}\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura (nível ${levelLabel}).\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
+  const { intent, text, suggestions, difficulty } = buildMedbotLocalContent({
+    topicId,
+    question,
+    history,
+    objective: context?.objective,
+    quickFacts: context?.quickFacts,
+    clinicalSummary: context?.clinicalSummary,
+    userLevel,
+    source: 'local',
+  });
 
   return {
     response: {
@@ -73,11 +50,7 @@ function buildLocalResponse({ topicId, question, history = [], sessionUuid, user
           estimated_read_time: 90,
         },
       },
-      suggestions: isHelpIntent
-        ? askedTopic
-          ? [`resumo ${askedTopic}`, `caso clínico ${askedTopic}`, `quiz ${askedTopic}`]
-          : ['resumo do tema', 'caso clínico curto', 'quiz de 3 perguntas']
-        : ['caso clínico', 'quiz', 'red flags'],
+      suggestions,
       session_state: { total_interactions: 1, topics_covered: [topicId], used_ids: [interactionId] },
     },
   };

@@ -16,21 +16,26 @@ export function mergeClinicalWithFallback(aiResponse, fallback) {
       }))
     : fallback.hypotheses;
 
+  const triageMap = { 'Ambulatorial': 1, 'Prioritário': 2, 'Urgente': 3, 'Emergência': 4 };
+  const aiTriage =
+    aiResponse?.triageLevel === 'Urgência'
+      ? 'Urgente'
+      : aiResponse?.triageLevel === 'Emergência'
+        ? 'Emergência'
+        : aiResponse?.triageLevel === 'Eletivo'
+          ? 'Ambulatorial'
+          : fallback.triageLevel;
+  const fallbackTriage = fallback.triageLevel || 'Ambulatorial';
+  const safeTriage = (triageMap[aiTriage] || 1) >= (triageMap[fallbackTriage] || 1) ? aiTriage : fallbackTriage;
+
   return {
     hypotheses: mappedHypotheses,
     emergencyWarning:
-      aiResponse?.triageLevel === 'Emergência'
+      safeTriage === 'Emergência'
         ? '🚨 Caso potencialmente crítico em contexto educacional. Encaminhar imediatamente para avaliação presencial/emergência.'
         : fallback.emergencyWarning,
-    triageLevel:
-      aiResponse?.triageLevel === 'Urgência'
-        ? 'Urgente'
-        : aiResponse?.triageLevel === 'Emergência'
-          ? 'Emergência'
-          : aiResponse?.triageLevel === 'Eletivo'
-            ? 'Ambulatorial'
-            : fallback.triageLevel,
-    triageReason: aiResponse?.triageReason || fallback.triageReason,
+    triageLevel: safeTriage,
+    triageReason: `${aiResponse?.triageReason || 'Sem justificativa da IA.'} | Base de segurança local: ${fallback.triageReason}`.slice(0, 700),
     suggestedExams: [
       ...new Set([
         ...(investigation.immediate || []),

@@ -13,6 +13,8 @@ describe('generateRandomStudyPack', () => {
     expect(pack.lessons.some((lesson) => lesson.content.includes(objective))).toBe(true);
     expect(pack.quiz.some((item) => item.question.includes(objective))).toBe(true);
     expect(pack.flashcards.some((card) => card.hint.includes(objective))).toBe(true);
+    expect(pack.lessons[0].content).toContain('1) Gancho clínico');
+    expect(pack.lessons[0].content).toContain('5) Resumo de bolso');
   });
 
   it('supports focus mode by returning only the requested content type', () => {

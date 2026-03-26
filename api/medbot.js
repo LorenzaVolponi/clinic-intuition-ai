@@ -29,7 +29,7 @@ function getSessionState(sessionId) {
   return next;
 }
 
-function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario' }) {
+function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {} }) {
   const intent = detectIntent(question);
   const interactionId = crypto.randomUUID();
   const difficulty = userLevel === 'iniciante' ? 'easy' : userLevel === 'avancado' ? 'hard' : 'medium';
@@ -37,6 +37,12 @@ function buildLocalResponse({ topicId, question, history = [], sessionUuid, user
   const askedTopicMatch = question.match(/(?:sobre|entender|estudar|revisar)\s+(.+)$/i) || question.match(/quero ajuda(?: para)?\s+(.+)$/i);
   const askedTopic = askedTopicMatch?.[1]?.trim().replace(/[?.!]+$/, '') || '';
   const hasRecentHistory = history.length > 0;
+  const lastUserMessage = [...history].reverse().find((item) => item.role === 'user')?.content;
+  const continuityHook = lastUserMessage ? `Último ponto citado: "${String(lastUserMessage).slice(0, 120)}".` : '';
+  const objective = context?.objective || 'Revisar raciocínio clínico e priorização de risco.';
+  const objectiveHook = `Objetivo atual: ${objective}.`;
+  const quickFacts = Array.isArray(context?.quickFacts) ? context.quickFacts.slice(0, 3) : [];
+  const factsHook = quickFacts.length ? `Pontos-chave: ${quickFacts.join(' • ')}.` : '';
   const levelLabel = userLevel === 'iniciante' ? 'iniciante' : userLevel === 'avancado' ? 'avançado' : 'intermediário';
 
   const text =
@@ -45,10 +51,10 @@ function buildLocalResponse({ topicId, question, history = [], sessionUuid, user
         ? `Boa! Vamos estudar **${askedTopic}** sem enrolação.\n\n1) fundamento em 30s\n2) aplicação clínica prática\n3) quiz curto de fixação\n\nSe quiser, começo agora pelo item 1.`
         : `Fechado 🤝 eu sigo o seu fluxo e respondo do jeito que você pedir (resumo, caso, quiz ou comparação), em linguagem ${levelLabel}.\n\nMe diga o tema e já começo.`
       : hasRecentHistory
-        ? `Continuando de onde paramos em **${topicId}**:\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, transformo isso em caso clínico curto agora.`
+        ? `Continuando de onde paramos em **${topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, transformo isso em caso clínico curto agora.`
       : intent === 'medicamento'
       ? `💊 **FARMACOLOGIA: foco em ${topicId}**\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• benefício clínico com evidência\n• contexto de urgência sob supervisão\n• manutenção após estabilização\n\n⚠️ **SEGURANÇA:**\n• validar contraindicações\n• não usar dose sem protocolo local\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n→ interações\n→ alternativas\n→ caso clínico`
-      : `📌 **TÓPICO: ${topicId}**\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura (nível ${levelLabel}).\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
+      : `📌 **TÓPICO: ${topicId}**\n\n${objectiveHook}\n${factsHook}\n\n🎯 **EM UMA FRASE:**\nRevisão objetiva para prática clínica segura (nível ${levelLabel}).\n\n🔑 **PONTOS-CHAVE:**\n• Hipótese principal baseada em dados explícitos\n• Exames que mudam conduta\n• Reavaliação serial\n\n🚨 **RED FLAGS:**\n⚠️ Instabilidade hemodinâmica → emergência\n⚠️ Rebaixamento de consciência → avaliação imediata\n\n📖 **BASEADO EM:** Consenso educacional local 2026\n\n---\n💡 **QUER APROFUNDAR?**\n→ caso clínico\n→ quiz\n→ medicamentos`;
 
   return {
     response: {
@@ -122,7 +128,7 @@ export default async function handler(req, res) {
   sessionState.userLevel = userLevel;
   sessionState.topics.add(topicId);
 
-  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel });
+  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel, context });
   sessionState.interactions.push(fallback.response.interaction_id);
   sessionState.usedIds.add(fallback.response.interaction_id);
   fallback.response.session_state = {

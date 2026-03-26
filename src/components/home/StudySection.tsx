@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { GeneratedStudyPack, StudyTopic } from '@/lib/studyContent';
 import { RefreshCcw } from 'lucide-react';
+import { useState } from 'react';
 
 interface StudySectionProps {
   topics: StudyTopic[];
@@ -79,6 +80,8 @@ export const StudySection = ({
   onRegenerateQuizAi,
   onRegenerateLessonsAi,
 }: StudySectionProps) => {
+  const [flashcardMode, setFlashcardMode] = useState<'topic' | 'ai'>('topic');
+  const [quizMode, setQuizMode] = useState<'topic' | 'ai'>('topic');
   const activeFlashcard = selectedTopic.flashcards[flashcardIndex];
   const activeQuestion = selectedTopic.quiz[currentQuestionIndex];
   const currentAnswer = selectedAnswers[currentQuestionIndex];
@@ -137,43 +140,94 @@ export const StudySection = ({
         <TabsList className="h-auto w-full justify-start gap-2 overflow-x-auto rounded-2xl bg-white p-1 shadow-sm sm:justify-center sm:rounded-full">
           <TabsTrigger value="flashcards" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Flashcards</TabsTrigger>
           <TabsTrigger value="quiz" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Quiz</TabsTrigger>
-          <TabsTrigger value="flashcards-ai" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Flashcards IA</TabsTrigger>
-          <TabsTrigger value="quiz-ai" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Quiz IA 10</TabsTrigger>
           <TabsTrigger value="aulas" className="rounded-full px-4 py-2 text-sm font-semibold sm:py-3 sm:text-base">Aulas 10</TabsTrigger>
         </TabsList>
 
         <TabsContent value="flashcards">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button variant={flashcardMode === 'topic' ? 'default' : 'outline'} className="rounded-full" onClick={() => setFlashcardMode('topic')}>
+              Flashcards do tema
+            </Button>
+            <Button
+              variant={flashcardMode === 'ai' ? 'default' : 'outline'}
+              className="rounded-full"
+              onClick={() => {
+                setFlashcardMode('ai');
+                onRegenerateFlashcardsAi();
+              }}
+              disabled={isGeneratingStudyPack}
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              {isGeneratingStudyPack ? 'Gerando IA...' : 'Gerar flashcards IA'}
+            </Button>
+          </div>
           <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
               <CardContent className="p-6 sm:p-8">
-                <button
-                  className="flex min-h-[320px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-cyan-50 p-6 text-left transition hover:shadow-lg"
-                  onClick={() => {
-                    triggerHaptic(10);
-                    onFlipFlashcard();
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary">Flashcard {flashcardIndex + 1}/{selectedTopic.flashcards.length}</Badge>
-                    <span className="text-sm font-medium text-slate-400">Clique para virar</span>
-                  </div>
+                {flashcardMode === 'ai' ? (
+                  !activeAiFlashcard ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando flashcards IA...</div>
+                  ) : (
+                    <>
+                      <button
+                        className="flex min-h-[320px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-violet-50 p-6 text-left transition hover:shadow-lg"
+                        onClick={() => {
+                          triggerHaptic(10);
+                          onFlipAiFlashcard();
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <Badge variant="secondary">IA {aiFlashcardIndex + 1}/{aiFlashcards.length}</Badge>
+                          <span className="text-sm font-medium text-slate-400">Clique para virar</span>
+                        </div>
+                        <div>
+                          <p className="text-sm uppercase tracking-[0.3em] text-slate-400">{aiFlashcardFlipped ? 'Resposta' : 'Pergunta'}</p>
+                          <h3 className="mt-4 text-2xl font-black leading-snug text-slate-900">
+                            {aiFlashcardFlipped ? activeAiFlashcard.answer : activeAiFlashcard.question}
+                          </h3>
+                        </div>
+                        <div className="rounded-2xl bg-slate-100/80 p-4 text-sm text-slate-500">
+                          <strong className="text-slate-700">Dica:</strong> {activeAiFlashcard.hint}
+                        </div>
+                      </button>
+                      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiFlashcard}>Anterior IA</Button>
+                        <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500" onClick={onNextAiFlashcard}>Próximo IA</Button>
+                      </div>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <button
+                      className="flex min-h-[320px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-cyan-50 p-6 text-left transition hover:shadow-lg"
+                      onClick={() => {
+                        triggerHaptic(10);
+                        onFlipFlashcard();
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary">Flashcard {flashcardIndex + 1}/{selectedTopic.flashcards.length}</Badge>
+                        <span className="text-sm font-medium text-slate-400">Clique para virar</span>
+                      </div>
 
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.3em] text-slate-400">{flashcardFlipped ? 'Resposta' : 'Pergunta'}</p>
-                    <h3 className="mt-4 text-2xl font-black leading-snug text-slate-900">
-                      {flashcardFlipped ? activeFlashcard.answer : activeFlashcard.question}
-                    </h3>
-                  </div>
+                      <div>
+                        <p className="text-sm uppercase tracking-[0.3em] text-slate-400">{flashcardFlipped ? 'Resposta' : 'Pergunta'}</p>
+                        <h3 className="mt-4 text-2xl font-black leading-snug text-slate-900">
+                          {flashcardFlipped ? activeFlashcard.answer : activeFlashcard.question}
+                        </h3>
+                      </div>
 
-                  <div className="rounded-2xl bg-slate-100/80 p-4 text-sm text-slate-500">
-                    <strong className="text-slate-700">Dica:</strong> {activeFlashcard.hint}
-                  </div>
-                </button>
+                      <div className="rounded-2xl bg-slate-100/80 p-4 text-sm text-slate-500">
+                        <strong className="text-slate-700">Dica:</strong> {activeFlashcard.hint}
+                      </div>
+                    </button>
 
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevFlashcard}>Anterior</Button>
-                  <Button className="flex-1 rounded-full bg-gradient-to-r from-cyan-500 to-violet-500" onClick={onNextFlashcard}>Próximo</Button>
-                </div>
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                      <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevFlashcard}>Anterior</Button>
+                      <Button className="flex-1 rounded-full bg-gradient-to-r from-cyan-500 to-violet-500" onClick={onNextFlashcard}>Próximo</Button>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
@@ -193,55 +247,88 @@ export const StudySection = ({
           </div>
         </TabsContent>
 
-        <TabsContent value="flashcards-ai">
-          <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle>Flashcards gerados por IA</CardTitle>
-                <CardDescription>10 cartões novos para revisão ativa em cada geração.</CardDescription>
-              </div>
-              <Button onClick={onRegenerateFlashcardsAi} disabled={isGeneratingStudyPack} variant="outline" className="rounded-full">
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novos'}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {!activeAiFlashcard ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando flashcards IA...</div>
-              ) : (
-                <>
-                  <button
-                    className="flex min-h-[280px] w-full flex-col justify-between rounded-[28px] border border-slate-200/70 bg-gradient-to-br from-white to-violet-50 p-6 text-left transition hover:shadow-lg"
-                    onClick={() => {
-                      triggerHaptic(10);
-                      onFlipAiFlashcard();
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary">IA {aiFlashcardIndex + 1}/{aiFlashcards.length}</Badge>
-                      <span className="text-sm font-medium text-slate-400">Clique para virar</span>
-                    </div>
-                    <div>
-                      <p className="text-sm uppercase tracking-[0.3em] text-slate-400">{aiFlashcardFlipped ? 'Resposta' : 'Pergunta'}</p>
-                      <h3 className="mt-4 text-2xl font-black leading-snug text-slate-900">
-                        {aiFlashcardFlipped ? activeAiFlashcard.answer : activeAiFlashcard.question}
-                      </h3>
-                    </div>
-                    <div className="rounded-2xl bg-slate-100/80 p-4 text-sm text-slate-500">
-                      <strong className="text-slate-700">Dica:</strong> {activeAiFlashcard.hint}
-                    </div>
-                  </button>
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                    <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiFlashcard}>Anterior IA</Button>
-                    <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-cyan-500" onClick={onNextAiFlashcard}>Próximo IA</Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="quiz">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button variant={quizMode === 'topic' ? 'default' : 'outline'} className="rounded-full" onClick={() => setQuizMode('topic')}>
+              Quiz do tema
+            </Button>
+            <Button
+              variant={quizMode === 'ai' ? 'default' : 'outline'}
+              className="rounded-full"
+              onClick={() => {
+                setQuizMode('ai');
+                onRegenerateQuizAi();
+              }}
+              disabled={isGeneratingStudyPack}
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              {isGeneratingStudyPack ? 'Gerando IA...' : 'Gerar quiz IA'}
+            </Button>
+          </div>
+          {quizMode === 'ai' ? (
+            <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Quiz IA interativo (10 perguntas)</CardTitle>
+                  <CardDescription>Responda uma por vez com feedback imediato e score em tempo real.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!activeAiQuestion ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando quiz IA...</div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-lg font-bold text-slate-900">{activeAiQuestion.question}</p>
+                        <p className="text-sm text-slate-500">Pergunta {aiQuizQuestionIndex + 1} de {aiQuiz.length}</p>
+                      </div>
+                      <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100">Score IA {aiQuizScore}/{aiQuiz.length || 1}</Badge>
+                    </div>
+                    <Progress value={((aiQuizQuestionIndex + 1) / (aiQuiz.length || 1)) * 100} className={`h-3 ${isAiCorrect ? 'animate-pulse' : ''}`} />
+                    <div className="grid gap-3">
+                      {activeAiQuestion.options.map((option) => {
+                        const selected = aiSelectedAnswers[aiQuizQuestionIndex] === option;
+                        const isCorrect = option === activeAiQuestion.answer;
+                        const showEvaluation = aiSelectedAnswers[aiQuizQuestionIndex] !== undefined;
+                        return (
+                          <button
+                            key={`ai-${option}`}
+                            onClick={() => {
+                              triggerHaptic(selected ? 8 : 18);
+                              onSelectAiAnswer(option);
+                            }}
+                            className={`w-full rounded-2xl border px-4 py-4 text-left text-sm font-medium transition ${
+                              showEvaluation
+                                ? isCorrect
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                  : selected
+                                    ? 'border-red-300 bg-red-50 text-red-700'
+                                    : 'border-slate-200 bg-white text-slate-500'
+                                : selected
+                                  ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50'
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {aiSelectedAnswers[aiQuizQuestionIndex] && (
+                      <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                        <strong className="text-slate-900">Explicação IA:</strong> {activeAiQuestion.explanation}
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiQuestion}>Pergunta IA anterior</Button>
+                      <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-emerald-500" onClick={onNextAiQuestion}>Próxima IA</Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
               <CardHeader>
@@ -342,75 +429,7 @@ export const StudySection = ({
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
-
-        <TabsContent value="quiz-ai">
-          <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between gap-4">
-              <div>
-                <CardTitle>Quiz IA interativo (10 perguntas)</CardTitle>
-                <CardDescription>Responda uma por vez com feedback imediato e score em tempo real.</CardDescription>
-              </div>
-              <Button onClick={onRegenerateQuizAi} disabled={isGeneratingStudyPack} className="rounded-full">
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                {isGeneratingStudyPack ? 'Gerando...' : 'Gerar novo quiz'}
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!activeAiQuestion ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 p-6 text-sm text-slate-500">Gerando quiz IA...</div>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-lg font-bold text-slate-900">{activeAiQuestion.question}</p>
-                      <p className="text-sm text-slate-500">Pergunta {aiQuizQuestionIndex + 1} de {aiQuiz.length}</p>
-                    </div>
-                    <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100">Score IA {aiQuizScore}/{aiQuiz.length || 1}</Badge>
-                  </div>
-                  <Progress value={((aiQuizQuestionIndex + 1) / (aiQuiz.length || 1)) * 100} className={`h-3 ${isAiCorrect ? 'animate-pulse' : ''}`} />
-                  <div className="grid gap-3">
-                    {activeAiQuestion.options.map((option) => {
-                      const selected = aiSelectedAnswers[aiQuizQuestionIndex] === option;
-                      const isCorrect = option === activeAiQuestion.answer;
-                      const showEvaluation = aiSelectedAnswers[aiQuizQuestionIndex] !== undefined;
-                      return (
-                        <button
-                          key={`ai-${option}`}
-                          onClick={() => {
-                            triggerHaptic(selected ? 8 : 18);
-                            onSelectAiAnswer(option);
-                          }}
-                          className={`w-full rounded-2xl border px-4 py-4 text-left text-sm font-medium transition ${
-                            showEvaluation
-                              ? isCorrect
-                                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                                : selected
-                                  ? 'border-red-300 bg-red-50 text-red-700'
-                                  : 'border-slate-200 bg-white text-slate-500'
-                              : selected
-                                ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
-                                : 'border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/50'
-                          }`}
-                        >
-                          {option}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {aiSelectedAnswers[aiQuizQuestionIndex] && (
-                    <div className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                      <strong className="text-slate-900">Explicação IA:</strong> {activeAiQuestion.explanation}
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <Button variant="outline" className="flex-1 rounded-full" onClick={onPrevAiQuestion}>Pergunta IA anterior</Button>
-                    <Button className="flex-1 rounded-full bg-gradient-to-r from-violet-500 to-emerald-500" onClick={onNextAiQuestion}>Próxima IA</Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="aulas">

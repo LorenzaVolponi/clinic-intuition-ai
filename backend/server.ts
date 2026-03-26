@@ -508,10 +508,15 @@ function mapClinicalResponse(aiResponse: BackendClinicalModelResponse, fallback:
             : fallback.triageLevel,
     triageReason: aiResponse.triageReason || fallback.triageReason,
     suggestedExams: [
-      ...new Set([...investigation.immediate, ...investigation.complementary, ...investigation.specialAttention]),
+      ...new Set([
+        ...investigation.immediate,
+        ...investigation.complementary,
+        ...investigation.specialAttention,
+        ...fallback.suggestedExams,
+      ]),
     ].slice(0, 8),
-    immediateActions: [...new Set([...conduct.immediateActions, ...conduct.monitoring])].slice(0, 6),
-    clinicalSummary: aiResponse.educationalWarning || fallback.clinicalSummary,
+    immediateActions: [...new Set([...conduct.immediateActions, ...conduct.monitoring, ...fallback.immediateActions])].slice(0, 6),
+    clinicalSummary: `${aiResponse.educationalWarning || fallback.clinicalSummary}\nResumo de segurança: ${fallback.clinicalSummary}`.slice(0, 1400),
     analysisSource: 'groq' as const,
   };
 }
@@ -602,6 +607,10 @@ function buildLocalMedbotAnswer(params: {
     params.question.match(/quero ajuda(?: para)?\s+(.+)$/i);
   const askedTopic = askedTopicMatch?.[1]?.trim().replace(/[?.!]+$/, '') || '';
   const hasRecentHistory = (params.history || []).length > 0;
+  const lastUserMessage = [...(params.history || [])].reverse().find((item) => item.role === 'user')?.content;
+  const continuityHook = lastUserMessage ? `Último ponto que você trouxe: "${lastUserMessage.slice(0, 120)}".` : '';
+  const objectiveHook = `Objetivo atual: ${objective}.`;
+  const factHook = facts.length ? `Pontos-chave do tema: ${facts.join(' • ')}.` : '';
   const levelLabel =
     params.userLevel === 'iniciante'
       ? 'iniciante'
@@ -609,22 +618,22 @@ function buildLocalMedbotAnswer(params: {
         ? 'avançado'
         : 'intermediário';
 
-  let text = `Perfeito — vamos direto ao ponto em **${params.topicId}** (nível ${levelLabel}).\n\n📌 **Resumo rápido**\n• conceito central\n• decisão clínica que mais cai\n• principal red flag\n\nSe quiser, no próximo passo eu transformo isso em caso clínico ou quiz.`;
+  let text = `Perfeito — vamos direto ao ponto em **${params.topicId}** (nível ${levelLabel}).\n\n${objectiveHook}\n${factHook}\n\n📌 **Resumo rápido**\n• conceito central\n• decisão clínica que mais cai\n• principal red flag\n\nSe quiser, no próximo passo eu transformo isso em caso clínico ou quiz.`;
 
   if (isHelpIntent) {
     text = askedTopic
       ? `Boa! Vamos estudar **${askedTopic}** de forma prática.\n\n1) **Fundamento em 30s**: definição + mecanismo principal.\n2) **Aplicação clínica**: quando suspeitar e o que não pode faltar.\n3) **Fixação rápida**: 3 perguntas objetivas com feedback.\n\nSe preferir, começamos agora pelo item 1.`
       : `Fechado 🤝 eu sigo o seu ritmo e respondo no formato que você pedir (resumo, caso, quiz ou comparação), sem enrolação.\n\nMe diga o tema e eu já começo com uma explicação objetiva em linguagem ${levelLabel}.`;
   } else if (hasRecentHistory) {
-    text = `Continuando de onde paramos em **${params.topicId}**:\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
+    text = `Continuando de onde paramos em **${params.topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
   }
 
   if (intent === 'caso') {
-    text = `🏥 **CASO CLÍNICO #${interactionId.slice(0, 8).toUpperCase()}**\n\n👤 **PACIENTE:** Adulto com foco em ${params.topicId}\n\n📋 **HISTÓRIA:**\nQueixa principal e evolução temporal objetiva.\n\n🔍 **EXAME FÍSICO:**\n• Priorize sinais vitais e achados focais.\n\n❓ **PERGUNTA:**\nQual hipótese principal e qual conduta imediata?\n\n✅ **CONDUTA CORRETA:**\nEstratificar gravidade, excluir diagnóstico letal e iniciar suporte.\n\n📚 **POR QUÊ:**\n${params.clinicalSummary || 'A conduta inicial deve ser guiada por risco e tempo-dependência.'}\n\n---\n🎯 **QUER MAIS?**\n→ "outro caso"\n→ "mais difícil"\n→ "quiz"`;
+    text = `🏥 **CASO CLÍNICO #${interactionId.slice(0, 8).toUpperCase()}**\n\n👤 **PACIENTE:** Adulto com foco em ${params.topicId}\n\n📋 **HISTÓRIA:**\nQueixa principal e evolução temporal objetiva.\n\n🔍 **EXAME FÍSICO:**\n• Priorize sinais vitais e achados focais.\n\n❓ **PERGUNTA:**\nQual hipótese principal e qual conduta imediata?\n\n✅ **CONDUTA CORRETA:**\nEstratificar gravidade, excluir diagnóstico letal e iniciar suporte.\n\n📚 **POR QUÊ:**\n${params.clinicalSummary || 'A conduta inicial deve ser guiada por risco e tempo-dependência.'}\n\n🧭 ${objectiveHook}\n${continuityHook}\n\n---\n🎯 **QUER MAIS?**\n→ "outro caso"\n→ "mais difícil"\n→ "quiz"`;
   }
 
   if (intent === 'quiz') {
-    text = `📝 **QUIZ RELÂMPAGO - ${params.topicId.toUpperCase()}**\n\n**Pergunta 1/1**\nQual ação inicial traz mais segurança clínica?\n\nA) Esperar exames tardios\nB) Ignorar red flags\nC) Reavaliar risco + sinais vitais\nD) Definir diagnóstico final sem monitorização\n\n✅ **Resposta:** C\n\n📖 **EXPLICAÇÃO:**\nConduta segura começa pela estabilização e reavaliação contínua.\n\n---\n→ "próxima"\n→ "resumo"\n→ "parar"`;
+    text = `📝 **QUIZ RELÂMPAGO - ${params.topicId.toUpperCase()}**\n\n${objectiveHook}\n\n**Pergunta 1/1**\nQual ação inicial traz mais segurança clínica?\n\nA) Esperar exames tardios\nB) Ignorar red flags\nC) Reavaliar risco + sinais vitais\nD) Definir diagnóstico final sem monitorização\n\n✅ **Resposta:** C\n\n📖 **EXPLICAÇÃO:**\nConduta segura começa pela estabilização e reavaliação contínua.\n\n---\n→ "próxima"\n→ "resumo"\n→ "parar"`;
   }
 
   if (intent === 'medicamento') {

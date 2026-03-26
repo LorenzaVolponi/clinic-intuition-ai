@@ -157,9 +157,16 @@ function mapClinicalResponse(aiResponse, fallback) {
             ? 'Ambulatorial'
             : fallback.triageLevel,
     triageReason: aiResponse.triageReason || fallback.triageReason,
-    suggestedExams: [...new Set([...(investigation.immediate || []), ...(investigation.complementary || []), ...(investigation.specialAttention || [])])].slice(0, 8),
-    immediateActions: [...new Set([...(conduct.immediateActions || []), ...(conduct.monitoring || [])])].slice(0, 6),
-    clinicalSummary: aiResponse.educationalWarning || fallback.clinicalSummary,
+    suggestedExams: [
+      ...new Set([
+        ...(investigation.immediate || []),
+        ...(investigation.complementary || []),
+        ...(investigation.specialAttention || []),
+        ...(fallback.suggestedExams || []),
+      ]),
+    ].slice(0, 8),
+    immediateActions: [...new Set([...(conduct.immediateActions || []), ...(conduct.monitoring || []), ...(fallback.immediateActions || [])])].slice(0, 6),
+    clinicalSummary: `${aiResponse.educationalWarning || fallback.clinicalSummary}\nResumo de segurança: ${fallback.clinicalSummary}`.slice(0, 1400),
     analysisSource: 'groq',
   };
 }

@@ -119,4 +119,25 @@ describe('backend server routes', () => {
     expect(response.body.answer).toContain('entorpecentes');
     expect(response.body.answer).not.toContain('No momento, consigo');
   });
+
+  it('POST /api/medbot mantém fluidez com histórico e objetivo no fallback local', async () => {
+    const app = createApp();
+    const response = await request(app)
+      .post('/api/medbot')
+      .send({
+        topicId: 'cardiologia',
+        question: 'continua',
+        history: [
+          { role: 'user', content: 'quero revisar dor torácica com red flags' },
+          { role: 'assistant', content: 'vamos focar em estratificação de risco' },
+        ],
+        context: { objective: 'focar em decisão inicial e segurança do paciente' },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.source).toBe('local');
+    expect(response.body.answer).toContain('Continuando de onde paramos');
+    expect(response.body.answer).toContain('focar em decisão inicial e segurança do paciente');
+    expect(response.body.answer).toContain('dor torácica com red flags');
+  });
 });

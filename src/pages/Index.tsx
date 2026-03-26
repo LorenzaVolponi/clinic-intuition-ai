@@ -138,7 +138,7 @@ const Index = () => {
     };
 
     loadStudyPack();
-  }, [isOffline, selectedTopicId]);
+  }, [isOffline, selectedTopicId, selectedTopic.objective]);
 
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEYS.medbotMessages, JSON.stringify(medbotMessages.slice(-20)));
@@ -163,11 +163,32 @@ const Index = () => {
   const regenerateAiPack = async (focus: 'flashcards' | 'quiz' | 'lessons') => {
     setIsGeneratingStudyPack(true);
     try {
-      const pack = await generateStudyPack(selectedTopicId, {
-        objective: aiGenerationPrompt.trim() || selectedTopic.objective,
-        focus,
-        nonce: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      });
+      const requestPack = () =>
+        generateStudyPack(selectedTopicId, {
+          objective: aiGenerationPrompt.trim() || selectedTopic.objective,
+          focus,
+          nonce: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        });
+
+      let pack = await requestPack();
+      const current = generatedStudyPack;
+      const repeatedFlashcard =
+        focus === 'flashcards' &&
+        current?.flashcards?.[0] &&
+        pack.flashcards?.[0] &&
+        current.flashcards[0].question === pack.flashcards[0].question;
+      const repeatedQuiz =
+        focus === 'quiz' && current?.quiz?.[0] && pack.quiz?.[0] && current.quiz[0].question === pack.quiz[0].question;
+      const repeatedLesson =
+        focus === 'lessons' &&
+        current?.lessons?.[0] &&
+        pack.lessons?.[0] &&
+        current.lessons[0].content === pack.lessons[0].content;
+
+      if (repeatedFlashcard || repeatedQuiz || repeatedLesson) {
+        pack = await requestPack();
+      }
+
       setGeneratedStudyPack((current) => {
         if (!current) return pack;
         return {

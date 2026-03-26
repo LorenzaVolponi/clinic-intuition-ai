@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "verify": "npm run lint && npm test && npm run build",
+    "smoke:e2e": "bash scripts/smoke-e2e.sh",
     "auto:guard": "bash scripts/auto-guard.sh --once",
     "auto:guard:watch": "bash scripts/auto-guard.sh --watch --interval 300",
     "preview": "vite preview",

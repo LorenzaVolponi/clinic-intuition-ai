@@ -16,6 +16,16 @@ describe('backend server routes', () => {
     expect(response.headers['x-request-id']).toBeTruthy();
   });
 
+  it('GET /api/metrics expõe contadores básicos', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/metrics');
+
+    expect(response.status).toBe(200);
+    expect(typeof response.body.requestCount).toBe('number');
+    expect(response.body.fallbackUsage).toBeTruthy();
+    expect(typeof response.body.sessionCacheSize).toBe('number');
+  });
+
   it('POST /api/clinical-analysis retorna 400 para payload inválido', async () => {
     const app = createApp();
     const response = await request(app).post('/api/clinical-analysis').send({});
@@ -106,6 +116,7 @@ describe('backend server routes', () => {
     expect(response.status).toBe(200);
     expect(response.body.source).toBe('local');
     expect(typeof response.body.answer).toBe('string');
+    expect(response.body.response.content.metadata.sources.some((item: string) => item.includes('ahajournals.org'))).toBe(true);
   });
 
   it('POST /api/medbot em pedido de ajuda responde de forma direta ao tema solicitado', async () => {

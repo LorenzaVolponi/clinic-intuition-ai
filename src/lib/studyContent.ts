@@ -364,22 +364,23 @@ function shuffleArray<T>(items: T[]) {
   return array;
 }
 
-function buildLessonPool() {
-  return STUDY_TOPICS.flatMap((topic) => {
-    const quickFactLessons = topic.quickFacts.map((fact, index) => ({
-      topicId: topic.id,
-      title: `${topic.title} • Aula rápida ${index + 1}`,
-      content: `${fact} Objetivo da aula: ${topic.objective}`,
-    }));
+function buildLessonPlan(topic: StudyTopic, objectiveSnippet: string, nonce: string): StudyLesson[] {
+  const anchors = shuffleArray([...topic.quickFacts]).slice(0, 5);
+  const drills = shuffleArray([...topic.flashcards]).slice(0, 5);
 
-    const flashcardLessons = topic.flashcards.map((card, index) => ({
-      topicId: topic.id,
-      title: `${topic.title} • Revisão clínica ${index + 1}`,
-      content: `Pergunta-chave: ${card.question}\nConceito central: ${card.answer}\nDica de fixação: ${card.hint}`,
-    }));
+  const anchorLessons = anchors.map((anchor, index) => ({
+    topicId: topic.id,
+    title: `${topic.title} • Aula prática ${index + 1} • ${nonce}`,
+    content: `Objetivo da aula: ${objectiveSnippet}\n\n1) Gancho clínico: ${anchor}\n2) Explicação direta: relacione o gancho ao tema ${topic.title}.\n3) Aplicação prática: descreva a conduta inicial segura em até 3 passos.\n4) Pergunta de checagem: qual red flag mudaria sua decisão?\n5) Resumo de bolso: uma frase para revisar em 15 segundos.`,
+  }));
 
-    return [...quickFactLessons, ...flashcardLessons];
-  });
+  const drillLessons = drills.map((card, index) => ({
+    topicId: topic.id,
+    title: `${topic.title} • Simulação guiada ${index + 6} • ${nonce}`,
+    content: `Objetivo da aula: ${objectiveSnippet}\n\nPergunta-base: ${card.question}\nConceito essencial: ${card.answer}\nPrática rápida:\n- Hipótese principal\n- Exame que muda conduta\n- Reavaliação em segurança\nDica final: ${card.hint}`,
+  }));
+
+  return [...anchorLessons, ...drillLessons];
 }
 
 function buildQuizPool() {
@@ -399,13 +400,7 @@ export function generateRandomStudyPack(
   const objective = options?.objective?.trim() || topic.objective;
   const objectiveSnippet = objective.slice(0, 120);
   const nonce = (options?.nonce || Date.now().toString()).slice(-5);
-  const lessons = shuffleArray(
-    buildLessonPool().map((lesson) => ({
-      ...lesson,
-      title: `${lesson.title} • ${nonce}`,
-      content: `${lesson.content}\nObjetivo personalizado: ${objectiveSnippet}.\nAplicação prática em ${topic.title}: conecte com red flags e exames iniciais.`,
-    })),
-  ).slice(0, 10);
+  const lessons = buildLessonPlan(topic, objectiveSnippet, nonce).slice(0, 10);
 
   const quiz = shuffleArray(buildQuizPool())
     .map((item, index) => ({

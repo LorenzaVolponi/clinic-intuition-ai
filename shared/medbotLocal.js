@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { formatReferencesForText, getTopicReferences } from './clinicalReferences.js';
 
 export function detectMedbotIntent(question) {
   const q = String(question || '').toLowerCase();
@@ -11,6 +12,8 @@ export function detectMedbotIntent(question) {
 }
 
 export function buildMedbotLocalContent(params) {
+  const referenceLabel = formatReferencesForText(params.topicId);
+  const references = getTopicReferences(params.topicId);
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
   const intent = detectMedbotIntent(params.question);
@@ -31,8 +34,8 @@ export function buildMedbotLocalContent(params) {
 
   if (isHelpIntent) {
     text = askedTopic
-      ? `Boa! Vamos estudar **${askedTopic}** de forma prática.\n\n1) **Fundamento em 30s**: definição + mecanismo principal.\n2) **Aplicação clínica**: quando suspeitar e o que não pode faltar.\n3) **Fixação rápida**: 3 perguntas objetivas com feedback.\n\nSe preferir, começamos agora pelo item 1.`
-      : `Fechado 🤝 eu sigo o seu ritmo e respondo no formato que você pedir (resumo, caso, quiz ou comparação), sem enrolação.\n\nMe diga o tema e eu já começo com uma explicação objetiva em linguagem ${levelLabel}.`;
+      ? `Boa! Vamos estudar **${askedTopic}** de forma prática.\n\n1) **Fundamento em 30s**: definição + mecanismo principal.\n2) **Aplicação clínica**: quando suspeitar e o que não pode faltar.\n3) **Fixação rápida**: 3 perguntas objetivas com feedback.\n\n📚 Referência-base: ${referenceLabel}.\n\nSe preferir, começamos agora pelo item 1.`
+      : `Fechado 🤝 eu sigo o seu ritmo e respondo no formato que você pedir (resumo, caso, quiz ou comparação), sem enrolação.\n\n📚 Referência-base: ${referenceLabel}.\n\nMe diga o tema e eu já começo com uma explicação objetiva em linguagem ${levelLabel}.`;
   } else if (hasRecentHistory) {
     text = `Continuando de onde paramos em **${params.topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
   }
@@ -47,7 +50,7 @@ export function buildMedbotLocalContent(params) {
   }
 
   if (intent === 'medicamento') {
-    text = `💊 **FARMACOLOGIA: foco em ${params.topicId}**\n\n📋 **CLASSE:** revisar por mecanismo e contexto clínico.\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• Situações com benefício comprovado em diretriz\n• Cenários de urgência com supervisão clínica\n• Estratégia de manutenção quando estabilizado\n\n⚠️ **SEGURANÇA:**\n• Não usar dose definitiva sem protocolo local\n• Confirmar contraindicações e função renal/hepática\n\n📖 **BASEADO EM:** ${sourceLabel}\n\n---\n→ Digite "interações"\n→ Digite "alternativas"\n→ Digite "caso clínico"`;
+    text = `💊 **FARMACOLOGIA: foco em ${params.topicId}**\n\n📋 **CLASSE:** revisar por mecanismo e contexto clínico.\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• Situações com benefício comprovado em diretriz\n• Cenários de urgência com supervisão clínica\n• Estratégia de manutenção quando estabilizado\n\n⚠️ **SEGURANÇA:**\n• Não usar dose definitiva sem protocolo local\n• Confirmar contraindicações e função renal/hepática\n\n📖 **BASEADO EM:** ${sourceLabel}\n📚 **Referência-base:** ${referenceLabel}\n\n---\n→ Digite "interações"\n→ Digite "alternativas"\n→ Digite "caso clínico"`;
   }
 
   const suggestions = isHelpIntent
@@ -62,5 +65,5 @@ export function buildMedbotLocalContent(params) {
 
   const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
 
-  return { intent, text, suggestions, sourceLabel, difficulty };
+  return { intent, text, suggestions, sourceLabel, difficulty, references };
 }

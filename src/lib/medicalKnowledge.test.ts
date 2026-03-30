@@ -27,4 +27,25 @@ describe('buildLocalAssessment', () => {
     expect(assessment.hypotheses[0]?.treatment).toContain('sem dose neste simulador');
     expect(assessment.hypotheses[0]?.treatment).not.toMatch(/\b\d+\s?(mg|g|ml|\/\d+h|\/dia)\b/i);
   });
+
+  it('altera hipótese principal conforme caso clínico inserido', () => {
+    const chestPain = buildLocalAssessment({
+      name: 'Paciente A',
+      age: 58,
+      gender: 'Masculino',
+      duration: '< 6h',
+      symptoms: 'Dor torácica em aperto com sudorese e dispneia',
+    });
+    const urinary = buildLocalAssessment({
+      name: 'Paciente B',
+      age: 24,
+      gender: 'Feminino',
+      duration: '1-7d',
+      symptoms: 'Disúria, polaciúria e dor suprapúbica sem febre alta',
+    });
+
+    expect(chestPain.hypotheses[0]?.name).not.toBe(urinary.hypotheses[0]?.name);
+    expect(chestPain.clinicalSummary).toContain('Base educacional');
+    expect(urinary.clinicalSummary).toContain('Base educacional');
+  });
 });

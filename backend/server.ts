@@ -2,11 +2,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
+import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, QUICK_LESSON_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
 import { mergeClinicalWithFallback } from '../shared/clinicalResponse.js';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
+import { getTopicReferences } from '../shared/clinicalReferences.js';
 
 dotenv.config();
 
@@ -14,6 +16,7 @@ const port = Number(process.env.BACKEND_PORT || 8787);
 const groqApiKey = process.env.GROQ_API_KEY?.trim();
 const preferredModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
 const modelFallbackChain = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
+const SESSION_STORE_FILE = process.env.SESSION_STORE_FILE || '/tmp/medinnova-session-cache.json';
 
 const patientDataSchema = z.object({
   name: z.string().optional(),
@@ -445,20 +448,31 @@ async function callGroq(messages: Array<{ role: 'system' | 'user'; content: stri
   let lastError = 'Falha desconhecida.';
 
   for (const model of modelFallbackChain) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${groqApiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        top_p: 0.5,
-        response_format: { type: 'json_object' },
-        messages,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    let response: Response;
+    try {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${groqApiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          top_p: 0.5,
+          response_format: { type: 'json_object' },
+          messages,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      lastError = `Groq timeout/network error (${model}): ${(error as Error).message}`;
+      clearTimeout(timeout);
+      continue;
+    }
+    clearTimeout(timeout);
 
     if (!response.ok) {
       lastError = `Groq ${response.status}: ${await response.text()}`;
@@ -505,6 +519,65 @@ type SessionState = {
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const sessionCache = new Map<string, SessionState>();
+const metrics = {
+  startedAt: new Date().toISOString(),
+  requestCount: 0,
+  byRoute: {} as Record<string, number>,
+  fallbackUsage: {
+    clinical: 0,
+    medbot: 0,
+    studyPack: 0,
+  },
+};
+
+let persistScheduled = false;
+
+async function loadSessionStore() {
+  try {
+    const raw = await fs.readFile(SESSION_STORE_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as Array<{ key: string; state: { interactions: string[]; topics: string[]; usedIds: string[]; userLevel: SessionState['userLevel']; createdAt: number; lastAccessed: number } }>;
+    for (const item of parsed) {
+      sessionCache.set(item.key, {
+        interactions: item.state.interactions || [],
+        topics: new Set(item.state.topics || []),
+        usedIds: new Set(item.state.usedIds || []),
+        userLevel: item.state.userLevel || 'intermediario',
+        createdAt: item.state.createdAt || Date.now(),
+        lastAccessed: item.state.lastAccessed || Date.now(),
+      });
+    }
+  } catch {
+    // no-op: first run or unavailable file
+  }
+}
+
+async function flushSessionStore() {
+  const payload = [...sessionCache.entries()].map(([key, state]) => ({
+    key,
+    state: {
+      interactions: state.interactions,
+      topics: [...state.topics],
+      usedIds: [...state.usedIds],
+      userLevel: state.userLevel,
+      createdAt: state.createdAt,
+      lastAccessed: state.lastAccessed,
+    },
+  }));
+  await fs.writeFile(SESSION_STORE_FILE, JSON.stringify(payload), 'utf-8');
+}
+
+function scheduleSessionPersist() {
+  if (persistScheduled) return;
+  persistScheduled = true;
+  setTimeout(async () => {
+    persistScheduled = false;
+    try {
+      await flushSessionStore();
+    } catch {
+      // no-op: telemetry only
+    }
+  }, 250);
+}
 
 function getSessionState(sessionId: string): SessionState {
   const now = Date.now();
@@ -522,6 +595,7 @@ function getSessionState(sessionId: string): SessionState {
     lastAccessed: now,
   };
   sessionCache.set(sessionId, created);
+  scheduleSessionPersist();
   return created;
 }
 
@@ -535,6 +609,7 @@ function updateSessionState(sessionId: string, partial: Partial<SessionState>) {
     lastAccessed: Date.now(),
   };
   sessionCache.set(sessionId, next);
+  scheduleSessionPersist();
 }
 
 function buildLocalMedbotAnswer(params: {
@@ -574,7 +649,7 @@ function buildLocalMedbotAnswer(params: {
         type: intent === 'quiz' ? 'quiz' : intent === 'caso' ? 'case' : intent === 'medicamento' ? 'medication' : 'text',
         metadata: {
           topic: params.topicId,
-          sources: [sourceLabel],
+          sources: [sourceLabel, ...getTopicReferences(params.topicId).map((item) => item.url)],
           difficulty,
           estimated_read_time: Math.max(45, Math.ceil(text.length / 12)),
         },
@@ -619,6 +694,8 @@ function requestLogger(req: express.Request, res: express.Response, next: expres
   const requestId = crypto.randomUUID();
   const startAt = Date.now();
   res.setHeader('x-request-id', requestId);
+  metrics.requestCount += 1;
+  metrics.byRoute[req.path] = (metrics.byRoute[req.path] || 0) + 1;
 
   res.on('finish', () => {
     const durationMs = Date.now() - startAt;
@@ -674,6 +751,14 @@ export function createApp() {
     res.json({ ok: true, providerConfigured: Boolean(groqApiKey), model: preferredModel, modelFallbackChain });
   });
 
+  app.get('/api/metrics', (_req, res) => {
+    res.json({
+      ...metrics,
+      sessionCacheSize: sessionCache.size,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   app.post('/api/clinical-analysis', async (req, res) => {
     const parsed = clinicalRequestSchema.safeParse(req.body);
 
@@ -682,6 +767,7 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
+      metrics.fallbackUsage.clinical += 1;
       return res.json({
         ...parsed.data.localAssessment,
         analysisSource: 'local',
@@ -714,6 +800,7 @@ export function createApp() {
       return res.json(mapClinicalResponse(aiResponse, parsed.data.localAssessment));
     } catch (error) {
       console.error('clinical-analysis error', error);
+      metrics.fallbackUsage.clinical += 1;
       return res.json({
         ...parsed.data.localAssessment,
         analysisSource: 'local',
@@ -738,6 +825,7 @@ export function createApp() {
     sessionState.topics.add(parsed.data.topicId);
 
     if (!groqApiKey) {
+      metrics.fallbackUsage.medbot += 1;
       const fallback = buildLocalMedbotAnswer({
         topicId: parsed.data.topicId,
         question: sanitized.sanitized,
@@ -799,6 +887,7 @@ export function createApp() {
       sessionState.usedIds.add(normalized.interaction_id);
       updateSessionState(sessionId, sessionState);
 
+      const responseSource = response.success ? 'groq' : 'local';
       return res.json({
         answer: normalized.content.text,
         response: {
@@ -810,12 +899,13 @@ export function createApp() {
             used_ids: [...sessionState.usedIds],
           },
         },
-        source: 'groq',
+        source: responseSource,
         suggestions: normalized.suggestions,
         intent: normalized.intent,
       });
     } catch (error) {
       console.error('medbot error', error);
+      metrics.fallbackUsage.medbot += 1;
       const fallback = buildLocalMedbotAnswer({
         topicId: parsed.data.topicId,
         question: sanitized.sanitized,
@@ -855,6 +945,7 @@ export function createApp() {
     }
 
     if (!groqApiKey) {
+      metrics.fallbackUsage.studyPack += 1;
       return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
     }
 
@@ -871,6 +962,7 @@ export function createApp() {
       ]);
       const response = studyPackModelResponseSchema.safeParse(rawResponse);
       if (!response.success) {
+        metrics.fallbackUsage.studyPack += 1;
         return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
       }
       const focus = parsed.data.focus || 'all';
@@ -885,12 +977,14 @@ export function createApp() {
               : (ai.lessons?.length || 0) >= 5 && (ai.quiz?.length || 0) >= 5 && (ai.flashcards?.length || 0) >= 5;
 
       if (!hasEnoughForFocus) {
+        metrics.fallbackUsage.studyPack += 1;
         return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
       }
 
       return res.json(applyStudyPackFocus(normalizeStudyPackForClient(parsed.data.topicId, ai), parsed.data.focus || 'all'));
     } catch (error) {
       console.error('study-pack error', error);
+      metrics.fallbackUsage.studyPack += 1;
       return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
     }
   });
@@ -899,7 +993,10 @@ export function createApp() {
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  createApp().listen(port, () => {
-    console.log(`Backend MedInnova rodando em http://localhost:${port}`);
-  });
+  loadSessionStore()
+    .finally(() => {
+      createApp().listen(port, () => {
+        console.log(`Backend MedInnova rodando em http://localhost:${port}`);
+      });
+    });
 }

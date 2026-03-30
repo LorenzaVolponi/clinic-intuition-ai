@@ -68,6 +68,9 @@ const SYMPTOM_SYNONYMS: Record<string, string[]> = {
   vômito: ['vomito'],
   fadiga: ['cansaço', 'astenia'],
   febre: ['temperatura alta'],
+  síncope: ['desmaio', 'apagão'],
+  palpitações: ['coração acelerado', 'batimento acelerado'],
+  'dor abdominal': ['dor na barriga', 'abdome doloroso'],
 };
 
 const RED_FLAG_PATTERNS = [
@@ -93,6 +96,15 @@ const CLINICAL_CONTEXT_PATTERNS = {
   fever: ['febre', '38.', '39.', 'temperatura alta'],
   severeTachycardia: ['fc 12', 'fc > 12', 'taquicardia', 'pulso rapido'],
   focalDeficit: ['deficit focal', 'déficit focal', 'afasia', 'hemiparesia', 'paresia'],
+};
+
+const CATEGORY_REFERENCE_MAP: Record<string, string> = {
+  cardiovascular: 'ACC/AHA ACS 2025: https://www.ahajournals.org/doi/10.1161/CIR.0000000000001309',
+  neurologico: 'AHA/ASA Stroke 2021: https://www.ahajournals.org/doi/10.1161/STR.0000000000000375',
+  infeccioso: 'IDSA CAP: https://www.idsociety.org/practice-guideline/community-acquired-pneumonia-cap-in-adults/',
+  respiratorio: 'IDSA CAP + diretrizes institucionais locais',
+  gastrointestinal: 'Diretrizes cirúrgicas e clínicas institucionais',
+  genitourinario: 'Diretrizes de ITU baseadas em perfil local de resistência',
 };
 
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
@@ -288,6 +300,13 @@ function normalizeText(text: string) {
     .replace(/\p{Diacritic}/gu, '');
 }
 
+function tokenizeClinicalText(text: string) {
+  return normalizeText(text)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 3);
+}
+
 function probabilityFromScore(score: number): 'Alta' | 'Moderada' | 'Baixa' {
   if (score >= 70) return 'Alta';
   if (score >= 45) return 'Moderada';
@@ -343,6 +362,10 @@ function normalizeGender(gender: string): MedicalCondition['genderPreference'] |
   return 'both';
 }
 
+function referencesForCategory(category: string) {
+  return CATEGORY_REFERENCE_MAP[category] || 'Referências clínicas públicas de sociedades médicas';
+}
+
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const ageGroup = getAgeGroup(patientData.age);
   const durationProfile = getDurationProfile(patientData.duration);
@@ -350,8 +373,13 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const normalizedGender = normalizeGender(patientData.gender);
   const symptomHits = condition.commonSymptoms.filter((symptom) => matchesTerm(patientData.symptoms, symptom)).length;
   const redFlagHits = condition.redFlags.filter((flag) => matchesTerm(patientData.symptoms, flag)).length;
+  const tokens = new Set(tokenizeClinicalText(patientData.symptoms));
+  const lexicalHits = [...new Set([...condition.commonSymptoms, ...condition.redFlags, ...condition.differentials])]
+    .map((item) => tokenizeClinicalText(item))
+    .flat()
+    .filter((token) => tokens.has(token)).length;
 
-  let score = symptomHits * 22 + redFlagHits * 10;
+  let score = symptomHits * 22 + redFlagHits * 10 + Math.min(lexicalHits, 8) * 3;
 
   if (condition.ageGroups.includes(ageGroup)) score += 10;
   if (!condition.durationProfile || condition.durationProfile.includes(durationProfile)) score += 8;
@@ -427,7 +455,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     name: condition.name,
     probability: probabilityFromScore(score),
     treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
-    explanation: `${condition.clinicalPearls[0] ?? 'Raciocínio clínico guiado pelos sintomas predominantes.'} Compatibilidade baseada em ${condition.commonSymptoms.slice(0, 3).join(', ')} e contexto clínico informado.`,
+    explanation: `${condition.clinicalPearls[0] ?? 'Raciocínio clínico guiado pelos sintomas predominantes.'} Compatibilidade baseada em ${condition.commonSymptoms.slice(0, 3).join(', ')} e contexto clínico informado. Referência-base: ${referencesForCategory(condition.category)}.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),
     redFlags: condition.redFlags.slice(0, 3),
@@ -454,7 +482,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(topMatches[0]?.condition.category || 'geral')}.`,
     analysisSource: 'local',
   };
 }

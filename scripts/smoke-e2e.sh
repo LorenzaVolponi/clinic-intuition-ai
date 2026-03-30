@@ -17,10 +17,19 @@ trap cleanup EXIT
 
 npm run start:server >"$LOG_FILE" 2>&1 &
 echo $! >"$PID_FILE"
-sleep 3
+
+for _ in {1..20}; do
+  if curl -fsS http://127.0.0.1:8787/api/health >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
 echo "[smoke] health"
 curl -fsS http://127.0.0.1:8787/api/health >/dev/null
+
+echo "[smoke] metrics"
+curl -fsS http://127.0.0.1:8787/api/metrics >/dev/null
 
 echo "[smoke] medbot"
 curl -fsS -X POST http://127.0.0.1:8787/api/medbot \

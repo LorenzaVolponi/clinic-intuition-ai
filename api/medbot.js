@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
+import { getTopicReferences } from '../shared/clinicalReferences.js';
 
 const MEDBOT_SYSTEM_PROMPT = `# ⚕️ MEDBOT
 Responda APENAS em JSON no formato:
@@ -22,7 +23,7 @@ function getSessionState(sessionId) {
 
 function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {} }) {
   const interactionId = crypto.randomUUID();
-  const { intent, text, suggestions, difficulty } = buildMedbotLocalContent({
+  const { intent, text, suggestions, difficulty, sourceLabel } = buildMedbotLocalContent({
     topicId,
     question,
     history,
@@ -45,7 +46,7 @@ function buildLocalResponse({ topicId, question, history = [], sessionUuid, user
         type: intent === 'quiz' ? 'quiz' : intent === 'caso' ? 'case' : intent === 'medicamento' ? 'medication' : 'text',
         metadata: {
           topic: topicId,
-          sources: ['Consenso educacional local 2026'],
+          sources: [sourceLabel, ...getTopicReferences(topicId).map((item) => item.url)],
           difficulty,
           estimated_read_time: 90,
         },
@@ -65,11 +66,22 @@ async function callGroq(messages) {
 
   let lastError = 'Erro desconhecido ao chamar Groq.';
   for (const model of models) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({ model, temperature: 0.2, top_p: 0.5, response_format: { type: 'json_object' }, messages }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    let response;
+    try {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({ model, temperature: 0.2, top_p: 0.5, response_format: { type: 'json_object' }, messages }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      lastError = `Groq timeout/network error (${model}): ${error.message}`;
+      clearTimeout(timeout);
+      continue;
+    }
+    clearTimeout(timeout);
 
     if (!response.ok) {
       lastError = `Groq ${response.status}: ${await response.text()}`;
@@ -102,16 +114,22 @@ export default async function handler(req, res) {
   sessionState.topics.add(topicId);
 
   const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel, context });
-  sessionState.interactions.push(fallback.response.interaction_id);
-  sessionState.usedIds.add(fallback.response.interaction_id);
-  fallback.response.session_state = {
-    total_interactions: sessionState.interactions.length,
-    topics_covered: [...sessionState.topics],
-    used_ids: [...sessionState.usedIds],
+  const updateSessionState = (normalizedResponse) => {
+    sessionState.interactions.push(normalizedResponse.interaction_id);
+    sessionState.usedIds.add(normalizedResponse.interaction_id);
+    return {
+      ...normalizedResponse,
+      session_state: {
+        total_interactions: sessionState.interactions.length,
+        topics_covered: [...sessionState.topics],
+        used_ids: [...sessionState.usedIds],
+      },
+    };
   };
 
   if (!process.env.GROQ_API_KEY) {
-    return res.status(200).json({ answer: fallback.response.content.text, response: fallback.response, suggestions: fallback.response.suggestions, intent: fallback.response.intent, source: 'local' });
+    const normalized = updateSessionState(fallback.response);
+    return res.status(200).json({ answer: normalized.content.text, response: normalized, suggestions: normalized.suggestions, intent: normalized.intent, source: 'local' });
   }
 
   try {
@@ -122,9 +140,17 @@ export default async function handler(req, res) {
       { role: 'user', content: `Tema: ${topicId}\nNível: ${userLevel}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${question}\nSession UUID: ${sessionUuid}` },
     ]);
 
-    const normalized = response?.response?.content?.text ? response.response : fallback.response;
-    return res.status(200).json({ answer: normalized.content.text, response: normalized, suggestions: normalized.suggestions, intent: normalized.intent, source: 'groq' });
+    const hasStructuredResponse = Boolean(response?.response?.content?.text);
+    const normalized = updateSessionState(hasStructuredResponse ? response.response : fallback.response);
+    return res.status(200).json({
+      answer: normalized.content.text,
+      response: normalized,
+      suggestions: normalized.suggestions,
+      intent: normalized.intent,
+      source: hasStructuredResponse ? 'groq' : 'local',
+    });
   } catch {
-    return res.status(200).json({ answer: fallback.response.content.text, response: fallback.response, suggestions: fallback.response.suggestions, intent: fallback.response.intent, source: 'local' });
+    const normalized = updateSessionState(fallback.response);
+    return res.status(200).json({ answer: normalized.content.text, response: normalized, suggestions: normalized.suggestions, intent: normalized.intent, source: 'local' });
   }
 }

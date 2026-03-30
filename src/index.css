@@ -117,3 +117,15 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@media (orientation: portrait) {
+  .quiz-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (orientation: landscape) {
+  .quiz-options {
+    grid-template-columns: 1fr 1fr;
+  }
+}

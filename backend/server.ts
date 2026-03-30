@@ -514,6 +514,7 @@ type SessionState = {
   topics: Set<string>;
   usedIds: Set<string>;
   userLevel: 'iniciante' | 'intermediario' | 'avancado';
+  lastIntent?: MedbotIntent;
   createdAt: number;
   lastAccessed: number;
 };
@@ -536,13 +537,14 @@ let persistScheduled = false;
 async function loadSessionStore() {
   try {
     const raw = await fs.readFile(SESSION_STORE_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Array<{ key: string; state: { interactions: string[]; topics: string[]; usedIds: string[]; userLevel: SessionState['userLevel']; createdAt: number; lastAccessed: number } }>;
+    const parsed = JSON.parse(raw) as Array<{ key: string; state: { interactions: string[]; topics: string[]; usedIds: string[]; userLevel: SessionState['userLevel']; lastIntent?: MedbotIntent; createdAt: number; lastAccessed: number } }>;
     for (const item of parsed) {
       sessionCache.set(item.key, {
         interactions: item.state.interactions || [],
         topics: new Set(item.state.topics || []),
         usedIds: new Set(item.state.usedIds || []),
         userLevel: item.state.userLevel || 'intermediario',
+        lastIntent: item.state.lastIntent,
         createdAt: item.state.createdAt || Date.now(),
         lastAccessed: item.state.lastAccessed || Date.now(),
       });
@@ -560,6 +562,7 @@ async function flushSessionStore() {
       topics: [...state.topics],
       usedIds: [...state.usedIds],
       userLevel: state.userLevel,
+      lastIntent: state.lastIntent,
       createdAt: state.createdAt,
       lastAccessed: state.lastAccessed,
     },
@@ -592,6 +595,7 @@ function getSessionState(sessionId: string): SessionState {
     topics: new Set<string>(),
     usedIds: new Set<string>(),
     userLevel: 'intermediario',
+    lastIntent: undefined,
     createdAt: now,
     lastAccessed: now,
   };
@@ -623,6 +627,7 @@ function buildLocalMedbotAnswer(params: {
   sessionData: SessionData;
   userLevel: 'iniciante' | 'intermediario' | 'avancado';
   source: 'local' | 'groq';
+  priorIntent?: MedbotIntent;
 }) {
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
@@ -636,6 +641,7 @@ function buildLocalMedbotAnswer(params: {
     clinicalSummary: params.clinicalSummary,
     userLevel: params.userLevel,
     source: params.source,
+    priorIntent: params.priorIntent,
   });
 
   return {
@@ -837,9 +843,11 @@ export function createApp() {
         sessionData: req.sessionData as SessionData,
         userLevel,
         source: 'local',
+        priorIntent: sessionState.lastIntent,
       });
       sessionState.interactions.push(fallback.response.interaction_id);
       sessionState.usedIds.add(fallback.response.interaction_id);
+      sessionState.lastIntent = fallback.response.intent;
       updateSessionState(sessionId, sessionState);
 
       return res.json({
@@ -882,6 +890,7 @@ export function createApp() {
         sessionData: req.sessionData as SessionData,
         userLevel,
         source: 'groq',
+        priorIntent: sessionState.lastIntent,
       });
       const modelAnswerSafe = response.success
         ? isMedbotAnswerSafe({ topicId: parsed.data.topicId, text: response.data.response.content.text })
@@ -890,6 +899,7 @@ export function createApp() {
       const normalized = useModelResponse ? response.data.response : fallback.response;
       sessionState.interactions.push(normalized.interaction_id);
       sessionState.usedIds.add(normalized.interaction_id);
+      sessionState.lastIntent = normalized.intent;
       updateSessionState(sessionId, sessionState);
 
       const responseSource = useModelResponse ? 'groq' : 'local';
@@ -921,9 +931,11 @@ export function createApp() {
         sessionData: req.sessionData as SessionData,
         userLevel,
         source: 'local',
+        priorIntent: sessionState.lastIntent,
       });
       sessionState.interactions.push(fallback.response.interaction_id);
       sessionState.usedIds.add(fallback.response.interaction_id);
+      sessionState.lastIntent = fallback.response.intent;
       updateSessionState(sessionId, sessionState);
       return res.json({
         answer: fallback.response.content.text,

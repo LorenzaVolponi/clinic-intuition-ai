@@ -22,13 +22,13 @@ function inferIntentFromHistory(history = []) {
   return 'resumo';
 }
 
-function resolveConversationIntent(question, history = []) {
+function resolveConversationIntent(question, history = [], priorIntent) {
   const explicitIntent = detectMedbotIntent(question);
   if (explicitIntent !== 'duvida') return explicitIntent;
 
   const q = String(question || '').trim().toLowerCase();
   const continuationOnly = /^(continua|continue|segue|prossegue|aprofunda|mais|pr[oó]ximo|proximo)$/i.test(q);
-  if (continuationOnly) return inferIntentFromHistory(history);
+  if (continuationOnly) return priorIntent || inferIntentFromHistory(history);
 
   return 'duvida';
 }
@@ -62,7 +62,7 @@ export function buildMedbotLocalContent(params) {
   const references = getTopicReferences(params.topicId);
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
-  const intent = resolveConversationIntent(params.question, params.history || []);
+  const intent = resolveConversationIntent(params.question, params.history || [], params.priorIntent);
   const sourceLabel = params.source === 'local' ? 'Consenso educacional local (atualização recomendada)' : 'Modelo Groq';
   const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(params.question);
   const askedTopicMatch =

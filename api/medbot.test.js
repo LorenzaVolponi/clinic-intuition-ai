@@ -165,6 +165,31 @@ describe('api/medbot handler', () => {
     expect(res.body.answer).toContain('versão curta');
   });
 
+  it('mantém intenção da sessão sem histórico explícito quando usuário diz "continua"', async () => {
+    const session = 'session-natural-flow-6';
+    const reqQuiz = {
+      method: 'POST',
+      headers: { 'x-session-uuid': session },
+      body: { topicId: 'cardiologia', question: 'quiz de dor torácica' },
+    };
+    const resQuiz = createResponseCollector();
+    await handler(reqQuiz, resQuiz);
+    expect(resQuiz.statusCode).toBe(200);
+    expect(resQuiz.body.intent).toBe('quiz');
+
+    const reqContinue = {
+      method: 'POST',
+      headers: { 'x-session-uuid': session },
+      body: { topicId: 'cardiologia', question: 'continua' },
+    };
+    const resContinue = createResponseCollector();
+    await handler(reqContinue, resContinue);
+
+    expect(resContinue.statusCode).toBe(200);
+    expect(resContinue.body.intent).toBe('quiz');
+    expect(resContinue.body.answer).toContain('QUIZ RELÂMPAGO');
+  });
+
   afterAll(() => {
     if (originalGroq) process.env.GROQ_API_KEY = originalGroq;
     else delete process.env.GROQ_API_KEY;

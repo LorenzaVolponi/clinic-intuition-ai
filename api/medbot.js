@@ -17,12 +17,12 @@ function getSessionState(sessionId) {
     existing.lastAccessed = now;
     return existing;
   }
-  const next = { interactions: [], topics: new Set(), usedIds: new Set(), userLevel: 'intermediario', lastAccessed: now };
+  const next = { interactions: [], topics: new Set(), usedIds: new Set(), userLevel: 'intermediario', lastIntent: undefined, lastAccessed: now };
   sessionCache.set(sessionId, next);
   return next;
 }
 
-function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {} }) {
+function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {}, priorIntent }) {
   const interactionId = crypto.randomUUID();
   const { intent, text, suggestions, difficulty, sourceLabel } = buildMedbotLocalContent({
     topicId,
@@ -33,6 +33,7 @@ function buildLocalResponse({ topicId, question, history = [], sessionUuid, user
     clinicalSummary: context?.clinicalSummary,
     userLevel,
     source: 'local',
+    priorIntent,
   });
 
   return {
@@ -114,10 +115,11 @@ export default async function handler(req, res) {
   sessionState.userLevel = userLevel;
   sessionState.topics.add(topicId);
 
-  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel, context });
+  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel, context, priorIntent: sessionState.lastIntent });
   const updateSessionState = (normalizedResponse) => {
     sessionState.interactions.push(normalizedResponse.interaction_id);
     sessionState.usedIds.add(normalizedResponse.interaction_id);
+    sessionState.lastIntent = normalizedResponse.intent;
     return {
       ...normalizedResponse,
       session_state: {

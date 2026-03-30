@@ -3,6 +3,9 @@ import { formatReferencesForText, getTopicReferences } from './clinicalReference
 
 export function detectMedbotIntent(question) {
   const q = String(question || '').toLowerCase();
+  if (/(agora|quero|vamos)\s+(quiz|pergunta)/i.test(q)) return 'quiz';
+  if (/(agora|quero|vamos)\s+(caso|caso cl[ií]nico|simulado)/i.test(q)) return 'caso';
+  if (/(agora|quero|vamos)\s+(resumo|revis[aã]o|resumir)/i.test(q)) return 'resumo';
   if (/(quiz|pergunta|quest[õo]es|quest)/i.test(q)) return 'quiz';
   if (/(caso cl[ií]nico|anamnese|simulado|caso)/i.test(q)) return 'caso';
   if (/(medicamento|dose|farmaco|f[áa]rmaco)/i.test(q)) return 'medicamento';
@@ -11,12 +14,31 @@ export function detectMedbotIntent(question) {
   return 'duvida';
 }
 
+function inferIntentFromHistory(history = []) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === 'assistant')?.content || '';
+  if (/QUIZ REL[ÂA]MPAGO/i.test(lastAssistant)) return 'quiz';
+  if (/CASO CL[ÍI]NICO/i.test(lastAssistant)) return 'caso';
+  if (/FARMACOLOGIA/i.test(lastAssistant)) return 'medicamento';
+  return 'resumo';
+}
+
+function resolveConversationIntent(question, history = []) {
+  const explicitIntent = detectMedbotIntent(question);
+  if (explicitIntent !== 'duvida') return explicitIntent;
+
+  const q = String(question || '').trim().toLowerCase();
+  const continuationOnly = /^(continua|continue|segue|prossegue|aprofunda|mais|pr[oó]ximo|proximo)$/i.test(q);
+  if (continuationOnly) return inferIntentFromHistory(history);
+
+  return 'duvida';
+}
+
 export function buildMedbotLocalContent(params) {
   const referenceLabel = formatReferencesForText(params.topicId);
   const references = getTopicReferences(params.topicId);
   const objective = params.objective || 'Revisar raciocínio clínico e priorização de risco.';
   const facts = (params.quickFacts || []).slice(0, 3);
-  const intent = detectMedbotIntent(params.question);
+  const intent = resolveConversationIntent(params.question, params.history || []);
   const sourceLabel = params.source === 'local' ? 'Consenso educacional local (atualização recomendada)' : 'Modelo Groq';
   const isHelpIntent = /(como pode me ajudar|como você pode ajudar|ajuda|comandos|o que voc[eê] faz)/i.test(params.question);
   const askedTopicMatch =

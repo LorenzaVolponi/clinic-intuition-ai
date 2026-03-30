@@ -71,6 +71,28 @@ describe('api/medbot handler', () => {
     expect(res.body.error).toBe('Payload inválido.');
   });
 
+  it('mantém fluxo natural da conversa quando usuário pede continuação', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-1' },
+      body: {
+        topicId: 'cardiologia',
+        question: 'continua',
+        history: [
+          { role: 'assistant', content: '📝 **QUIZ RELÂMPAGO - CARDIOLOGIA**\n\nPergunta 1/1...' },
+          { role: 'user', content: 'manda mais' },
+        ],
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.source).toBe('local');
+    expect(res.body.intent).toBe('quiz');
+    expect(res.body.answer).toContain('QUIZ RELÂMPAGO');
+  });
+
   afterAll(() => {
     if (originalGroq) process.env.GROQ_API_KEY = originalGroq;
     else delete process.env.GROQ_API_KEY;

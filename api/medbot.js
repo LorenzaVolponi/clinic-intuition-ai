@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 import { getTopicReferences } from '../shared/clinicalReferences.js';
+import { isMedbotAnswerSafe } from '../shared/medbotSafety.js';
 
 const MEDBOT_SYSTEM_PROMPT = `# ⚕️ MEDBOT
 Responda APENAS em JSON no formato:
@@ -141,13 +142,15 @@ export default async function handler(req, res) {
     ]);
 
     const hasStructuredResponse = Boolean(response?.response?.content?.text);
-    const normalized = updateSessionState(hasStructuredResponse ? response.response : fallback.response);
+    const modelAnswerSafe = hasStructuredResponse ? isMedbotAnswerSafe({ topicId, text: response.response.content.text }) : false;
+    const shouldUseModel = hasStructuredResponse && modelAnswerSafe;
+    const normalized = updateSessionState(shouldUseModel ? response.response : fallback.response);
     return res.status(200).json({
       answer: normalized.content.text,
       response: normalized,
       suggestions: normalized.suggestions,
       intent: normalized.intent,
-      source: hasStructuredResponse ? 'groq' : 'local',
+      source: shouldUseModel ? 'groq' : 'local',
     });
   } catch {
     const normalized = updateSessionState(fallback.response);

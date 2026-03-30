@@ -33,11 +33,27 @@ function resolveConversationIntent(question, history = []) {
   return 'duvida';
 }
 
-function inferResponseStyle(question = '') {
+function inferStyleFromHistory(history = []) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === 'assistant')?.content || '';
+  if (/vers[aã]o curta/i.test(lastAssistant)) return 'concise';
+  if (/vamos por etapas|passo a passo/i.test(lastAssistant)) return 'step';
+  if (/agir como preceptor|preceptor/i.test(lastAssistant)) return 'coach';
+  if (/vamos aprofundar|aprofundar/i.test(lastAssistant)) return 'detailed';
+  return 'default';
+}
+
+function inferResponseStyle(question = '', history = []) {
   const q = String(question || '').toLowerCase();
+  if (/(preceptor|mentoria|me guia|guia como|estilo preceptor|coach)/i.test(q)) return 'coach';
   if (/(curto|resumido|3 linhas|objetivo|sem enrola[çc][aã]o)/i.test(q)) return 'concise';
   if (/(detalha|detalhado|aprofunda|profundo|mais completo)/i.test(q)) return 'detailed';
   if (/(passo a passo|etapas|roteiro|fluxo)/i.test(q)) return 'step';
+
+  const continuationOnly = /^(continua|continue|segue|prossegue|aprofunda|mais|pr[oó]ximo|proximo)$/i.test(String(question || '').trim());
+  if (continuationOnly) {
+    return inferStyleFromHistory(history);
+  }
+
   return 'default';
 }
 
@@ -56,7 +72,7 @@ export function buildMedbotLocalContent(params) {
   const hasRecentHistory = (params.history || []).length > 0;
   const lastUserMessage = [...(params.history || [])].reverse().find((item) => item.role === 'user')?.content;
   const continuityHook = lastUserMessage ? `Último ponto que você trouxe: "${String(lastUserMessage).slice(0, 120)}".` : '';
-  const responseStyle = inferResponseStyle(params.question);
+  const responseStyle = inferResponseStyle(params.question, params.history || []);
   const objectiveHook = `Objetivo atual: ${objective}.`;
   const factHook = facts.length ? `Pontos-chave do tema: ${facts.join(' • ')}.` : '';
   const levelLabel = params.userLevel === 'iniciante' ? 'iniciante' : params.userLevel === 'avancado' ? 'avançado' : 'intermediário';
@@ -73,6 +89,8 @@ export function buildMedbotLocalContent(params) {
 
   if (responseStyle === 'concise') {
     text = `Fechado — versão curta em **${params.topicId}**:\n\n1) conceito central\n2) red flag principal\n3) ação inicial segura\n\nSe quiser, te mando a versão detalhada depois.`;
+  } else if (responseStyle === 'coach') {
+    text = `Combinado — vou agir como preceptor em **${params.topicId}**.\n\n${objectiveHook}\n\nVamos por etapas:\n1) o que você já sabe (rápido)\n2) lacuna principal agora\n3) mini-caso para fixar conduta\n4) feedback objetivo\n\nTe acompanho sem julgamento, focando decisão clínica segura.`;
   } else if (responseStyle === 'detailed') {
     text = `Perfeito, vamos aprofundar **${params.topicId}** com calma.\n\n${objectiveHook}\n${continuityHook}\n\n1) fisiopatologia prática\n2) reconhecimento clínico (o que muda conduta)\n3) red flags e erros frequentes\n4) checklist de decisão inicial\n\nSe quiser, no final transformo isso em caso clínico aplicado.`;
   } else if (responseStyle === 'step') {
@@ -96,7 +114,7 @@ export function buildMedbotLocalContent(params) {
     text = `Ótima comparação. Em **${params.topicId}**, pense assim:\n\n• **Semelhanças-chave**: apresentação inicial e necessidade de triagem.\n• **Diferenças que mudam conduta**: red flags, exame inicial prioritário e tempo-dependência.\n• **Erro comum**: tratar como iguais sem estratificar risco.\n\nSe você quiser, eu comparo em tabela (A x B) no próximo passo.`;
   }
 
-  if (intent === 'duvida' && !isHelpIntent) {
+  if (intent === 'duvida' && !isHelpIntent && responseStyle === 'default') {
     text = `Entendi. Me manda em uma frase o que você quer agora em **${params.topicId}** (resumo, caso, quiz, comparação ou farmacologia) e eu sigo exatamente nesse formato, sem enrolação.\n\n${hasRecentHistory ? continuityHook : ''}`.trim();
   }
 

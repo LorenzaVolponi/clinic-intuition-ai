@@ -9,6 +9,7 @@ import { validateClinicalResponse, type BackendClinicalModelResponse } from './v
 import { mergeClinicalWithFallback } from '../shared/clinicalResponse.js';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 import { getTopicReferences } from '../shared/clinicalReferences.js';
+import { isMedbotAnswerSafe } from '../shared/medbotSafety.js';
 
 dotenv.config();
 
@@ -882,12 +883,16 @@ export function createApp() {
         userLevel,
         source: 'groq',
       });
-      const normalized = response.success ? response.data.response : fallback.response;
+      const modelAnswerSafe = response.success
+        ? isMedbotAnswerSafe({ topicId: parsed.data.topicId, text: response.data.response.content.text })
+        : false;
+      const useModelResponse = response.success && modelAnswerSafe;
+      const normalized = useModelResponse ? response.data.response : fallback.response;
       sessionState.interactions.push(normalized.interaction_id);
       sessionState.usedIds.add(normalized.interaction_id);
       updateSessionState(sessionId, sessionState);
 
-      const responseSource = response.success ? 'groq' : 'local';
+      const responseSource = useModelResponse ? 'groq' : 'local';
       return res.json({
         answer: normalized.content.text,
         response: {

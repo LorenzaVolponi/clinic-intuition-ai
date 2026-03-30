@@ -128,6 +128,43 @@ describe('api/medbot handler', () => {
     expect(res.body.answer).toContain('versão curta');
   });
 
+  it('adota tom de preceptor quando pessoa pedir mentoria', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-4' },
+      body: {
+        topicId: 'emergencias',
+        question: 'me guia como preceptor em emergência',
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.answer).toContain('agir como preceptor');
+    expect(res.body.answer).toContain('Vamos por etapas');
+  });
+
+  it('mantém estilo curto na continuação quando já estava nesse formato', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-5' },
+      body: {
+        topicId: 'infectologia',
+        question: 'continua',
+        history: [
+          { role: 'assistant', content: 'Fechado — versão curta em infectologia: 1) ... 2) ... 3) ...' },
+          { role: 'user', content: 'continua' },
+        ],
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.answer).toContain('versão curta');
+  });
+
   afterAll(() => {
     if (originalGroq) process.env.GROQ_API_KEY = originalGroq;
     else delete process.env.GROQ_API_KEY;

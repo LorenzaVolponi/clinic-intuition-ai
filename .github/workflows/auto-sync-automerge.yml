@@ -12,15 +12,10 @@ permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: auto-sync-automerge-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   auto-sync:
-    if: github.event_name == 'push' && github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+    if: github.event_name == 'push' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,7 +50,6 @@ jobs:
   verify-and-enable-automerge:
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4

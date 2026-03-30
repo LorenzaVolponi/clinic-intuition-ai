@@ -93,6 +93,41 @@ describe('api/medbot handler', () => {
     expect(res.body.answer).toContain('QUIZ RELÂMPAGO');
   });
 
+  it('muda de formato naturalmente quando usuário pede "agora caso"', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-2' },
+      body: {
+        topicId: 'cardiologia',
+        question: 'agora caso clínico',
+        history: [{ role: 'assistant', content: 'Resumo enviado.' }],
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.intent).toBe('caso');
+    expect(res.body.answer).toContain('CASO CLÍNICO');
+  });
+
+  it('responde de forma curta quando pessoa pedir objetividade', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-3' },
+      body: {
+        topicId: 'infectologia',
+        question: 'resumo curto, sem enrolação',
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.source).toBe('local');
+    expect(res.body.answer).toContain('versão curta');
+  });
+
   afterAll(() => {
     if (originalGroq) process.env.GROQ_API_KEY = originalGroq;
     else delete process.env.GROQ_API_KEY;

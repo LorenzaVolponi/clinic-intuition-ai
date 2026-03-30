@@ -33,6 +33,14 @@ function resolveConversationIntent(question, history = []) {
   return 'duvida';
 }
 
+function inferResponseStyle(question = '') {
+  const q = String(question || '').toLowerCase();
+  if (/(curto|resumido|3 linhas|objetivo|sem enrola[çc][aã]o)/i.test(q)) return 'concise';
+  if (/(detalha|detalhado|aprofunda|profundo|mais completo)/i.test(q)) return 'detailed';
+  if (/(passo a passo|etapas|roteiro|fluxo)/i.test(q)) return 'step';
+  return 'default';
+}
+
 export function buildMedbotLocalContent(params) {
   const referenceLabel = formatReferencesForText(params.topicId);
   const references = getTopicReferences(params.topicId);
@@ -48,6 +56,7 @@ export function buildMedbotLocalContent(params) {
   const hasRecentHistory = (params.history || []).length > 0;
   const lastUserMessage = [...(params.history || [])].reverse().find((item) => item.role === 'user')?.content;
   const continuityHook = lastUserMessage ? `Último ponto que você trouxe: "${String(lastUserMessage).slice(0, 120)}".` : '';
+  const responseStyle = inferResponseStyle(params.question);
   const objectiveHook = `Objetivo atual: ${objective}.`;
   const factHook = facts.length ? `Pontos-chave do tema: ${facts.join(' • ')}.` : '';
   const levelLabel = params.userLevel === 'iniciante' ? 'iniciante' : params.userLevel === 'avancado' ? 'avançado' : 'intermediário';
@@ -62,6 +71,14 @@ export function buildMedbotLocalContent(params) {
     text = `Continuando de onde paramos em **${params.topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
   }
 
+  if (responseStyle === 'concise') {
+    text = `Fechado — versão curta em **${params.topicId}**:\n\n1) conceito central\n2) red flag principal\n3) ação inicial segura\n\nSe quiser, te mando a versão detalhada depois.`;
+  } else if (responseStyle === 'detailed') {
+    text = `Perfeito, vamos aprofundar **${params.topicId}** com calma.\n\n${objectiveHook}\n${continuityHook}\n\n1) fisiopatologia prática\n2) reconhecimento clínico (o que muda conduta)\n3) red flags e erros frequentes\n4) checklist de decisão inicial\n\nSe quiser, no final transformo isso em caso clínico aplicado.`;
+  } else if (responseStyle === 'step') {
+    text = `Boa — vamos em passo a passo para **${params.topicId}**:\n\nPasso 1: reconhecer padrão clínico.\nPasso 2: checar sinais de gravidade.\nPasso 3: priorizar exames que mudam conduta.\nPasso 4: revisar hipótese principal vs diferenciais.\n\nPosso seguir com um exemplo prático no Passo 1 agora.`;
+  }
+
   if (intent === 'caso') {
     const caseId = crypto.randomUUID().slice(0, 8).toUpperCase();
     text = `🏥 **CASO CLÍNICO #${caseId}**\n\n👤 **PACIENTE:** Adulto com foco em ${params.topicId}\n\n📋 **HISTÓRIA:**\nQueixa principal e evolução temporal objetiva.\n\n🔍 **EXAME FÍSICO:**\n• Priorize sinais vitais e achados focais.\n\n❓ **PERGUNTA:**\nQual hipótese principal e qual conduta imediata?\n\n✅ **CONDUTA CORRETA:**\nEstratificar gravidade, excluir diagnóstico letal e iniciar suporte.\n\n📚 **POR QUÊ:**\n${params.clinicalSummary || 'A conduta inicial deve ser guiada por risco e tempo-dependência.'}\n\n🧭 ${objectiveHook}\n${continuityHook}\n\n---\n🎯 **QUER MAIS?**\n→ "outro caso"\n→ "mais difícil"\n→ "quiz"`;
@@ -73,6 +90,14 @@ export function buildMedbotLocalContent(params) {
 
   if (intent === 'medicamento') {
     text = `💊 **FARMACOLOGIA: foco em ${params.topicId}**\n\n📋 **CLASSE:** revisar por mecanismo e contexto clínico.\n\n🎯 **INDICAÇÕES PRINCIPAIS:**\n• Situações com benefício comprovado em diretriz\n• Cenários de urgência com supervisão clínica\n• Estratégia de manutenção quando estabilizado\n\n⚠️ **SEGURANÇA:**\n• Não usar dose definitiva sem protocolo local\n• Confirmar contraindicações e função renal/hepática\n\n📖 **BASEADO EM:** ${sourceLabel}\n📚 **Referência-base:** ${referenceLabel}\n\n---\n→ Digite "interações"\n→ Digite "alternativas"\n→ Digite "caso clínico"`;
+  }
+
+  if (intent === 'comparacao') {
+    text = `Ótima comparação. Em **${params.topicId}**, pense assim:\n\n• **Semelhanças-chave**: apresentação inicial e necessidade de triagem.\n• **Diferenças que mudam conduta**: red flags, exame inicial prioritário e tempo-dependência.\n• **Erro comum**: tratar como iguais sem estratificar risco.\n\nSe você quiser, eu comparo em tabela (A x B) no próximo passo.`;
+  }
+
+  if (intent === 'duvida' && !isHelpIntent) {
+    text = `Entendi. Me manda em uma frase o que você quer agora em **${params.topicId}** (resumo, caso, quiz, comparação ou farmacologia) e eu sigo exatamente nesse formato, sem enrolação.\n\n${hasRecentHistory ? continuityHook : ''}`.trim();
   }
 
   const suggestions = isHelpIntent

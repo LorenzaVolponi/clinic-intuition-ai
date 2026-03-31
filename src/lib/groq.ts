@@ -3,12 +3,13 @@ interface GroqMessage {
   content: string;
 }
 
-const GROQ_MODEL = "llama3-70b-8192";
+export const GROQ_MODEL = "llama3-70b-8192";
+
+export const GROQ_API_KEY =
+  "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"; // default development key
 
 export async function callGroq(messages: GroqMessage[]): Promise<string> {
-  const apiKey =
-    import.meta.env.VITE_GROQ_API_KEY ??
-    "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";
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY ?? GROQ_API_KEY;
 
   if (!apiKey) {
     throw new Error("Chave da API Groq não configurada");
@@ -54,5 +55,3 @@ export async function callGroq(messages: GroqMessage[]): Promise<string> {
     clearTimeout(timeout);
   }
 }
-
-export { GROQ_MODEL };

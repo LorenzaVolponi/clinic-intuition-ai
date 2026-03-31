@@ -26,13 +26,13 @@ interface DiagnosisData {
   hypotheses: Array<{
     name: string;
     probability: string;
-    treatment: string;
+    treatment?: string;
     explanation: string;
     differentials: string[];
-    remedies: string[];
   }>;
   emergencyWarning?: string;
   unexplainedSymptoms?: string[];
+  remedies?: string[];
 }
 
 interface DiagnosisResultProps {
@@ -203,17 +203,21 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
             
             <CardContent className="space-y-4 pt-0">
               {/* Treatment */}
-              <div className="bg-success-soft p-3 sm:p-4 rounded-lg border border-success/20">
-                <div className="flex items-start gap-3">
-                  <Pill className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">
-                      💊 Possível Conduta Terapêutica
-                    </h4>
-                    <p className="text-success/90 text-sm leading-relaxed">{hypothesis.treatment}</p>
+              {hypothesis.treatment && (
+                <div className="bg-success-soft p-3 sm:p-4 rounded-lg border border-success/20">
+                  <div className="flex items-start gap-3">
+                    <Pill className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">
+                        💊 Exemplo educacional de conduta
+                      </h4>
+                      <p className="text-success/90 text-sm leading-relaxed whitespace-pre-line">
+                        {hypothesis.treatment}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Clinical Explanation */}
               <div className="bg-primary-soft p-3 sm:p-4 rounded-lg border border-primary/20">
@@ -247,34 +251,35 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                 </div>
               </div>
 
-              {/* Recommended Remedies */}
-              {hypothesis.remedies && hypothesis.remedies.length > 0 && (
-                <div className="bg-muted/50 p-3 sm:p-4 rounded-lg border border-border/50">
-                  <div className="flex items-start gap-3">
-                    <Pill className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-muted-foreground mb-3 text-sm sm:text-base">
-                        💊 Remédios recomendados
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {hypothesis.remedies.map((med, i) => (
-                          <Badge
-                            key={i}
-                            variant="secondary"
-                            className="text-xs justify-center py-1 px-2"
-                          >
-                            {med}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {diagnosis.remedies && diagnosis.remedies.length > 0 && (
+        <Card className="border-success/40 bg-success/5 shadow-lg">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-success/20 rounded-full">
+                <Pill className="h-5 w-5 text-success flex-shrink-0" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-success mb-2 text-sm sm:text-base">
+                  💊 Exemplo educacional de conduta
+                </h3>
+                <ul className="list-disc list-inside space-y-1 text-success/90 text-sm leading-relaxed">
+                  {diagnosis.remedies.map((med, i) => (
+                    <li key={i}>{med}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-success/90 mt-2">
+                  (exemplos ilustrativos – consultar protocolo institucional)
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Educational Notice */}
       <Card className="bg-gradient-to-r from-warning-soft/50 to-orange-50/50 border-warning shadow-lg">

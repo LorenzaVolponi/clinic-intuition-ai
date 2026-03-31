@@ -1,4 +1,6 @@
 // Base de conhecimento médico avançada para o Dr. IA
+import { generateMainPrompt } from "./mainPrompt";
+
 export interface MedicalCondition {
   name: string;
   icd10?: string;
@@ -194,6 +196,120 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     differentials: ["Influenza", "Pneumonia bacteriana", "Outras viroses"],
     redFlags: ["sat O2 < 94%", "dispneia progressiva", "confusão mental"],
     clinicalPearls: ["RT-PCR", "D-dímero elevado", "Isolamento necessário"]
+  },
+
+  // INFECÇÕES DAS VIAS AÉREAS SUPERIORES
+  {
+    name: "Faringite Viral Aguda",
+    icd10: "J02.9",
+    category: "infeccioso",
+    commonSymptoms: ["febre", "dor de garganta", "tosse", "coriza", "congestão nasal", "rouquidão"],
+    riskFactors: ["contato com doentes", "época fria"],
+    ageGroups: ["adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Dipirona (para dor e febre)",
+      "Paracetamol (acetaminofeno)",
+      "Repouso e hidratação"
+    ],
+    differentials: [
+      "Faringite estreptocócica",
+      "Mononucleose infecciosa",
+      "Influenza"
+    ],
+    redFlags: [
+      "dispneia grave",
+      "dificuldade para deglutir",
+      "sinais de abscesso peritonsilar"
+    ],
+    clinicalPearls: [
+      "Quadros virais melhoram em 3–7 dias",
+      "Antibióticos não indicados sem sinais bacterianos"
+    ]
+  },
+  {
+    name: "Faringite Estreptocócica",
+    icd10: "J02.0",
+    category: "infeccioso",
+    commonSymptoms: ["febre", "dor de garganta", "exsudato", "adenomegalia"],
+    riskFactors: ["contato com caso confirmado", "época fria"],
+    ageGroups: ["crianca", "adolescente", "adulto"],
+    urgencyLevel: "moderada",
+    treatments: [
+      "Amoxicilina (primeira escolha)",
+      "Azitromicina (alérgicos a penicilina)",
+      "Repouso e hidratação"
+    ],
+    differentials: [
+      "Mononucleose infecciosa",
+      "Faringite viral aguda",
+      "Abscesso peritonsilar"
+    ],
+    redFlags: [
+      "dificuldade para respirar",
+      "impossibilidade de deglutir",
+      "sinais de choque"
+    ],
+    clinicalPearls: [
+      "Aplicar critérios de Centor",
+      "Confirmar com teste rápido ou cultura"
+    ]
+  },
+  {
+    name: "Mononucleose Infecciosa",
+    icd10: "B27.0",
+    category: "infeccioso",
+    commonSymptoms: ["febre", "dor de garganta", "adenomegalia", "fadiga"],
+    riskFactors: ["adolescência", "contato com saliva"],
+    ageGroups: ["adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Repouso",
+      "Hidratação",
+      "Dipirona (para dor e febre)"
+    ],
+    differentials: [
+      "Faringite viral aguda",
+      "Faringite estreptocócica",
+      "Hepatite"
+    ],
+    redFlags: [
+      "dor abdominal intensa",
+      "amígdalas muito aumentadas",
+      "icterícia"
+    ],
+    clinicalPearls: [
+      "Linfócitos atípicos sugerem diagnóstico",
+      "Esplenomegalia pode ocorrer"
+    ]
+  },
+  {
+    name: "Infecção Respiratória Aguda Viral",
+    icd10: "J06.9",
+    category: "infeccioso",
+    commonSymptoms: ["febre", "tosse", "coriza"],
+    riskFactors: ["contato com doentes", "ambientes fechados"],
+    ageGroups: ["crianca", "adolescente", "adulto"],
+    urgencyLevel: "baixa",
+    treatments: [
+      "Dipirona (dor e febre)",
+      "Paracetamol (acetaminofeno)",
+      "Repouso e hidratação"
+    ],
+    differentials: [
+      "Influenza",
+      "COVID-19",
+      "Faringite viral aguda"
+    ],
+    redFlags: [
+      "dispneia",
+      "saturação < 94%",
+      "sinais de pneumonia"
+    ],
+    clinicalPearls: [
+      "Normalmente autolimitada",
+      "Antibióticos não indicados na ausência de sinais bacterianos"
+    ]
   }
 ];
 
@@ -279,51 +395,5 @@ export function findMatchingConditions(
 }
 
 export function generateClinicalPrompt(patientData: PatientInput): string {
-  const matchingConditions = findMatchingConditions(
-    patientData.symptoms, 
-    patientData.age, 
-    patientData.gender, 
-    patientData.duration
-  );
-
-  return `
-CASO CLÍNICO PARA ANÁLISE:
-- Paciente: ${patientData.name || "Não informado"}
-- Idade: ${patientData.age} anos (${patientData.age < 18 ? 'pediátrico' : patientData.age < 65 ? 'adulto' : 'geriátrico'})
-- Sexo: ${patientData.gender}
-- Sintomas: ${patientData.symptoms}
-- Duração: ${patientData.duration}
-
-INSTRUÇÕES PARA ANÁLISE MÉDICA:
-Como Dr. IA, analise este caso seguindo raciocínio clínico estruturado baseado em evidências médicas atuais.
-
-CONDIÇÕES SUSPEITAS BASEADAS EM ALGORITMOS:
-${matchingConditions.slice(0, 3).map(condition => `
-- ${condition.name} (${condition.category})
-  * Probabilidade: ${condition.urgencyLevel === 'emergencia' ? 'ALTA' : condition.urgencyLevel === 'alta' ? 'ALTA' : condition.urgencyLevel === 'moderada' ? 'MODERADA' : 'BAIXA'}
-  * Red flags: ${condition.redFlags.join(', ')}
-  * Tratamento padrão: ${condition.treatments.slice(0, 3).join(', ')}
-  * Diferenciais: ${condition.differentials.slice(0, 3).join(', ')}
-`).join('')}
-
-CRITÉRIOS DE ANÁLISE:
-1. Use terminologia médica precisa (CID-10 quando relevante)
-2. Considere epidemiologia (idade, sexo, prevalência)
-3. Avalie urgência baseada em sinais de alarme
-4. Sugira condutas baseadas em guidelines atuais
-5. Mencione exames complementares quando indicados
-6. Respeite regras absolutas: não priorize hipertensão, hipoglicemia, anemia, diabetes descompensado ou insuficiência cardíaca sem dados objetivos.
-7. SEMPRE inclua aviso de que é simulação educacional
-
-FORMATO DE RESPOSTA OBRIGATÓRIO:
-- Máximo 3 hipóteses diagnósticas
-- Probabilidade: ALTA/MODERADA/BAIXA
-- Tratamentos apenas como exemplos educacionais
-- Explicação fisiopatológica quando relevante
-- Se sinais de alarme: incluir aviso de emergência
-- Campo "remedies" com 2-3 medicamentos comuns (exemplos educacionais)
-
-${matchingConditions.some(c => c.urgencyLevel === 'emergencia') ? 
-  'ALERTA: Este caso apresenta possíveis sinais de emergência médica. Orienta-se busca imediata por atendimento médico.' : ''}
-`;
+  return generateMainPrompt(patientData);
 }

@@ -61,11 +61,13 @@ npm test
 npm run build
 npm run verify
 npm run auto:guard
+npm run review:medbot:diagnosis
 ```
 
 Cobertura inicial inclui:
 - validação clínica de segurança (`backend/validators.test.ts`);
 - smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
+- revisão guiada para fluidez do MedBot + variação de hipóteses (`scripts/review-medbot-diagnosis.sh`).
 
 ### Smoke test rápido local (API + frontend)
 

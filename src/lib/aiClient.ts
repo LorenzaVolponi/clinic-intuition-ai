@@ -65,8 +65,20 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
 }
 
 function normalizeBackendAssessment(response: ClinicalApiResponse, localAssessment: ClinicalAssessment): ClinicalAssessment {
+  const localHypothesisByName = new Map(localAssessment.hypotheses.map((item) => [item.name, item]));
+  const normalizedHypotheses = Array.isArray(response.hypotheses) && response.hypotheses.length > 0
+    ? response.hypotheses.map((item) => {
+      const localMatch = localHypothesisByName.get(item.name);
+      return {
+        ...item,
+        referenceLabel: item.referenceLabel || localMatch?.referenceLabel,
+        referenceUrl: item.referenceUrl || localMatch?.referenceUrl,
+      };
+    })
+    : localAssessment.hypotheses;
+
   return {
-    hypotheses: Array.isArray(response.hypotheses) && response.hypotheses.length > 0 ? response.hypotheses : localAssessment.hypotheses,
+    hypotheses: normalizedHypotheses,
     emergencyWarning: response.emergencyWarning || localAssessment.emergencyWarning,
     triageLevel: response.triageLevel || localAssessment.triageLevel,
     triageReason: response.triageReason || localAssessment.triageReason,

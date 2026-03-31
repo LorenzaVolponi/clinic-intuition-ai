@@ -14,6 +14,7 @@
     "verify": "npm run lint && npm test && npm run build",
     "smoke:e2e": "bash scripts/smoke-e2e.sh",
     "review:medbot:diagnosis": "bash scripts/review-medbot-diagnosis.sh",
+    "auto:orchestrate:pr": "bash scripts/auto-pr-orchestrator.sh",
     "auto:repair": "bash scripts/auto-repair-and-verify.sh",
     "auto:repair:ci": "bash scripts/auto-repair-ci.sh",
     "auto:ship": "bash scripts/auto-ship-pr.sh",

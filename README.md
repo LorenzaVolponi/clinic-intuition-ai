@@ -112,14 +112,25 @@ O guard executa em sequência:
 
 Também foi incluído workflow diário em `.github/workflows/daily-auto-guard.yml` (cron) com upload de logs.
 
-### Bot de conflito com issue automática
+## Orquestração automática de PR (corrigir + validar + fechar PRs abertas)
 
-O workflow `.github/workflows/auto-pr-merge.yml` agora tenta resolver conflito e, se falhar, cria/atualiza issue automaticamente com rastreabilidade:
+Foi adicionado:
 
-- script de resolução: `scripts/auto-pr-conflict-fix-and-merge.sh`
-- script de issue automática: `scripts/create-conflict-issue.sh`
+- script: `scripts/auto-pr-orchestrator.sh`
+- workflow: `.github/workflows/auto-pr-orchestrator.yml`
 
-Isso evita PR parada em “Merge conflicts” sem acompanhamento.
+Fluxo automático ao subir PR:
+
+1. roda `npm ci`, `lint --fix`, `test` e `build`;
+2. se houver ajustes, commita e faz push automático;
+3. habilita auto-merge da PR atual;
+4. fecha as demais PRs abertas no branch base para manter um único fluxo ativo de entrega.
+
+Rodar local/manual:
+
+```bash
+npm run auto:orchestrate:pr
+```
 
 ## Deploy automático (Vercel)
 

@@ -109,3 +109,21 @@ O guard executa em sequência:
 4. `npm run build`
 
 Também foi incluído workflow diário em `.github/workflows/daily-auto-guard.yml` (cron) com upload de logs.
+
+## Deploy automático (Vercel)
+
+Agora o repositório possui workflow de deploy automático: `.github/workflows/deploy-vercel.yml`.
+
+- **PR para `main/master`**: gera deploy de **preview** e comenta a URL na PR.
+- **Push em `main/master`**: gera deploy de **produção** automaticamente.
+- **Manual**: pode ser disparado em **Actions → Deploy Vercel (Auto)**.
+
+### Secrets obrigatórios no GitHub
+
+Configure em **Settings → Secrets and variables → Actions**:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+Sem esses 3 secrets o workflow falha com mensagem explícita.

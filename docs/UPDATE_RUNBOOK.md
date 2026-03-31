@@ -107,3 +107,21 @@ git push origin <sua-branch>
 - curl /api/health (backend e via frontend)
 - curl POST /api/medbot
 ```
+
+## 7) Deploy automático (GitHub Actions + Vercel)
+
+O projeto agora publica automaticamente via workflow:
+
+- arquivo: `.github/workflows/deploy-vercel.yml`
+- PR em `main/master` → deploy preview + comentário com URL
+- push em `main/master` → deploy produção
+
+### Pré-requisitos no GitHub
+
+Em **Settings → Secrets and variables → Actions**, cadastrar:
+
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+Se faltar qualquer secret, o workflow falha imediatamente com erro claro.

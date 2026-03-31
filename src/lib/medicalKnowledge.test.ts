@@ -48,4 +48,17 @@ describe('buildLocalAssessment', () => {
     expect(chestPain.clinicalSummary).toContain('Base educacional');
     expect(urinary.clinicalSummary).toContain('Base educacional');
   });
+
+  it('inclui referência rápida por hipótese para uso no layout diagnóstico', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente C',
+      age: 61,
+      gender: 'Masculino',
+      duration: '< 6h',
+      symptoms: 'Dor torácica, sudorese, náusea e dispneia',
+    });
+
+    expect(assessment.hypotheses[0]?.referenceLabel).toBeTruthy();
+    expect(assessment.hypotheses[0]?.referenceUrl).toMatch(/^https?:\/\//);
+  });
 });

@@ -32,6 +32,8 @@ export interface DiagnosisHypothesis {
   recommendedExams: string[];
   redFlags: string[];
   score: number;
+  referenceLabel?: string;
+  referenceUrl?: string;
 }
 
 export interface ClinicalAssessment {
@@ -366,6 +368,12 @@ function referencesForCategory(category: string) {
   return CATEGORY_REFERENCE_MAP[category] || 'Referências clínicas públicas de sociedades médicas';
 }
 
+function referenceUrlForCategory(category: string) {
+  const label = referencesForCategory(category);
+  const match = label.match(/https?:\/\/\S+/i);
+  return match?.[0] || 'https://www.who.int/publications/i/item/9789240041256';
+}
+
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const ageGroup = getAgeGroup(patientData.age);
   const durationProfile = getDurationProfile(patientData.duration);
@@ -380,6 +388,10 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
     .filter((token) => tokens.has(token)).length;
 
   let score = symptomHits * 22 + redFlagHits * 10 + Math.min(lexicalHits, 8) * 3;
+
+  if (symptomHits === 0 && redFlagHits === 0) {
+    score = Math.min(score, 18);
+  }
 
   if (condition.ageGroups.includes(ageGroup)) score += 10;
   if (!condition.durationProfile || condition.durationProfile.includes(durationProfile)) score += 8;
@@ -446,12 +458,32 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   }
 
   const topMatches = rankedConditions.slice(0, 3);
-  const topUrgency = topMatches.reduce<MedicalCondition['urgencyLevel']>((current, { condition }) => {
+  const diversifiedTopMatches = topMatches.length < 3
+    ? rankedConditions
+    : (() => {
+      const selected: typeof rankedConditions = [];
+      const categories = new Set<string>();
+      for (const candidate of rankedConditions) {
+        if (selected.length >= 3) break;
+        if (!categories.has(candidate.condition.category)) {
+          selected.push(candidate);
+          categories.add(candidate.condition.category);
+        }
+      }
+      for (const candidate of rankedConditions) {
+        if (selected.length >= 3) break;
+        if (!selected.some((item) => item.condition.name === candidate.condition.name)) {
+          selected.push(candidate);
+        }
+      }
+      return selected.slice(0, 3);
+    })();
+  const topUrgency = diversifiedTopMatches.reduce<MedicalCondition['urgencyLevel']>((current, { condition }) => {
     const order = { emergencia: 4, alta: 3, moderada: 2, baixa: 1 };
     return order[condition.urgencyLevel] > order[current] ? condition.urgencyLevel : current;
   }, 'baixa');
 
-  const hypotheses = topMatches.map(({ condition, score }) => ({
+  const hypotheses = diversifiedTopMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
     treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
@@ -460,13 +492,15 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     recommendedExams: condition.recommendedExams.slice(0, 4),
     redFlags: condition.redFlags.slice(0, 3),
     score,
+    referenceLabel: referencesForCategory(condition.category),
+    referenceUrl: referenceUrlForCategory(condition.category),
   }));
 
-  const emergencyWarning = topMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
+  const emergencyWarning = diversifiedTopMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
     ? '🚨 Atenção: o quadro contém sinais compatíveis com possível emergência médica. Recomenda-se avaliação presencial IMEDIATA. Em situação real, procure pronto-socorro ou acione o SAMU (192).'
     : undefined;
 
-  const suggestedExams = [...new Set(topMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
+  const suggestedExams = [...new Set(diversifiedTopMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
   const immediateActions = [
     topUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
     'Revisar fatores de risco, medicações em uso e comorbidades.',
@@ -478,11 +512,11 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     emergencyWarning,
     triageLevel: urgencyToTriage(topUrgency),
     triageReason: topMatches.length > 0
-      ? `Prioridade definida pela hipótese principal (${topMatches[0].condition.name}) e pelos sinais de alarme associados.`
+      ? `Prioridade definida pela hipótese principal (${diversifiedTopMatches[0].condition.name}) e pelos sinais de alarme associados.`
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(topMatches[0]?.condition.category || 'geral')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(diversifiedTopMatches[0]?.condition.category || 'geral')}.`,
     analysisSource: 'local',
   };
 }

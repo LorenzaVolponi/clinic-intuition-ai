@@ -1,0 +1,125 @@
+name: Deploy Vercel (Auto)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: deploy-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate Vercel secrets
+        run: |
+          test -n "${{ secrets.VERCEL_TOKEN }}" || (echo "Missing VERCEL_TOKEN secret" && exit 1)
+          test -n "${{ secrets.VERCEL_ORG_ID }}" || (echo "Missing VERCEL_ORG_ID secret" && exit 1)
+          test -n "${{ secrets.VERCEL_PROJECT_ID }}" || (echo "Missing VERCEL_PROJECT_ID secret" && exit 1)
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=preview --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build Project Artifacts
+        run: vercel build --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy Preview
+        id: deploy_preview
+        run: |
+          URL="$(vercel deploy --prebuilt --token="${{ secrets.VERCEL_TOKEN }}")"
+          echo "preview_url=${URL}" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Comment preview URL
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ✅ Deploy de preview concluído.
+            🔗 URL: ${{ steps.deploy_preview.outputs.preview_url }}
+
+  deploy-production:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate Vercel secrets
+        run: |
+          test -n "${{ secrets.VERCEL_TOKEN }}" || (echo "Missing VERCEL_TOKEN secret" && exit 1)
+          test -n "${{ secrets.VERCEL_ORG_ID }}" || (echo "Missing VERCEL_ORG_ID secret" && exit 1)
+          test -n "${{ secrets.VERCEL_PROJECT_ID }}" || (echo "Missing VERCEL_PROJECT_ID secret" && exit 1)
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify
+        run: npm run verify
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy Production
+        run: vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

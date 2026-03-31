@@ -4,7 +4,18 @@ import { getTopicReferences } from '../shared/clinicalReferences.js';
 import { isMedbotAnswerSafe } from '../shared/medbotSafety.js';
 
 const MEDBOT_SYSTEM_PROMPT = `# ⚕️ MEDBOT
-Responda APENAS em JSON no formato:
+Você é um médico-tutor para ensino clínico. Conduza diálogo limpo, humano e natural, acompanhando o fluxo da conversa sem engessar a pessoa em menus ou classificações.
+
+## Diretrizes de conversa
+- Responda em português do Brasil.
+- Priorize resposta direta ao pedido atual, com continuidade real do histórico.
+- Escreva como conversa normal de consultório/preceptoria: claro, acolhedor e objetivo.
+- Evite tom robótico, listas excessivas, slogans, ou repetir "escolha formato".
+- Se houver risco clínico, sinalize com linguagem prudente e orientada à segurança.
+- Contexto educacional: não substituir atendimento médico real, protocolo local ou preceptor.
+
+## Saída obrigatória
+Responda APENAS JSON válido no formato:
 {"response":{"session_id":"string","interaction_id":"string","timestamp":"ISO8601","user_level":"iniciante|intermediario|avancado","intent":"resumo|caso|quiz|medicamento|comparacao|duvida","content":{"text":"markdown","type":"text|case|quiz|medication","metadata":{"topic":"string","sources":["string"],"difficulty":"easy|medium|hard","estimated_read_time":90}},"suggestions":["string"],"session_state":{"total_interactions":1,"topics_covered":["string"],"used_ids":["string"]}}}`;
 
 const sessionCache = new Map();
@@ -17,18 +28,26 @@ function getSessionState(sessionId) {
     existing.lastAccessed = now;
     return existing;
   }
-  const next = { interactions: [], topics: new Set(), usedIds: new Set(), userLevel: 'intermediario', lastIntent: undefined, lastAccessed: now };
+  const next = {
+    interactions: [],
+    topics: new Set(),
+    usedIds: new Set(),
+    userLevel: 'intermediario',
+    lastIntent: undefined,
+    lastObjective: undefined,
+    lastAccessed: now,
+  };
   sessionCache.set(sessionId, next);
   return next;
 }
 
-function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {}, priorIntent }) {
+function buildLocalResponse({ topicId, question, history = [], sessionUuid, userLevel = 'intermediario', context = {}, priorIntent, priorObjective }) {
   const interactionId = crypto.randomUUID();
   const { intent, text, suggestions, difficulty, sourceLabel } = buildMedbotLocalContent({
     topicId,
     question,
     history,
-    objective: context?.objective,
+    objective: context?.objective || priorObjective,
     quickFacts: context?.quickFacts,
     clinicalSummary: context?.clinicalSummary,
     userLevel,
@@ -115,11 +134,21 @@ export default async function handler(req, res) {
   sessionState.userLevel = userLevel;
   sessionState.topics.add(topicId);
 
-  const fallback = buildLocalResponse({ topicId, question, history, sessionUuid, userLevel, context, priorIntent: sessionState.lastIntent });
+  const fallback = buildLocalResponse({
+    topicId,
+    question,
+    history,
+    sessionUuid,
+    userLevel,
+    context,
+    priorIntent: sessionState.lastIntent,
+    priorObjective: sessionState.lastObjective,
+  });
   const updateSessionState = (normalizedResponse) => {
     sessionState.interactions.push(normalizedResponse.interaction_id);
     sessionState.usedIds.add(normalizedResponse.interaction_id);
     sessionState.lastIntent = normalizedResponse.intent;
+    if (context?.objective) sessionState.lastObjective = context.objective;
     return {
       ...normalizedResponse,
       session_state: {

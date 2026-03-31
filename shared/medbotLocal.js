@@ -76,19 +76,20 @@ export function buildMedbotLocalContent(params) {
   const hasRecentHistory = (params.history || []).length > 0;
   const lastUserMessage = [...(params.history || [])].reverse().find((item) => item.role === 'user')?.content;
   const continuityHook = lastUserMessage ? `Último ponto que você trouxe: "${String(lastUserMessage).slice(0, 120)}".` : '';
+  const trimmedQuestion = String(params.question || '').trim().replace(/[?.!]+$/, '');
   const responseStyle = inferResponseStyle(params.question, params.history || []);
   const objectiveHook = `Objetivo atual: ${objective}.`;
   const factHook = facts.length ? `Pontos-chave do tema: ${facts.join(' • ')}.` : '';
   const levelLabel = params.userLevel === 'iniciante' ? 'iniciante' : params.userLevel === 'avancado' ? 'avançado' : 'intermediário';
 
-  let text = `Perfeito — vamos direto ao ponto em **${params.topicId}** (nível ${levelLabel}).\n\n${objectiveHook}\n${factHook}\n\n📌 **Resumo rápido**\n• conceito central\n• decisão clínica que mais cai\n• principal red flag\n\nSe quiser, no próximo passo eu transformo isso em caso clínico ou quiz.`;
+  let text = `Boa — em **${params.topicId}** eu te explico de forma direta e natural, sem enrolação.\n\n${objectiveHook}\n${factHook}\n\nSobre "${trimmedQuestion || params.topicId}", o ponto principal é entender o mecanismo central, reconhecer sinais de alerta e decidir a primeira conduta segura. Se quiser, eu aprofundo em cima do seu contexto.`;
 
   if (isHelpIntent) {
     text = askedTopic
-      ? `Boa! Vamos estudar **${askedTopic}** de forma prática.\n\n1) **Fundamento em 30s**: definição + mecanismo principal.\n2) **Aplicação clínica**: quando suspeitar e o que não pode faltar.\n3) **Fixação rápida**: 3 perguntas objetivas com feedback.\n\n📚 Referência-base: ${referenceLabel}.\n\nSe preferir, começamos agora pelo item 1.`
-      : `Fechado 🤝 eu sigo o seu ritmo e respondo no formato que você pedir (resumo, caso, quiz ou comparação), sem enrolação.\n\n📚 Referência-base: ${referenceLabel}.\n\nMe diga o tema e eu já começo com uma explicação objetiva em linguagem ${levelLabel}.`;
+      ? `Perfeito. Vamos em linguagem simples sobre **${askedTopic}**: começo pelo essencial, depois trago aplicação prática e fecho com revisão rápida para fixar.\n\n📚 Referência-base: ${referenceLabel}.`
+      : `Fechado 🤝. Pode falar comigo como conversa normal: você traz o tema e eu respondo objetivo, humano e direto ao ponto, no seu ritmo (${levelLabel}).\n\n📚 Referência-base: ${referenceLabel}.`;
   } else if (hasRecentHistory) {
-    text = `Continuando de onde paramos em **${params.topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\n• ponto-chave clínico\n• exame que muda conduta\n• erro comum para evitar\n\nSe quiser, envio agora a versão em caso clínico curto.`;
+    text = `Continuando de onde paramos em **${params.topicId}**:\n\n${continuityHook}\n${objectiveHook}\n\nSeguindo no mesmo fio da conversa: foque no achado que muda conduta, no exame que realmente altera decisão e no erro mais comum para evitar agora.`;
   }
 
   if (responseStyle === 'concise') {
@@ -119,18 +120,18 @@ export function buildMedbotLocalContent(params) {
   }
 
   if (intent === 'duvida' && !isHelpIntent && responseStyle === 'default') {
-    text = `Entendi. Me manda em uma frase o que você quer agora em **${params.topicId}** (resumo, caso, quiz, comparação ou farmacologia) e eu sigo exatamente nesse formato, sem enrolação.\n\n${hasRecentHistory ? continuityHook : ''}`.trim();
+    text = `Entendi você. Vamos direto no que importa em **${params.topicId}**: explicação clara, conversa fluida e aplicação prática sem ficar te pedindo formato.\n\nSe quiser, já respondo em cima de "${trimmedQuestion || params.topicId}" com foco clínico seguro.${hasRecentHistory ? `\n\n${continuityHook}` : ''}`.trim();
   }
 
   const suggestions = isHelpIntent
     ? askedTopic
-      ? [`resumo ${askedTopic}`, `caso clínico ${askedTopic}`, `quiz ${askedTopic}`]
-      : ['resumo do tema', 'caso clínico curto', 'quiz de 3 perguntas']
+      ? [`quero entender ${askedTopic}`, `me dá exemplo prático`, `resumo rápido`]
+      : ['me explica de forma simples', 'aprofunda um pouco', 'me dá exemplo prático']
     : intent === 'quiz'
       ? ['próxima', 'resumo', 'caso clínico']
       : intent === 'caso'
         ? ['outro caso', 'mais difícil', 'quiz']
-        : ['medicamentos', 'caso clínico', 'quiz'];
+        : ['aprofunda um pouco', 'me dá exemplo prático', 'resumo rápido'];
 
   const difficulty = params.userLevel === 'iniciante' ? 'easy' : params.userLevel === 'avancado' ? 'hard' : 'medium';
 

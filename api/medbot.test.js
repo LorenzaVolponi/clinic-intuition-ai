@@ -162,6 +162,23 @@ describe('api/medbot handler', () => {
     expect(res.body.answer).not.toContain('Me manda em uma frase');
   });
 
+  it('mantém conversa natural sem exigir classificação de formato', async () => {
+    const req = {
+      method: 'POST',
+      headers: { 'x-session-uuid': 'session-natural-flow-conversation' },
+      body: {
+        topicId: 'emergencias',
+        question: 'quero um papo normal sobre sepse',
+      },
+    };
+    const res = createResponseCollector();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.answer).toContain('direta e natural');
+    expect(res.body.answer).not.toContain('resumo, caso, quiz');
+  });
+
   it('mantém estilo curto na continuação quando já estava nesse formato', async () => {
     const req = {
       method: 'POST',

@@ -121,7 +121,7 @@ Foi adicionado:
 
 Fluxo automático ao subir PR:
 
-1. roda `npm ci`, `lint --fix`, `test` e `build`;
+1. roda o pipeline definitivo (`scripts/definitive-auto-run.sh`) com auto-correção e retries;
 2. se houver ajustes, commita e faz push automático;
 3. habilita auto-merge da PR atual;
 4. fecha as demais PRs abertas no branch base para manter um único fluxo ativo de entrega.
@@ -131,6 +131,54 @@ Rodar local/manual:
 ```bash
 npm run auto:orchestrate:pr
 ```
+
+Pipeline definitivo (manual/local):
+
+```bash
+npm run auto:definitive:run
+```
+
+Esse pipeline:
+- provisiona dependências;
+- tenta corrigir lint automaticamente;
+- roda testes/build/smoke/review com retry inteligente;
+- em CI pode commitar auto-fix e habilitar auto-merge da PR.
+
+## Resolver conflitos de merge e rodar direto (Actions)
+
+Workflow: `.github/workflows/auto-pr-merge.yml`
+
+Você pode disparar de 3 formas:
+
+1. automático ao atualizar a PR;
+2. manual em **Actions → Auto PR Conflict Fix + Merge**;
+3. comentando na PR:  
+   ` /resolve-merge `
+
+Esse fluxo tenta resolver conflitos automaticamente, roda validações mínimas (`npm test` + `npm run build`) e já habilita auto-merge.
+
+## Script único para atualizar/corrigir tudo automaticamente
+
+Se você quer um comando “faz tudo” para corrigir o projeto quando der problema, use:
+
+```bash
+npm run auto:update:everything
+```
+
+Esse script (`scripts/auto-update-everything.sh`) executa:
+
+1. `npm ci`
+2. `lint --fix`
+3. `test`
+4. `build`
+5. `smoke-e2e`
+6. `review-medbot-diagnosis`
+
+Opções extras:
+
+- `--apply-updates` → roda `npm update` e `npm audit fix`
+- `--commit` → cria commit automático se houver mudanças
+- `--push` → faz push para branch atual (ou `TARGET_BRANCH`)
 
 ## Deploy automático (Vercel)
 

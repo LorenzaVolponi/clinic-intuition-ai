@@ -112,6 +112,15 @@ O guard executa em sequência:
 
 Também foi incluído workflow diário em `.github/workflows/daily-auto-guard.yml` (cron) com upload de logs.
 
+### Bot de conflito com issue automática
+
+O workflow `.github/workflows/auto-pr-merge.yml` agora tenta resolver conflito e, se falhar, cria/atualiza issue automaticamente com rastreabilidade:
+
+- script de resolução: `scripts/auto-pr-conflict-fix-and-merge.sh`
+- script de issue automática: `scripts/create-conflict-issue.sh`
+
+Isso evita PR parada em “Merge conflicts” sem acompanhamento.
+
 ## Deploy automático (Vercel)
 
 Agora o repositório possui workflow de deploy automático: `.github/workflows/deploy-vercel.yml`.

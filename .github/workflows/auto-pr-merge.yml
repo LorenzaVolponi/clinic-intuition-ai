@@ -13,6 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   resolve-and-merge:
@@ -39,8 +40,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Auto resolve conflicts and enable auto-merge
+        id: auto_fix
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
         run: bash scripts/auto-pr-conflict-fix-and-merge.sh
+
+      - name: Abrir issue automática se o auto-fix falhar
+        if: steps.auto_fix.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
+        run: bash scripts/create-conflict-issue.sh "$PR_NUMBER"
+
+      - name: Falhar workflow quando houver conflito pendente
+        if: steps.auto_fix.outcome == 'failure'
+        run: |
+          echo "Auto-fix de conflito falhou. Issue automática criada para rastreamento."
+          exit 1

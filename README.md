@@ -157,6 +157,21 @@ Você pode disparar de 3 formas:
 
 Esse fluxo tenta resolver conflitos automaticamente, roda validações mínimas (`npm test` + `npm run build`) e já habilita auto-merge.
 
+### Resolver conflito a partir de issue automática
+
+Para casos como issue `[auto] Resolver conflito de merge da PR #XX`, foi adicionado:
+
+- workflow: `.github/workflows/auto-conflict-issue-resolver.yml`
+- script: `scripts/auto-handle-conflict-issue.sh`
+
+Esse fluxo extrai o número da PR da issue, tenta resolver conflito, roda validação e fecha a issue automaticamente se der certo.
+
+Rodar manual:
+
+```bash
+ISSUE_NUMBER=60 npm run auto:resolve:conflict-issue
+```
+
 ## Script único para atualizar/corrigir tudo automaticamente
 
 Se você quer um comando “faz tudo” para corrigir o projeto quando der problema, use:
@@ -179,6 +194,17 @@ Opções extras:
 - `--apply-updates` → roda `npm update` e `npm audit fix`
 - `--commit` → cria commit automático se houver mudanças
 - `--push` → faz push para branch atual (ou `TARGET_BRANCH`)
+
+## Script “all-in-one” (tudo que foi sugerido)
+
+```bash
+npm run auto:run:all
+```
+
+Opcional:
+
+- `--issue=<n>` para tratar issue automática de conflito
+- `--pr=<n>` para disparar orquestração completa de PR
 
 ## Deploy automático (Vercel)
 

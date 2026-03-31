@@ -16,6 +16,8 @@
     "review:medbot:diagnosis": "bash scripts/review-medbot-diagnosis.sh",
     "auto:definitive:run": "bash scripts/definitive-auto-run.sh",
     "auto:orchestrate:pr": "bash scripts/auto-pr-orchestrator.sh",
+    "auto:resolve:conflict-issue": "bash scripts/auto-handle-conflict-issue.sh",
+    "auto:run:all": "bash scripts/auto-run-all-suggestions.sh",
     "auto:update:everything": "bash scripts/auto-update-everything.sh",
     "auto:repair": "bash scripts/auto-repair-and-verify.sh",
     "auto:repair:ci": "bash scripts/auto-repair-ci.sh",

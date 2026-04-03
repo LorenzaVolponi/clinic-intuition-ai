@@ -68,7 +68,7 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -111,6 +111,7 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
   // Mobile detection
   React.useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -152,7 +153,7 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
         </div>
       </CardHeader>
 
-      <CardContent className="p-4 sm:p-6">
+      <CardContent className="p-4 pb-24 sm:p-6 sm:pb-6">
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Nome do Paciente */}
           <div className="space-y-2">
@@ -319,23 +320,25 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
           </div>
 
           {/* Submit Button */}
-          <Button 
-            type="submit" 
-            className="w-full h-11 sm:h-12 text-base bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-            disabled={isAnalyzing}
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Analisando caso clínico...
-              </>
-            ) : (
-              <>
-                <Stethoscope className="h-5 w-5 mr-2" />
-                Analisar Caso Clínico
-              </>
-            )}
-          </Button>
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
+            <Button
+              type="submit"
+              className="w-full h-11 sm:h-12 text-base bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Analisando caso clínico...
+                </>
+              ) : (
+                <>
+                  <Stethoscope className="h-5 w-5 mr-2" />
+                  Analisar Caso Clínico
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </CardContent>
     </Card>

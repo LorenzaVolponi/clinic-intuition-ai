@@ -26,6 +26,8 @@ export interface PatientData {
 export interface DiagnosisHypothesis {
   name: string;
   probability: 'Alta' | 'Moderada' | 'Baixa';
+  probabilityPercent?: number;
+  medicationOptions?: Array<{ name: string; why: string }>;
   treatment: string;
   explanation: string;
   differentials: string[];
@@ -45,6 +47,7 @@ export interface ClinicalAssessment {
   immediateActions: string[];
   clinicalSummary: string;
   analysisSource: 'local' | 'groq';
+  validationWarnings?: string[];
 }
 
 const DURATION_MAP: Record<string, 'hiperagudo' | 'agudo' | 'subagudo' | 'cronico'> = {
@@ -101,12 +104,46 @@ const CLINICAL_CONTEXT_PATTERNS = {
 };
 
 const CATEGORY_REFERENCE_MAP: Record<string, string> = {
-  cardiovascular: 'ACC/AHA ACS 2025: https://www.ahajournals.org/doi/10.1161/CIR.0000000000001309',
-  neurologico: 'AHA/ASA Stroke 2021: https://www.ahajournals.org/doi/10.1161/STR.0000000000000375',
-  infeccioso: 'IDSA CAP: https://www.idsociety.org/practice-guideline/community-acquired-pneumonia-cap-in-adults/',
+  cardiovascular: 'Diretrizes cardiovasculares institucionais (base educacional)',
+  neurologico: 'Diretrizes neurológicas institucionais (base educacional)',
+  infeccioso: 'Diretrizes infecciosas institucionais (base educacional)',
   respiratorio: 'IDSA CAP + diretrizes institucionais locais',
   gastrointestinal: 'Diretrizes cirúrgicas e clínicas institucionais',
   genitourinario: 'Diretrizes de ITU baseadas em perfil local de resistência',
+};
+
+const MANDATORY_EVIDENCE_RULES: Array<{ condition: string; requiredSymptoms: string[]; maxScoreWithoutEvidence: number }> = [
+  { condition: 'Acidente Vascular Cerebral', requiredSymptoms: ['hemiparesia', 'afasia', 'déficit focal', 'alteração consciência'], maxScoreWithoutEvidence: 35 },
+  { condition: 'Síndrome Coronariana Aguda', requiredSymptoms: ['dor torácica', 'dor no peito', 'aperto no peito'], maxScoreWithoutEvidence: 35 },
+  { condition: 'Apendicite Aguda', requiredSymptoms: ['dor abdominal', 'fossa ilíaca direita', 'dor em fossa ilíaca'], maxScoreWithoutEvidence: 35 },
+];
+
+const CONDITION_MEDICATION_OPTIONS: Record<string, Array<{ name: string; why: string }>> = {
+  'Síndrome Coronariana Aguda': [
+    { name: 'Antiagregante plaquetário', why: 'Reduz progressão trombótica no contexto de síndrome coronariana.' },
+    { name: 'Estatina de alta potência', why: 'Diminui risco cardiovascular e estabiliza placa aterosclerótica.' },
+    { name: 'Nitrato/analgesia conforme protocolo', why: 'Auxilia no controle de dor isquêmica e conforto clínico inicial.' },
+  ],
+  'Asma Agudizada': [
+    { name: 'Broncodilatador de resgate (SABA)', why: 'Promove broncodilatação rápida em crise de broncoespasmo.' },
+    { name: 'Corticoterapia sistêmica conforme protocolo', why: 'Reduz inflamação de via aérea e risco de piora.' },
+    { name: 'Oxigenoterapia se hipoxemia', why: 'Corrige hipóxia e melhora segurança ventilatória inicial.' },
+  ],
+  'Pneumonia Adquirida na Comunidade': [
+    { name: 'Antibioticoterapia empírica inicial', why: 'Cobre etiologias bacterianas prováveis no início do tratamento.' },
+    { name: 'Antitérmico/analgesia', why: 'Controla febre e sintomas sistêmicos associados.' },
+    { name: 'Suporte respiratório conforme necessidade', why: 'Melhora oxigenação em casos com desconforto respiratório.' },
+  ],
+  'Apendicite Aguda': [
+    { name: 'Analgesia conforme protocolo', why: 'Controla dor enquanto o paciente é preparado para avaliação cirúrgica.' },
+    { name: 'Antiemético', why: 'Reduz náusea/vômito e melhora tolerância clínica inicial.' },
+    { name: 'Antibioticoprofilaxia perioperatória', why: 'Reduz risco infeccioso em contexto de abordagem cirúrgica.' },
+  ],
+  'Enxaqueca com Aura': [
+    { name: 'Analgésico/anti-inflamatório', why: 'Reduz intensidade da crise álgica de enxaqueca.' },
+    { name: 'Antiemético', why: 'Controla náusea frequentemente associada à crise.' },
+    { name: 'Triptano conforme protocolo', why: 'Pode abortar crise típica quando não houver contraindicação.' },
+  ],
 };
 
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
@@ -217,6 +254,21 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     durationProfile: ['subagudo', 'cronico'],
   },
   {
+    name: 'Enxaqueca com Aura',
+    icd10: 'G43.1',
+    category: 'neurologico',
+    commonSymptoms: ['enxaqueca', 'cefaleia', 'dor de cabeça', 'aura', 'fotofobia', 'náusea'],
+    riskFactors: ['história pessoal/familiar', 'gatilhos alimentares', 'privação de sono', 'estresse'],
+    ageGroups: ['adolescente', 'adulto'],
+    urgencyLevel: 'moderada',
+    treatments: ['Analgésicos e antieméticos conforme protocolo institucional', 'Hidratação e ambiente com menor estímulo luminoso', 'Reavaliação clínica e prevenção de gatilhos'],
+    differentials: ['Cefaleia tensional', 'Cefaleia secundária', 'AVC (quando sinais focais)'],
+    redFlags: ['déficit neurológico persistente', 'cefaleia súbita em thunderclap', 'alteração do nível de consciência'],
+    clinicalPearls: ['Aura visual transitória e fotofobia favorecem enxaqueca com aura', 'Sempre excluir causas secundárias quando houver red flags'],
+    recommendedExams: ['Exame neurológico', 'Neuroimagem se sinais de alarme'],
+    durationProfile: ['agudo', 'subagudo', 'cronico'],
+  },
+  {
     name: 'Acidente Vascular Cerebral',
     icd10: 'I64',
     category: 'neurologico',
@@ -315,6 +367,16 @@ function probabilityFromScore(score: number): 'Alta' | 'Moderada' | 'Baixa' {
   return 'Baixa';
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scoreToProbabilityPercent(score: number, probability: DiagnosisHypothesis['probability']) {
+  if (probability === 'Alta') return clamp(score, 70, 95);
+  if (probability === 'Moderada') return clamp(score, 45, 69);
+  return clamp(score, 20, 44);
+}
+
 function urgencyToTriage(level: MedicalCondition['urgencyLevel']): ClinicalAssessment['triageLevel'] {
   switch (level) {
     case 'emergencia':
@@ -368,10 +430,11 @@ function referencesForCategory(category: string) {
   return CATEGORY_REFERENCE_MAP[category] || 'Referências clínicas públicas de sociedades médicas';
 }
 
-function referenceUrlForCategory(category: string) {
-  const label = referencesForCategory(category);
-  const match = label.match(/https?:\/\/\S+/i);
-  return match?.[0] || 'https://www.who.int/publications/i/item/9789240041256';
+function medicationOptionsForCondition(condition: MedicalCondition) {
+  return CONDITION_MEDICATION_OPTIONS[condition.name] || [
+    { name: 'Tratamento sintomático conforme protocolo', why: 'Alivia sintomas enquanto diagnóstico é refinado.' },
+    { name: 'Suporte clínico e monitorização', why: 'Permite reavaliação contínua da evolução clínica.' },
+  ];
 }
 
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
@@ -410,6 +473,14 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   if (context.focalDeficit && condition.category === 'neurologico') score += 12;
   if (context.severeTachycardia && condition.category === 'cardiovascular') score += 6;
 
+  for (const rule of MANDATORY_EVIDENCE_RULES) {
+    if (condition.name !== rule.condition) continue;
+    const hasRequiredEvidence = rule.requiredSymptoms.some((symptom) => matchesTerm(patientData.symptoms, symptom));
+    if (!hasRequiredEvidence) {
+      score = Math.min(score, rule.maxScoreWithoutEvidence);
+    }
+  }
+
   return Math.min(score, 100);
 }
 
@@ -425,6 +496,7 @@ export function findMatchingConditions(patientData: PatientData) {
 export function buildLocalAssessment(patientData: PatientData): ClinicalAssessment {
   const rankedConditions = findMatchingConditions(patientData);
   const normalizedSymptoms = normalizeText(patientData.symptoms);
+  const context = inferClinicalContext(patientData.symptoms);
   const genericRedFlags = RED_FLAG_PATTERNS.filter((flag) => normalizedSymptoms.includes(normalizeText(flag)));
 
   if (rankedConditions.length === 0) {
@@ -458,51 +530,94 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   }
 
   const topMatches = rankedConditions.slice(0, 3);
-  const diversifiedTopMatches = topMatches.length < 3
-    ? rankedConditions
-    : (() => {
-      const selected: typeof rankedConditions = [];
-      const categories = new Set<string>();
-      for (const candidate of rankedConditions) {
-        if (selected.length >= 3) break;
-        if (!categories.has(candidate.condition.category)) {
-          selected.push(candidate);
-          categories.add(candidate.condition.category);
-        }
-      }
-      for (const candidate of rankedConditions) {
-        if (selected.length >= 3) break;
-        if (!selected.some((item) => item.condition.name === candidate.condition.name)) {
-          selected.push(candidate);
-        }
-      }
-      return selected.slice(0, 3);
-    })();
-  const topUrgency = diversifiedTopMatches.reduce<MedicalCondition['urgencyLevel']>((current, { condition }) => {
-    const order = { emergencia: 4, alta: 3, moderada: 2, baixa: 1 };
-    return order[condition.urgencyLevel] > order[current] ? condition.urgencyLevel : current;
-  }, 'baixa');
+  const topScore = topMatches[0]?.score ?? 0;
+  const clinicallyCoherentMatches = topMatches.filter(({ score }) => score >= Math.max(35, topScore - 20));
+  const selectedMatches = clinicallyCoherentMatches.length > 0 ? clinicallyCoherentMatches : topMatches.slice(0, 1);
+  const primaryMatch = selectedMatches[0];
+  const hasStrongEmergencySignal =
+    genericRedFlags.length >= 2 ||
+    context.severeHypotension ||
+    context.hypoxia ||
+    context.focalDeficit ||
+    selectedMatches.some(({ condition, score }) => condition.urgencyLevel === 'emergencia' && score >= 65);
 
-  const hypotheses = diversifiedTopMatches.map(({ condition, score }) => ({
+  const hasStrongUrgentSignal =
+    hasStrongEmergencySignal ||
+    genericRedFlags.length >= 1 ||
+    selectedMatches.some(({ condition, score }) => condition.urgencyLevel === 'alta' && score >= 55);
+
+  const derivedUrgency: MedicalCondition['urgencyLevel'] = hasStrongEmergencySignal
+    ? 'emergencia'
+    : hasStrongUrgentSignal
+      ? 'alta'
+      : primaryMatch?.condition.urgencyLevel || 'baixa';
+
+  const baseHypotheses = selectedMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
-    treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
-    explanation: `${condition.clinicalPearls[0] ?? 'Raciocínio clínico guiado pelos sintomas predominantes.'} Compatibilidade baseada em ${condition.commonSymptoms.slice(0, 3).join(', ')} e contexto clínico informado. Referência-base: ${referencesForCategory(condition.category)}.`,
+    probabilityPercent: scoreToProbabilityPercent(score, probabilityFromScore(score)),
+    treatment: `${condition.treatments.slice(0, 3).join('; ')}. Indicadas porque o quadro descrito é compatível com ${condition.name.toLowerCase()} e exige abordagem inicial segura (sem dose neste simulador; validar com protocolo institucional e preceptor).`,
+    medicationOptions: medicationOptionsForCondition(condition).slice(0, 3),
+    explanation: `Compatível com ${condition.commonSymptoms.slice(0, 2).join(' e ')} no contexto informado.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),
     redFlags: condition.redFlags.slice(0, 3),
     score,
     referenceLabel: referencesForCategory(condition.category),
-    referenceUrl: referenceUrlForCategory(condition.category),
+    referenceUrl: undefined,
   }));
 
-  const emergencyWarning = diversifiedTopMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
+  const primaryCondition = selectedMatches[0]?.condition;
+  const triLevelTargets: Array<'Alta' | 'Moderada' | 'Baixa'> = ['Alta', 'Moderada', 'Baixa'];
+  const usedNames = new Set<string>();
+  const hypotheses = triLevelTargets.map((targetProbability, index) => {
+    const directMatch = baseHypotheses.find((item) => item.probability === targetProbability && !usedNames.has(item.name));
+    if (directMatch) {
+      usedNames.add(directMatch.name);
+      return {
+        ...directMatch,
+        explanation: `Classificação ${targetProbability}: ${directMatch.explanation}`,
+      };
+    }
+
+    const fallbackFromList = baseHypotheses.find((item) => !usedNames.has(item.name));
+    if (fallbackFromList) {
+      usedNames.add(fallbackFromList.name);
+      return {
+        ...fallbackFromList,
+        probability: targetProbability,
+        probabilityPercent: scoreToProbabilityPercent(fallbackFromList.score, targetProbability),
+        explanation: `Classificação ${targetProbability}: hipótese coerente com os sintomas relatados.`,
+      };
+    }
+
+    const differentialName = primaryCondition?.differentials[index] || `Hipótese ${targetProbability} a confirmar`;
+    return {
+      name: differentialName,
+      probability: targetProbability,
+      treatment: 'Conduta educacional: correlacionar com exame físico, sinais vitais e protocolo institucional.',
+      medicationOptions: [
+        { name: 'Analgésico/controle sintomático conforme protocolo', why: 'Ajuda no controle inicial de sintomas enquanto hipótese é confirmada.' },
+        { name: 'Suporte clínico e monitorização', why: 'Permite reavaliação dinâmica e aumenta segurança do paciente.' },
+      ],
+      probabilityPercent: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
+      explanation: `Classificação ${targetProbability}: diferencial mantido para estratificação clínica.`,
+      differentials: primaryCondition?.differentials.slice(0, 4) || [],
+      recommendedExams: primaryCondition?.recommendedExams.slice(0, 3) || ['Exame físico dirigido'],
+      redFlags: primaryCondition?.redFlags.slice(0, 3) || [],
+      score: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
+      referenceLabel: referencesForCategory(primaryCondition?.category || 'geral'),
+      referenceUrl: undefined,
+    };
+  });
+
+  const emergencyWarning = selectedMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
     ? '🚨 Atenção: o quadro contém sinais compatíveis com possível emergência médica. Recomenda-se avaliação presencial IMEDIATA. Em situação real, procure pronto-socorro ou acione o SAMU (192).'
     : undefined;
 
-  const suggestedExams = [...new Set(diversifiedTopMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
+  const suggestedExams = [...new Set(selectedMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
   const immediateActions = [
-    topUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
+    derivedUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
     'Revisar fatores de risco, medicações em uso e comorbidades.',
     'Correlacionar anamnese com exame físico antes de definir conduta real.',
   ];
@@ -510,13 +625,13 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   return {
     hypotheses,
     emergencyWarning,
-    triageLevel: urgencyToTriage(topUrgency),
+    triageLevel: urgencyToTriage(derivedUrgency),
     triageReason: topMatches.length > 0
-      ? `Prioridade definida pela hipótese principal (${diversifiedTopMatches[0].condition.name}) e pelos sinais de alarme associados.`
+      ? `Prioridade definida pela hipótese principal (${selectedMatches[0].condition.name}) e pelos sinais de alarme associados.`
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(diversifiedTopMatches[0]?.condition.category || 'geral')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => `${item.name} (${item.probability} ${item.probabilityPercent}%)`).join(', ')}.`,
     analysisSource: 'local',
   };
 }
@@ -561,8 +676,11 @@ RESPONDA COM ESTE JSON:
 
 REGRAS:
 - Máximo 3 hipóteses.
+- Ordem obrigatória: Alta, depois Moderada, depois Baixa.
+- Percentual/score coerente: Alta 70-95, Moderada 45-69, Baixa 20-44.
+- Em cada hipótese, sugerir 2-3 opções terapêuticas sem dose e explicar brevemente o motivo da indicação.
 - Ferramenta exclusivamente educacional; não prescrever conduta definitiva.
 - Se houver sinais graves, inclua emergencyWarning.
-- Use linguagem clínica objetiva, útil para estudantes.
+- Use linguagem clínica objetiva, breve e direta, sem links externos.
 `;
 }

@@ -16,8 +16,13 @@ import {
   FlaskConical,
   ClipboardCheck,
   Activity,
-  Cpu,
 } from 'lucide-react';
+
+const REGULATORY_REFERENCES = [
+  'Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)',
+  'Código de Ética Médica (Resolução CFM nº 2.217/2018)',
+  'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
+];
 
 interface DiagnosisResultProps {
   diagnosis: ClinicalAssessment;
@@ -129,14 +134,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                 <Badge className={getTriageColor(diagnosis.triageLevel)}>{diagnosis.triageLevel}</Badge>
                 <p className="text-sm text-muted-foreground mt-2">{diagnosis.triageReason}</p>
               </div>
-              <div className="rounded-lg border p-4 bg-background/70">
-                <div className="flex items-center gap-2 mb-2">
-                  <Cpu className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-semibold">Fonte da análise</p>
-                </div>
-                <p className="text-sm font-medium capitalize">{diagnosis.analysisSource === 'groq' ? 'Groq + base local' : 'Base local'}</p>
-                <p className="text-xs text-muted-foreground mt-1">Se a API não estiver configurada, o app mantém fallback seguro e funcional.</p>
-              </div>
             </div>
           </div>
         </CardContent>
@@ -193,6 +190,42 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
         </CardContent>
       </Card>
 
+      {diagnosis.validationWarnings && diagnosis.validationWarnings.length > 0 && (
+        <Card className="border-warning/50 bg-warning-soft/30">
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Validações de segurança aplicadas</CardTitle>
+            <CardDescription>
+              A resposta externa foi filtrada e o sistema priorizou dados locais seguros para evitar inconsistências.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+              {diagnosis.validationWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Referências regulatórias (Brasil)</CardTitle>
+          <CardDescription>
+            Base legal e ética para uso educacional seguro do simulador com dados de saúde no contexto brasileiro.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2 text-sm">
+            {REGULATORY_REFERENCES.map((ref) => (
+              <li key={ref} className="text-muted-foreground">
+                {ref}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+
       <div className="space-y-4 sm:space-y-6">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
           <div className="p-2 bg-primary/20 rounded-lg">
@@ -215,7 +248,10 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   </CardTitle>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={`${getProbabilityColor(hypothesis.probability)} text-xs sm:text-sm`}>{hypothesis.probability}</Badge>
+                  <Badge className={`${getProbabilityColor(hypothesis.probability)} text-xs sm:text-sm`}>
+                    {hypothesis.probability}
+                    {typeof hypothesis.probabilityPercent === 'number' ? ` ${hypothesis.probabilityPercent}%` : ''}
+                  </Badge>
                   <Badge variant="outline" className="text-xs">Score {hypothesis.score}</Badge>
                 </div>
               </div>
@@ -228,6 +264,15 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">💊 Possível conduta terapêutica</h4>
                     <p className="text-success/90 text-sm leading-relaxed">{hypothesis.treatment}</p>
+                    {hypothesis.medicationOptions && hypothesis.medicationOptions.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-xs sm:text-sm text-success/90 list-disc pl-5">
+                        {hypothesis.medicationOptions.slice(0, 3).map((option) => (
+                          <li key={`${option.name}-${option.why}`}>
+                            <strong>{option.name}:</strong> {option.why}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>
@@ -238,16 +283,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-primary mb-2 text-sm sm:text-base">📌 Explicação clínica</h4>
                     <p className="text-primary/90 text-sm leading-relaxed">{hypothesis.explanation}</p>
-                      {hypothesis.referenceUrl && (
-                        <a
-                          href={hypothesis.referenceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex text-xs sm:text-sm font-medium text-primary underline underline-offset-2"
-                        >
-                          Ver referência rápida
-                        </a>
-                      )}
                   </div>
                 </div>
               </div>

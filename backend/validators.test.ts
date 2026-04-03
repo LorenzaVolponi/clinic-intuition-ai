@@ -22,6 +22,26 @@ const validResponse = {
       exams: ['ECG', 'Troponina'],
       differentials: ['Dissecção de aorta'],
     },
+    {
+      name: 'Pericardite aguda',
+      role: 'mais grave a excluir',
+      probability: 'Média',
+      confidenceScore: 60,
+      justification: 'Dor torácica também pode ter causa inflamatória cardíaca.',
+      physiopathology: 'Inflamação pericárdica pode simular dor isquêmica.',
+      exams: ['ECG', 'PCR'],
+      differentials: ['SCA'],
+    },
+    {
+      name: 'Dor musculoesquelética torácica',
+      role: 'diferencial comum',
+      probability: 'Baixa',
+      confidenceScore: 35,
+      justification: 'Pode ocorrer dor torácica benigna, porém menos provável no cenário atual.',
+      physiopathology: 'Dor parietal sem sinais de instabilidade sistêmica.',
+      exams: ['Exame físico dirigido'],
+      differentials: ['SCA'],
+    },
   ],
   investigationPlan: {
     immediate: ['ECG', 'Troponina'],
@@ -54,6 +74,17 @@ describe('validateClinicalResponse', () => {
     const result = validateClinicalResponse({ patientData: basePatient, response: responseWithoutEcg });
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Dor torácica sem ECG');
+  });
+
+  it('reprova resposta sem as 3 probabilidades obrigatórias (Alta/Média/Baixa)', () => {
+    const missingLevel = {
+      ...validResponse,
+      hypotheses: validResponse.hypotheses.map((item) => ({ ...item, probability: 'Média' as const })),
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: missingLevel });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Nível de probabilidade ausente na resposta');
   });
 
   it('reprova mulher em idade fértil com dor+nausea sem beta-HCG', () => {

@@ -25,6 +25,7 @@
     "auto:guard": "bash scripts/auto-guard.sh --once",
     "auto:guard:watch": "bash scripts/auto-guard.sh --watch --interval 300",
     "safety:parse:case": "tsx scripts/clinical-facts-check.ts",
+    "safety:check:ladder": "tsx scripts/check-probability-ladder.ts",
     "preview": "vite preview",
     "start:server": "npx tsx backend/server.ts"
   },

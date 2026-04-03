@@ -482,7 +482,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       ? 'alta'
       : primaryMatch?.condition.urgencyLevel || 'baixa';
 
-  const hypotheses = selectedMatches.map(({ condition, score }) => ({
+  const baseHypotheses = selectedMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
     treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
@@ -494,6 +494,44 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     referenceLabel: referencesForCategory(condition.category),
     referenceUrl: referenceUrlForCategory(condition.category),
   }));
+
+  const primaryCondition = selectedMatches[0]?.condition;
+  const triLevelTargets: Array<'Alta' | 'Moderada' | 'Baixa'> = ['Alta', 'Moderada', 'Baixa'];
+  const usedNames = new Set<string>();
+  const hypotheses = triLevelTargets.map((targetProbability, index) => {
+    const directMatch = baseHypotheses.find((item) => item.probability === targetProbability && !usedNames.has(item.name));
+    if (directMatch) {
+      usedNames.add(directMatch.name);
+      return {
+        ...directMatch,
+        explanation: `Classificação ${targetProbability}: ${directMatch.explanation}`,
+      };
+    }
+
+    const fallbackFromList = baseHypotheses.find((item) => !usedNames.has(item.name));
+    if (fallbackFromList) {
+      usedNames.add(fallbackFromList.name);
+      return {
+        ...fallbackFromList,
+        probability: targetProbability,
+        explanation: `Classificação ${targetProbability}: hipótese mantida por coerência clínica relativa ao relato.`,
+      };
+    }
+
+    const differentialName = primaryCondition?.differentials[index] || `Hipótese ${targetProbability} a confirmar`;
+    return {
+      name: differentialName,
+      probability: targetProbability,
+      treatment: 'Conduta educacional: correlacionar com exame físico, sinais vitais e protocolo institucional.',
+      explanation: `Classificação ${targetProbability}: hipótese incluída como diferencial para completar estratificação objetiva (Alta/Média/Baixa).`,
+      differentials: primaryCondition?.differentials.slice(0, 4) || [],
+      recommendedExams: primaryCondition?.recommendedExams.slice(0, 3) || ['Exame físico dirigido'],
+      redFlags: primaryCondition?.redFlags.slice(0, 3) || [],
+      score: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
+      referenceLabel: referencesForCategory(primaryCondition?.category || 'geral'),
+      referenceUrl: referenceUrlForCategory(primaryCondition?.category || 'geral'),
+    };
+  });
 
   const emergencyWarning = selectedMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
     ? '🚨 Atenção: o quadro contém sinais compatíveis com possível emergência médica. Recomenda-se avaliação presencial IMEDIATA. Em situação real, procure pronto-socorro ou acione o SAMU (192).'

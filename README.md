@@ -75,3 +75,9 @@ Para validar o que o parser clínico extrai do relato livre antes da IA:
 ```bash
 CASE_TEXT=\"relato clínico aqui\" CASE_DURATION=\"6-24h\" npm run safety:parse:case
 ```
+
+Para validar a escada obrigatória de hipóteses `Alta -> Moderada -> Baixa`:
+
+```bash
+CASE_TEXT=\"relato clínico aqui\" CASE_DURATION=\"1-7d\" CASE_AGE=\"35\" CASE_GENDER=\"Feminino\" npm run safety:check:ladder
+```

@@ -88,8 +88,15 @@ export function validateClinicalResponse({
   );
   const primaryHypothesisBlob = normalize(response.hypotheses[0]?.name || '');
 
-  if (!Array.isArray(response.hypotheses) || response.hypotheses.length === 0 || response.hypotheses.length > MAX_HYPOTHESES) {
-    errors.push(`Quantidade de hipóteses fora do limite seguro (1 a ${MAX_HYPOTHESES}).`);
+  if (!Array.isArray(response.hypotheses) || response.hypotheses.length !== MAX_HYPOTHESES) {
+    errors.push(`Quantidade de hipóteses fora do padrão obrigatório (${MAX_HYPOTHESES}).`);
+  }
+  const probabilitySet = new Set(response.hypotheses.map((item) => item.probability));
+  const requiredProbabilities: Array<BackendHypothesis['probability']> = ['Alta', 'Média', 'Baixa'];
+  for (const required of requiredProbabilities) {
+    if (!probabilitySet.has(required)) {
+      errors.push(`Nível de probabilidade ausente na resposta: ${required}`);
+    }
   }
 
   if (!response.triageReason || response.triageReason.trim().length < 12) {

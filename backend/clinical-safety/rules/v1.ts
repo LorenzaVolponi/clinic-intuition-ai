@@ -12,6 +12,8 @@ export const UNSUPPORTED_TERM_RULES = [
 
 export const INCOMPATIBLE_HYPOTHESIS_RULES = [
   { terms: ['apendicite', 'abdome agudo'], requiredSymptoms: ['dor abdominal', 'fossa ilíaca', 'epigastr'] },
+  { terms: ['asma', 'broncoespasmo'], requiredSymptoms: ['sibilo', 'dispneia', 'falta de ar', 'tosse', 'aperto no peito'] },
+  { terms: ['enxaqueca', 'migraine'], requiredSymptoms: ['cefaleia', 'enxaqueca', 'dor de cabeca', 'aura', 'fotofobia', 'fonofobia'] },
   { terms: ['sindrome coronariana', 'infarto', 'iam'], requiredSymptoms: ['dor no peito', 'dor toracica', 'aperto no peito', 'dispneia'] },
   { terms: ['avc', 'acidente vascular'], requiredSymptoms: ['hemiparesia', 'deficit focal', 'afasia', 'paresia'] },
 ] as const;

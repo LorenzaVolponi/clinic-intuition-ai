@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Caso cefaleia",
+    "age": 29,
+    "gender": "Feminino",
+    "symptoms": "Crise de enxaqueca com aura visual e fotofobia",
+    "duration": "1-7d"
+  },
+  {
+    "name": "Caso respiratório",
+    "age": 33,
+    "gender": "Masculino",
+    "symptoms": "Dispneia, sibilos e tosse seca",
+    "duration": "6-24h"
+  },
+  {
+    "name": "Caso abdominal",
+    "age": 24,
+    "gender": "Masculino",
+    "symptoms": "Dor abdominal em fossa ilíaca direita e náusea",
+    "duration": "6-24h"
+  }
+]

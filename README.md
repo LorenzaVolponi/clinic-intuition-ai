@@ -81,3 +81,10 @@ Para validar a escada obrigatória de hipóteses `Alta -> Moderada -> Baixa`:
 ```bash
 CASE_TEXT=\"relato clínico aqui\" CASE_DURATION=\"1-7d\" CASE_AGE=\"35\" CASE_GENDER=\"Feminino\" npm run safety:check:ladder
 ```
+
+Guard completo de coerência clínica (lote de casos):
+
+```bash
+npm run safety:coherence:guard
+# opcional: npm run safety:coherence:guard -- ./meus-casos.json
+```

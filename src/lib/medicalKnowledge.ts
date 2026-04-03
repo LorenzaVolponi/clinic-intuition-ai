@@ -110,6 +110,12 @@ const CATEGORY_REFERENCE_MAP: Record<string, string> = {
   genitourinario: 'Diretrizes de ITU baseadas em perfil local de resistência',
 };
 
+const MANDATORY_EVIDENCE_RULES: Array<{ condition: string; requiredSymptoms: string[]; maxScoreWithoutEvidence: number }> = [
+  { condition: 'Acidente Vascular Cerebral', requiredSymptoms: ['hemiparesia', 'afasia', 'déficit focal', 'alteração consciência'], maxScoreWithoutEvidence: 35 },
+  { condition: 'Síndrome Coronariana Aguda', requiredSymptoms: ['dor torácica', 'dor no peito', 'aperto no peito'], maxScoreWithoutEvidence: 35 },
+  { condition: 'Apendicite Aguda', requiredSymptoms: ['dor abdominal', 'fossa ilíaca direita', 'dor em fossa ilíaca'], maxScoreWithoutEvidence: 35 },
+];
+
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
     name: 'Síndrome Coronariana Aguda',
@@ -216,6 +222,21 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     clinicalPearls: ['História é fundamental', 'Sinais de alarme', 'Diário da cefaleia'],
     recommendedExams: ['Exame neurológico', 'Neuroimagem se sinais de alarme'],
     durationProfile: ['subagudo', 'cronico'],
+  },
+  {
+    name: 'Enxaqueca com Aura',
+    icd10: 'G43.1',
+    category: 'neurologico',
+    commonSymptoms: ['enxaqueca', 'cefaleia', 'dor de cabeça', 'aura', 'fotofobia', 'náusea'],
+    riskFactors: ['história pessoal/familiar', 'gatilhos alimentares', 'privação de sono', 'estresse'],
+    ageGroups: ['adolescente', 'adulto'],
+    urgencyLevel: 'moderada',
+    treatments: ['Analgésicos e antieméticos conforme protocolo institucional', 'Hidratação e ambiente com menor estímulo luminoso', 'Reavaliação clínica e prevenção de gatilhos'],
+    differentials: ['Cefaleia tensional', 'Cefaleia secundária', 'AVC (quando sinais focais)'],
+    redFlags: ['déficit neurológico persistente', 'cefaleia súbita em thunderclap', 'alteração do nível de consciência'],
+    clinicalPearls: ['Aura visual transitória e fotofobia favorecem enxaqueca com aura', 'Sempre excluir causas secundárias quando houver red flags'],
+    recommendedExams: ['Exame neurológico', 'Neuroimagem se sinais de alarme'],
+    durationProfile: ['agudo', 'subagudo', 'cronico'],
   },
   {
     name: 'Acidente Vascular Cerebral',
@@ -410,6 +431,14 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   if (context.fever && condition.category === 'respiratorio') score += 5;
   if (context.focalDeficit && condition.category === 'neurologico') score += 12;
   if (context.severeTachycardia && condition.category === 'cardiovascular') score += 6;
+
+  for (const rule of MANDATORY_EVIDENCE_RULES) {
+    if (condition.name !== rule.condition) continue;
+    const hasRequiredEvidence = rule.requiredSymptoms.some((symptom) => matchesTerm(patientData.symptoms, symptom));
+    if (!hasRequiredEvidence) {
+      score = Math.min(score, rule.maxScoreWithoutEvidence);
+    }
+  }
 
   return Math.min(score, 100);
 }

@@ -95,6 +95,12 @@ Smoke test rápido do backend principal (health + `/api/clinical-analysis`):
 npm run smoke:backend
 ```
 
+Automação CI adicional ativa:
+- `PR Quality Gate`: lint fix automático + lint/test/safety/build + auto-repair em falha.
+- `Continuous Safety Guard`: execução periódica com guard clínico e smoke backend.
+- `CI Failure Alert`: abre/atualiza issue automaticamente quando workflow crítico falha.
+- `Backend Auto Maintenance`: manutenção automática a cada 2h com lint/test/guard/smoke/build.
+
 Gerar base ampliada com mais de 10.000 possibilidades de hipóteses:
 
 ```bash

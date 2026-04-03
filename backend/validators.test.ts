@@ -31,7 +31,7 @@ const validResponse = {
   conduct: {
     immediateActions: ['Oxigênio se necessário'],
     monitoring: ['Monitor cardíaco'],
-    legalNotice: 'Buscar avaliação presencial.',
+    legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
   },
 };
 
@@ -105,5 +105,58 @@ describe('validateClinicalResponse', () => {
     const result = validateClinicalResponse({ patientData: nonAbdominalPatient, response: hallucinatedResponse });
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Possível alucinação clínica');
+  });
+
+  it('reprova confidenceScore acima do limite de segurança', () => {
+    const overconfident = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          confidenceScore: 99,
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: overconfident });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('ConfidenceScore excessivo');
+  });
+
+  it('reprova ausência de aviso legal/educacional adequado', () => {
+    const withoutLegalNotice = {
+      ...validResponse,
+      conduct: {
+        ...validResponse.conduct,
+        legalNotice: 'seguir conduta',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withoutLegalNotice });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Aviso legal/educacional insuficiente');
+  });
+
+  it('reprova hipótese incompatível com sintomas explícitos', () => {
+    const neurologicPatient = {
+      age: 40,
+      gender: 'Masculino',
+      symptoms: 'Cefaleia leve há 1 dia, sem alterações neurológicas descritas',
+    };
+
+    const incompatibleResponse = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          name: 'Acidente vascular cerebral isquêmico',
+          justification: 'AVC agudo apesar de ausência de déficit focal informado.',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: neurologicPatient, response: incompatibleResponse });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Hipótese incompatível com sintomas explícitos');
   });
 });

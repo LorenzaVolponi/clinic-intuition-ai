@@ -13,7 +13,7 @@ import { extractCaseFacts } from './parser';
 type BackendHypothesis = {
   name: string;
   role: 'mais provável' | 'mais grave a excluir' | 'diferencial comum';
-  probability: 'Alta' | 'Média' | 'Baixa';
+  probability: 'Alta' | 'Moderada' | 'Média' | 'Baixa';
   confidenceScore: number;
   justification: string;
   physiopathology: string;
@@ -91,13 +91,20 @@ export function validateClinicalResponse({
   if (!Array.isArray(response.hypotheses) || response.hypotheses.length !== MAX_HYPOTHESES) {
     errors.push(`Quantidade de hipóteses fora do padrão obrigatório (${MAX_HYPOTHESES}).`);
   }
-  const probabilitySet = new Set(response.hypotheses.map((item) => item.probability));
-  const requiredProbabilities: Array<BackendHypothesis['probability']> = ['Alta', 'Média', 'Baixa'];
+  const normalizedProbabilities = response.hypotheses.map((item) => (item.probability === 'Média' ? 'Moderada' : item.probability));
+  const probabilitySet = new Set(normalizedProbabilities);
+  const requiredProbabilities: Array<'Alta' | 'Moderada' | 'Baixa'> = ['Alta', 'Moderada', 'Baixa'];
   for (const required of requiredProbabilities) {
     if (!probabilitySet.has(required)) {
       errors.push(`Nível de probabilidade ausente na resposta: ${required}`);
     }
   }
+  const expectedOrder: Array<'Alta' | 'Moderada' | 'Baixa'> = ['Alta', 'Moderada', 'Baixa'];
+  expectedOrder.forEach((expected, index) => {
+    if (normalizedProbabilities[index] !== expected) {
+      errors.push(`Ordem inválida das hipóteses: esperado ${expected} na posição ${index + 1}.`);
+    }
+  });
 
   if (!response.triageReason || response.triageReason.trim().length < 12) {
     errors.push('Justificativa de triagem insuficiente.');
@@ -117,6 +124,16 @@ export function validateClinicalResponse({
     }
     if (hypothesis.confidenceScore > MAX_CONFIDENCE_SCORE) {
       errors.push(`ConfidenceScore excessivo para uso educacional seguro: ${hypothesis.name}`);
+    }
+    const normalizedProbability = hypothesis.probability === 'Média' ? 'Moderada' : hypothesis.probability;
+    if (normalizedProbability === 'Alta' && (hypothesis.confidenceScore < 70 || hypothesis.confidenceScore > 95)) {
+      errors.push(`ConfidenceScore fora da faixa para hipótese Alta: ${hypothesis.name}`);
+    }
+    if (normalizedProbability === 'Moderada' && (hypothesis.confidenceScore < 45 || hypothesis.confidenceScore > 69)) {
+      errors.push(`ConfidenceScore fora da faixa para hipótese Moderada: ${hypothesis.name}`);
+    }
+    if (normalizedProbability === 'Baixa' && (hypothesis.confidenceScore < 20 || hypothesis.confidenceScore > 44)) {
+      errors.push(`ConfidenceScore fora da faixa para hipótese Baixa: ${hypothesis.name}`);
     }
   }
 

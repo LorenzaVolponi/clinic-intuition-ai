@@ -74,6 +74,7 @@ function normalizeBackendAssessment(response: ClinicalApiResponse, localAssessme
         ...item,
         referenceLabel: item.referenceLabel || localMatch?.referenceLabel,
         referenceUrl: item.referenceUrl || localMatch?.referenceUrl,
+        medicationOptions: item.medicationOptions || localMatch?.medicationOptions || [],
       };
     })
     : localAssessment.hypotheses;

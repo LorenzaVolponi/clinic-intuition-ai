@@ -27,6 +27,7 @@ export interface DiagnosisHypothesis {
   name: string;
   probability: 'Alta' | 'Moderada' | 'Baixa';
   probabilityPercent?: number;
+  medicationOptions?: Array<{ name: string; why: string }>;
   treatment: string;
   explanation: string;
   differentials: string[];
@@ -521,6 +522,10 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     probability: probabilityFromScore(score),
     probabilityPercent: scoreToProbabilityPercent(score, probabilityFromScore(score)),
     treatment: `${condition.treatments.slice(0, 3).join('; ')}. Indicadas porque o quadro descrito é compatível com ${condition.name.toLowerCase()} e exige abordagem inicial segura (sem dose neste simulador; validar com protocolo institucional e preceptor).`,
+    medicationOptions: condition.treatments.slice(0, 3).map((item) => ({
+      name: item,
+      why: `Opção educacional inicial por compatibilidade com o quadro sugestivo de ${condition.name.toLowerCase()}.`,
+    })),
     explanation: `Compatível com ${condition.commonSymptoms.slice(0, 2).join(' e ')} no contexto informado.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),
@@ -559,6 +564,10 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       name: differentialName,
       probability: targetProbability,
       treatment: 'Conduta educacional: correlacionar com exame físico, sinais vitais e protocolo institucional.',
+      medicationOptions: [
+        { name: 'Analgésico/controle sintomático conforme protocolo', why: 'Ajuda no controle inicial de sintomas enquanto hipótese é confirmada.' },
+        { name: 'Suporte clínico e monitorização', why: 'Permite reavaliação dinâmica e aumenta segurança do paciente.' },
+      ],
       probabilityPercent: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
       explanation: `Classificação ${targetProbability}: diferencial mantido para estratificação clínica.`,
       differentials: primaryCondition?.differentials.slice(0, 4) || [],
@@ -637,6 +646,7 @@ REGRAS:
 - Máximo 3 hipóteses.
 - Ordem obrigatória: Alta, depois Moderada, depois Baixa.
 - Percentual/score coerente: Alta 70-95, Moderada 45-69, Baixa 20-44.
+- Em cada hipótese, sugerir 2-3 opções terapêuticas sem dose e explicar brevemente o motivo da indicação.
 - Ferramenta exclusivamente educacional; não prescrever conduta definitiva.
 - Se houver sinais graves, inclua emergencyWarning.
 - Use linguagem clínica objetiva, breve e direta, sem links externos.

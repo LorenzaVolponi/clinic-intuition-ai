@@ -275,6 +275,15 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">💊 Possível conduta terapêutica</h4>
                     <p className="text-success/90 text-sm leading-relaxed">{hypothesis.treatment}</p>
+                    {hypothesis.medicationOptions && hypothesis.medicationOptions.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-xs sm:text-sm text-success/90 list-disc pl-5">
+                        {hypothesis.medicationOptions.slice(0, 3).map((option) => (
+                          <li key={`${option.name}-${option.why}`}>
+                            <strong>{option.name}:</strong> {option.why}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
               </div>

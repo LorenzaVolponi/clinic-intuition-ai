@@ -51,12 +51,12 @@ mantendo o objetivo educacional original da plataforma.
 ### Back-end
 - Manter endpoint `/api/clinical-analysis` como endpoint principal.
 - Manter `/api/health` para visibilidade do provedor.
-- Endpoints de estudo/medbot podem permanecer tecnicamente, porém fora do fluxo principal.
+- Endpoints de estudo/medbot permanecem desativados com retorno `410` para reforçar o escopo atual.
 
 ## 5) Estratégia de migração
-- **Fase 1 (concluída neste commit):** simplificar interface principal para anamnese + simulador.
-- **Fase 2:** limpar dependências e módulos não usados na UX principal.
-- **Fase 3:** consolidar documentação e suíte mínima de testes voltada ao fluxo clínico.
+- **Fase 1 (concluída):** simplificar interface principal para anamnese + simulador.
+- **Fase 2 (concluída):** desativar endpoints fora do escopo principal (`/api/medbot` e `/api/study-pack`) com retorno `410`.
+- **Fase 3 (em andamento):** limpar dependências/módulos não usados e consolidar suíte mínima de testes voltada ao fluxo clínico.
 
 ## 6) Critérios de aceite da fase 1
 - Home abre com foco em anamnese e simulador clínico.

@@ -34,6 +34,16 @@ VITE_API_BASE_URL=
 3. Revise triagem, hipóteses, exames sugeridos e ações imediatas.
 4. Reinicie para novo caso simulado.
 
+## Endpoints ativos no escopo atual
+
+- `GET /api/health`
+- `POST /api/clinical-analysis`
+
+### Endpoints desativados por escopo
+
+- `POST /api/medbot` → `410`
+- `POST /api/study-pack` → `410`
+
 ## Segurança
 
 - Uso estritamente educacional.

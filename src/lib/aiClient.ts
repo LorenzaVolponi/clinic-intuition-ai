@@ -16,6 +16,7 @@ interface ClinicalApiResponse {
   immediateActions: string[];
   clinicalSummary: string;
   analysisSource: 'local' | 'groq';
+  validationWarnings?: string[];
 }
 
 export interface AiHealthStatus {
@@ -86,6 +87,7 @@ function normalizeBackendAssessment(response: ClinicalApiResponse, localAssessme
     immediateActions: response.immediateActions?.length ? response.immediateActions : localAssessment.immediateActions,
     clinicalSummary: response.clinicalSummary || localAssessment.clinicalSummary,
     analysisSource: response.analysisSource || 'groq',
+    validationWarnings: response.validationWarnings || [],
   };
 }
 

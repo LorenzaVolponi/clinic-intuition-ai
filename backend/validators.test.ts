@@ -31,7 +31,7 @@ const validResponse = {
   conduct: {
     immediateActions: ['Oxigênio se necessário'],
     monitoring: ['Monitor cardíaco'],
-    legalNotice: 'Buscar avaliação presencial.',
+    legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
   },
 };
 
@@ -105,5 +105,138 @@ describe('validateClinicalResponse', () => {
     const result = validateClinicalResponse({ patientData: nonAbdominalPatient, response: hallucinatedResponse });
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Possível alucinação clínica');
+  });
+
+  it('reprova confidenceScore acima do limite de segurança', () => {
+    const overconfident = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          confidenceScore: 99,
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: overconfident });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('ConfidenceScore excessivo');
+  });
+
+  it('reprova ausência de aviso legal/educacional adequado', () => {
+    const withoutLegalNotice = {
+      ...validResponse,
+      conduct: {
+        ...validResponse.conduct,
+        legalNotice: 'seguir conduta',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withoutLegalNotice });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Aviso legal/educacional insuficiente');
+  });
+
+  it('reprova hipótese incompatível com sintomas explícitos', () => {
+    const neurologicPatient = {
+      age: 40,
+      gender: 'Masculino',
+      symptoms: 'Cefaleia leve há 1 dia, sem alterações neurológicas descritas',
+    };
+
+    const incompatibleResponse = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          name: 'Acidente vascular cerebral isquêmico',
+          justification: 'AVC agudo apesar de ausência de déficit focal informado.',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: neurologicPatient, response: incompatibleResponse });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Hipótese incompatível com sintomas explícitos');
+  });
+
+  it('reprova linguagem de diagnóstico definitivo', () => {
+    const definitiveLanguage = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          justification: 'Diagnóstico definitivo de infarto com certeza diagnóstica absoluta.',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: definitiveLanguage });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('diagnóstico definitivo');
+  });
+
+  it('reprova hipótese sem justificativa mínima', () => {
+    const withoutJustification = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          justification: 'curto',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withoutJustification });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Justificativa insuficiente na hipótese');
+  });
+
+  it('reprova dose/posologia explícita no texto clínico', () => {
+    const withDose = {
+      ...validResponse,
+      conduct: {
+        ...validResponse.conduct,
+        immediateActions: ['Prescrever 500mg de medicação X a cada 8h'],
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withDose });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Dose/posologia explícita não permitida');
+  });
+
+  it('reprova quando medicação citada no caso não aparece na justificativa/plano', () => {
+    const patientWithMedication = {
+      age: 30,
+      gender: 'Feminino',
+      symptoms: 'Crises de enxaqueca com aura visual e palpitações; usou ceffalium e dipirona.',
+    };
+
+    const responseWithoutMedicationTrace = {
+      ...validResponse,
+      triageReason: 'Cefaleia com sintomas neurológicos associados.',
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          name: 'Enxaqueca com aura',
+          justification: 'Cefaleia pulsátil com fenômeno visual.',
+        },
+      ],
+      investigationPlan: {
+        immediate: ['Exame neurológico'],
+        complementary: ['Avaliar gatilhos clínicos'],
+        specialAttention: ['Reavaliação se piora'],
+      },
+      conduct: {
+        immediateActions: ['Hidratação e observação'],
+        monitoring: ['Monitorar intensidade da dor'],
+        legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: patientWithMedication, response: responseWithoutMedicationTrace });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Medicação citada no caso não foi considerada');
   });
 });

@@ -102,9 +102,26 @@ export function validateClinicalResponse({
   }
 
   for (const hypothesis of response.hypotheses) {
+    if (!hypothesis.name || hypothesis.name.trim().length < 4) {
+      errors.push('Nome de hipótese insuficiente.');
+    }
+    if (!hypothesis.justification || hypothesis.justification.trim().length < 12) {
+      errors.push(`Justificativa insuficiente na hipótese: ${hypothesis.name || 'sem nome'}`);
+    }
     if (hypothesis.confidenceScore > 95) {
       errors.push(`ConfidenceScore excessivo para uso educacional seguro: ${hypothesis.name}`);
     }
+  }
+
+  const narrativeBlob = normalize(
+    JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification}`)) + JSON.stringify(response.conduct),
+  );
+  const rawNarrativeBlob = JSON.stringify(response.hypotheses) + JSON.stringify(response.conduct);
+  if (includesAny(narrativeBlob, ['diagnostico definitivo', 'diagnostico fechado', 'certeza diagnostica'])) {
+    errors.push('Linguagem de diagnóstico definitivo não permitida em contexto educacional.');
+  }
+  if (/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/i.test(rawNarrativeBlob) || /\b\d+\s?\/\s?\d+\s?h\b/i.test(rawNarrativeBlob)) {
+    errors.push('Dose/posologia explícita não permitida em contexto educacional.');
   }
 
   for (const rule of UNSUPPORTED_TERM_RULES) {

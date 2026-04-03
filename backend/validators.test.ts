@@ -159,4 +159,50 @@ describe('validateClinicalResponse', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Hipótese incompatível com sintomas explícitos');
   });
+
+  it('reprova linguagem de diagnóstico definitivo', () => {
+    const definitiveLanguage = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          justification: 'Diagnóstico definitivo de infarto com certeza diagnóstica absoluta.',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: definitiveLanguage });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('diagnóstico definitivo');
+  });
+
+  it('reprova hipótese sem justificativa mínima', () => {
+    const withoutJustification = {
+      ...validResponse,
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          justification: 'curto',
+        },
+      ],
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withoutJustification });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Justificativa insuficiente na hipótese');
+  });
+
+  it('reprova dose/posologia explícita no texto clínico', () => {
+    const withDose = {
+      ...validResponse,
+      conduct: {
+        ...validResponse.conduct,
+        immediateActions: ['Prescrever 500mg de medicação X a cada 8h'],
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withDose });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Dose/posologia explícita não permitida');
+  });
 });

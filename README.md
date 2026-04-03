@@ -61,3 +61,9 @@ VITE_API_BASE_URL=
 ## Documentação de refatoração
 
 - Plano de preparação e escopo da reestruturação: `docs/RESTRUCTURE_PREPARATION.md`.
+
+## Operação contínua (full time)
+
+- Guard contínuo local: `npm run auto:guard:watch`
+- Guard contínuo no GitHub Actions: `.github/workflows/continuous-safety-guard.yml` (a cada 6 horas)
+- Para correção assistida periódica: `.github/workflows/daily-auto-guard.yml`

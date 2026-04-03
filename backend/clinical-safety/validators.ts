@@ -1,3 +1,14 @@
+import {
+  DEFINITIVE_DIAGNOSIS_TERMS,
+  DOSAGE_PATTERN,
+  DOSING_INTERVAL_PATTERN,
+  INCOMPATIBLE_HYPOTHESIS_RULES,
+  LEGAL_NOTICE_REQUIRED_TERMS,
+  MAX_CONFIDENCE_SCORE,
+  MAX_HYPOTHESES,
+  UNSUPPORTED_TERM_RULES,
+} from './rules/v1';
+
 type BackendHypothesis = {
   name: string;
   role: 'mais provável' | 'mais grave a excluir' | 'diferencial comum';
@@ -26,19 +37,6 @@ export type BackendClinicalModelResponse = {
   };
 };
 
-const UNSUPPORTED_TERM_RULES = [
-  { trigger: ['dor abdominal', 'abdome', 'fossa iliaca'], symptomKeys: ['dor abdominal', 'epigastr', 'hipocondrio', 'fossa ilíaca', 'dor no abdome', 'abdome'] },
-  { trigger: ['dispneia', 'falta de ar'], symptomKeys: ['dispneia', 'falta de ar', 'dificuldade respir', 'cansaço respiratório'] },
-  { trigger: ['edema'], symptomKeys: ['edema', 'inchaço', 'membro inchado'] },
-  { trigger: ['dor lombar'], symptomKeys: ['dor lombar', 'dor nas costas'] },
-];
-
-const INCOMPATIBLE_HYPOTHESIS_RULES = [
-  { terms: ['apendicite', 'abdome agudo'], requiredSymptoms: ['dor abdominal', 'fossa ilíaca', 'epigastr'] },
-  { terms: ['sindrome coronariana', 'infarto', 'iam'], requiredSymptoms: ['dor no peito', 'dor toracica', 'aperto no peito', 'dispneia'] },
-  { terms: ['avc', 'acidente vascular'], requiredSymptoms: ['hemiparesia', 'deficit focal', 'afasia', 'paresia'] },
-];
-
 function normalize(value: string) {
   return value
     .toLowerCase()
@@ -46,7 +44,7 @@ function normalize(value: string) {
     .replace(/\p{Diacritic}/gu, '');
 }
 
-function includesAny(text: string, terms: string[]) {
+function includesAny(text: string, terms: readonly string[]) {
   return terms.some((term) => text.includes(normalize(term)));
 }
 
@@ -88,8 +86,8 @@ export function validateClinicalResponse({
   );
   const primaryHypothesisBlob = normalize(response.hypotheses[0]?.name || '');
 
-  if (!Array.isArray(response.hypotheses) || response.hypotheses.length === 0 || response.hypotheses.length > 3) {
-    errors.push('Quantidade de hipóteses fora do limite seguro (1 a 3).');
+  if (!Array.isArray(response.hypotheses) || response.hypotheses.length === 0 || response.hypotheses.length > MAX_HYPOTHESES) {
+    errors.push(`Quantidade de hipóteses fora do limite seguro (1 a ${MAX_HYPOTHESES}).`);
   }
 
   if (!response.triageReason || response.triageReason.trim().length < 12) {
@@ -97,7 +95,7 @@ export function validateClinicalResponse({
   }
 
   const legalNotice = normalize(response.conduct?.legalNotice || '');
-  if (!includesAny(legalNotice, ['educacional', 'preceptor', 'protocolo'])) {
+  if (!includesAny(legalNotice, LEGAL_NOTICE_REQUIRED_TERMS)) {
     errors.push('Aviso legal/educacional insuficiente na conduta.');
   }
 
@@ -108,7 +106,7 @@ export function validateClinicalResponse({
     if (!hypothesis.justification || hypothesis.justification.trim().length < 12) {
       errors.push(`Justificativa insuficiente na hipótese: ${hypothesis.name || 'sem nome'}`);
     }
-    if (hypothesis.confidenceScore > 95) {
+    if (hypothesis.confidenceScore > MAX_CONFIDENCE_SCORE) {
       errors.push(`ConfidenceScore excessivo para uso educacional seguro: ${hypothesis.name}`);
     }
   }
@@ -117,10 +115,10 @@ export function validateClinicalResponse({
     JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification}`)) + JSON.stringify(response.conduct),
   );
   const rawNarrativeBlob = JSON.stringify(response.hypotheses) + JSON.stringify(response.conduct);
-  if (includesAny(narrativeBlob, ['diagnostico definitivo', 'diagnostico fechado', 'certeza diagnostica'])) {
+  if (includesAny(narrativeBlob, DEFINITIVE_DIAGNOSIS_TERMS)) {
     errors.push('Linguagem de diagnóstico definitivo não permitida em contexto educacional.');
   }
-  if (/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/i.test(rawNarrativeBlob) || /\b\d+\s?\/\s?\d+\s?h\b/i.test(rawNarrativeBlob)) {
+  if (DOSAGE_PATTERN.test(rawNarrativeBlob) || DOSING_INTERVAL_PATTERN.test(rawNarrativeBlob)) {
     errors.push('Dose/posologia explícita não permitida em contexto educacional.');
   }
 

@@ -22,7 +22,12 @@ concurrency:
 
 jobs:
   deploy-preview:
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      secrets.VERCEL_TOKEN != '' &&
+      secrets.VERCEL_ORG_ID != '' &&
+      secrets.VERCEL_PROJECT_ID != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,12 +38,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-
-      - name: Validate Vercel secrets
-        run: |
-          test -n "${{ secrets.VERCEL_TOKEN }}" || (echo "Missing VERCEL_TOKEN secret" && exit 1)
-          test -n "${{ secrets.VERCEL_ORG_ID }}" || (echo "Missing VERCEL_ORG_ID secret" && exit 1)
-          test -n "${{ secrets.VERCEL_PROJECT_ID }}" || (echo "Missing VERCEL_PROJECT_ID secret" && exit 1)
 
       - name: Install dependencies
         run: npm ci
@@ -79,7 +78,11 @@ jobs:
             🔗 URL: ${{ steps.deploy_preview.outputs.preview_url }}
 
   deploy-production:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: >
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      secrets.VERCEL_TOKEN != '' &&
+      secrets.VERCEL_ORG_ID != '' &&
+      secrets.VERCEL_PROJECT_ID != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -90,12 +93,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-
-      - name: Validate Vercel secrets
-        run: |
-          test -n "${{ secrets.VERCEL_TOKEN }}" || (echo "Missing VERCEL_TOKEN secret" && exit 1)
-          test -n "${{ secrets.VERCEL_ORG_ID }}" || (echo "Missing VERCEL_ORG_ID secret" && exit 1)
-          test -n "${{ secrets.VERCEL_PROJECT_ID }}" || (echo "Missing VERCEL_PROJECT_ID secret" && exit 1)
 
       - name: Install dependencies
         run: npm ci

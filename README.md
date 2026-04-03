@@ -108,6 +108,13 @@ npm run auto:pau-na-maquina
 # opcional com auditoria de segurança: bash scripts/pau-na-maquina.sh --repair-on-fail --with-audit
 ```
 
+Script “fazer todos” (orquestra todos os pipelines principais):
+
+```bash
+npm run auto:todos
+# opcional: bash scripts/auto-todos.sh --with-audit --with-pr-bot
+```
+
 Gerar base ampliada com mais de 10.000 possibilidades de hipóteses:
 
 ```bash

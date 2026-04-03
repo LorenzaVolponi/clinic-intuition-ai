@@ -270,4 +270,42 @@ describe('validateClinicalResponse', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Medicação citada no caso não foi considerada');
   });
+
+  it('reprova quando ação relatada no caso não aparece na resposta', () => {
+    const patientWithAction = {
+      age: 31,
+      gender: 'Feminino',
+      symptoms: 'Cefaleia com aura e palpitações; recebeu soro na veia.',
+    };
+
+    const responseWithoutActionTrace = {
+      ...validResponse,
+      triageReason: 'Cefaleia com sintomas associados.',
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          name: 'Enxaqueca com aura',
+          probability: 'Alta' as const,
+          justification: 'Cefaleia pulsátil com fenômeno visual.',
+        },
+        {
+          ...validResponse.hypotheses[1],
+          probability: 'Média' as const,
+        },
+        {
+          ...validResponse.hypotheses[2],
+          probability: 'Baixa' as const,
+        },
+      ],
+      conduct: {
+        immediateActions: ['Observação e analgesia sem dose'],
+        monitoring: ['Reavaliar sinais vitais'],
+        legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: patientWithAction, response: responseWithoutActionTrace });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Ação relatada no caso não foi considerada');
+  });
 });

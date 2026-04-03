@@ -157,6 +157,12 @@ export function validateClinicalResponse({
     }
   }
 
+  for (const action of caseFacts.reportedActions) {
+    if (!modelEvidenceBlob.includes(normalize(action))) {
+      errors.push(`Ação relatada no caso não foi considerada: ${action}`);
+    }
+  }
+
   const hypothesisBlob = normalize(
     JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification} ${item.physiopathology}`)),
   );

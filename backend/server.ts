@@ -112,7 +112,7 @@ const clinicalModelResponseSchema = z.object({
     z.object({
       name: z.string(),
       role: z.enum(['mais provável', 'mais grave a excluir', 'diferencial comum']),
-      probability: z.enum(['Alta', 'Média', 'Baixa']),
+      probability: z.enum(['Alta', 'Moderada', 'Média', 'Baixa']),
       confidenceScore: z.number().min(0).max(100),
       justification: z.string(),
       physiopathology: z.string(),

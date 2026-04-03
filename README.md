@@ -89,6 +89,12 @@ npm run safety:coherence:guard
 # opcional: npm run safety:coherence:guard -- ./meus-casos.json
 ```
 
+Smoke test rápido do backend principal (health + `/api/clinical-analysis`):
+
+```bash
+npm run smoke:backend
+```
+
 Gerar base ampliada com mais de 10.000 possibilidades de hipóteses:
 
 ```bash

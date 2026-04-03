@@ -39,6 +39,12 @@ jobs:
       - name: Verify
         run: npm run verify
 
+      - name: Safety coherence guard
+        run: npm run safety:coherence:guard
+
+      - name: Backend smoke
+        run: npm run smoke:backend
+
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 

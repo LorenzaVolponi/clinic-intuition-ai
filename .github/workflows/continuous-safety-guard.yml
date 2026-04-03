@@ -31,5 +31,11 @@ jobs:
       - name: Test
         run: npm run test
 
+      - name: Safety coherence guard
+        run: npm run safety:coherence:guard
+
+      - name: Backend smoke
+        run: npm run smoke:backend
+
       - name: Build
         run: npm run build

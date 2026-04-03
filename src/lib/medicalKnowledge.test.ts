@@ -73,4 +73,18 @@ describe('buildLocalAssessment', () => {
 
     expect(assessment.triageLevel).not.toBe('Emergência');
   });
+
+  it('não sugere hipóteses desconexas (asma/apendicite) em quadro típico de enxaqueca', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente E',
+      age: 29,
+      gender: 'Feminino',
+      duration: '1-7d',
+      symptoms: 'Crises fortes de enxaqueca ao redor da cabeça, aura visual e palpitações',
+    });
+
+    const hypothesisNames = assessment.hypotheses.map((item) => item.name.toLowerCase()).join(' | ');
+    expect(hypothesisNames).not.toContain('asma');
+    expect(hypothesisNames).not.toContain('apendicite');
+  });
 });

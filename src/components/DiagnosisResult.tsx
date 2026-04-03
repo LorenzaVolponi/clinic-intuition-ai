@@ -259,7 +259,10 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   </CardTitle>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={`${getProbabilityColor(hypothesis.probability)} text-xs sm:text-sm`}>{hypothesis.probability}</Badge>
+                  <Badge className={`${getProbabilityColor(hypothesis.probability)} text-xs sm:text-sm`}>
+                    {hypothesis.probability}
+                    {typeof hypothesis.probabilityPercent === 'number' ? ` ${hypothesis.probabilityPercent}%` : ''}
+                  </Badge>
                   <Badge variant="outline" className="text-xs">Score {hypothesis.score}</Badge>
                 </div>
               </div>
@@ -282,16 +285,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-primary mb-2 text-sm sm:text-base">📌 Explicação clínica</h4>
                     <p className="text-primary/90 text-sm leading-relaxed">{hypothesis.explanation}</p>
-                      {hypothesis.referenceUrl && (
-                        <a
-                          href={hypothesis.referenceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex text-xs sm:text-sm font-medium text-primary underline underline-offset-2"
-                        >
-                          Ver referência rápida
-                        </a>
-                      )}
                   </div>
                 </div>
               </div>

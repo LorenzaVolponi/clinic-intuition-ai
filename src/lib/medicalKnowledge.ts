@@ -26,6 +26,7 @@ export interface PatientData {
 export interface DiagnosisHypothesis {
   name: string;
   probability: 'Alta' | 'Moderada' | 'Baixa';
+  probabilityPercent?: number;
   treatment: string;
   explanation: string;
   differentials: string[];
@@ -337,6 +338,16 @@ function probabilityFromScore(score: number): 'Alta' | 'Moderada' | 'Baixa' {
   return 'Baixa';
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scoreToProbabilityPercent(score: number, probability: DiagnosisHypothesis['probability']) {
+  if (probability === 'Alta') return clamp(score, 70, 95);
+  if (probability === 'Moderada') return clamp(score, 45, 69);
+  return clamp(score, 20, 44);
+}
+
 function urgencyToTriage(level: MedicalCondition['urgencyLevel']): ClinicalAssessment['triageLevel'] {
   switch (level) {
     case 'emergencia':
@@ -388,12 +399,6 @@ function normalizeGender(gender: string): MedicalCondition['genderPreference'] |
 
 function referencesForCategory(category: string) {
   return CATEGORY_REFERENCE_MAP[category] || 'Referências clínicas públicas de sociedades médicas';
-}
-
-function referenceUrlForCategory(category: string) {
-  const label = referencesForCategory(category);
-  const match = label.match(/https?:\/\/\S+/i);
-  return match?.[0] || 'https://www.who.int/publications/i/item/9789240041256';
 }
 
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
@@ -514,14 +519,15 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   const baseHypotheses = selectedMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
-    treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
-    explanation: `${condition.clinicalPearls[0] ?? 'Raciocínio clínico guiado pelos sintomas predominantes.'} Compatibilidade baseada em ${condition.commonSymptoms.slice(0, 3).join(', ')} e contexto clínico informado. Referência-base: ${referencesForCategory(condition.category)}.`,
+    probabilityPercent: scoreToProbabilityPercent(score, probabilityFromScore(score)),
+    treatment: `${condition.treatments.slice(0, 3).join('; ')}. Indicadas porque o quadro descrito é compatível com ${condition.name.toLowerCase()} e exige abordagem inicial segura (sem dose neste simulador; validar com protocolo institucional e preceptor).`,
+    explanation: `Compatível com ${condition.commonSymptoms.slice(0, 2).join(' e ')} no contexto informado.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),
     redFlags: condition.redFlags.slice(0, 3),
     score,
     referenceLabel: referencesForCategory(condition.category),
-    referenceUrl: referenceUrlForCategory(condition.category),
+    referenceUrl: undefined,
   }));
 
   const primaryCondition = selectedMatches[0]?.condition;
@@ -543,7 +549,8 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       return {
         ...fallbackFromList,
         probability: targetProbability,
-        explanation: `Classificação ${targetProbability}: hipótese mantida por coerência clínica relativa ao relato.`,
+        probabilityPercent: scoreToProbabilityPercent(fallbackFromList.score, targetProbability),
+        explanation: `Classificação ${targetProbability}: hipótese coerente com os sintomas relatados.`,
       };
     }
 
@@ -552,13 +559,14 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       name: differentialName,
       probability: targetProbability,
       treatment: 'Conduta educacional: correlacionar com exame físico, sinais vitais e protocolo institucional.',
-      explanation: `Classificação ${targetProbability}: hipótese incluída como diferencial para completar estratificação objetiva (Alta/Média/Baixa).`,
+      probabilityPercent: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
+      explanation: `Classificação ${targetProbability}: diferencial mantido para estratificação clínica.`,
       differentials: primaryCondition?.differentials.slice(0, 4) || [],
       recommendedExams: primaryCondition?.recommendedExams.slice(0, 3) || ['Exame físico dirigido'],
       redFlags: primaryCondition?.redFlags.slice(0, 3) || [],
       score: targetProbability === 'Alta' ? 75 : targetProbability === 'Moderada' ? 55 : 35,
       referenceLabel: referencesForCategory(primaryCondition?.category || 'geral'),
-      referenceUrl: referenceUrlForCategory(primaryCondition?.category || 'geral'),
+      referenceUrl: undefined,
     };
   });
 
@@ -582,7 +590,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(selectedMatches[0]?.condition.category || 'geral')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => `${item.name} (${item.probability} ${item.probabilityPercent}%)`).join(', ')}.`,
     analysisSource: 'local',
   };
 }
@@ -627,8 +635,10 @@ RESPONDA COM ESTE JSON:
 
 REGRAS:
 - Máximo 3 hipóteses.
+- Ordem obrigatória: Alta, depois Moderada, depois Baixa.
+- Percentual/score coerente: Alta 70-95, Moderada 45-69, Baixa 20-44.
 - Ferramenta exclusivamente educacional; não prescrever conduta definitiva.
 - Se houver sinais graves, inclua emergencyWarning.
-- Use linguagem clínica objetiva, útil para estudantes.
+- Use linguagem clínica objetiva, breve e direta, sem links externos.
 `;
 }

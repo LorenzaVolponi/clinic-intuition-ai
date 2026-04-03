@@ -88,3 +88,10 @@ Guard completo de coerência clínica (lote de casos):
 npm run safety:coherence:guard
 # opcional: npm run safety:coherence:guard -- ./meus-casos.json
 ```
+
+Gerar base ampliada com mais de 10.000 possibilidades de hipóteses:
+
+```bash
+npm run safety:generate:10k
+# opcional: npm run safety:generate:10k -- ./saida.json
+```

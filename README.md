@@ -49,6 +49,7 @@ VITE_API_BASE_URL=
 - Uso estritamente educacional.
 - Não substitui avaliação médica real.
 - Em emergência real, acione SAMU 192.
+- Validação clínica defensiva no backend para bloquear respostas incompatíveis com sintomas explícitos e reduzir risco de alucinação.
 
 ## Documentação de refatoração
 

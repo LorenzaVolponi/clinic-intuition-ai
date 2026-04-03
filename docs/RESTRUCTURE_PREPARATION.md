@@ -63,3 +63,7 @@ mantendo o objetivo educacional original da plataforma.
 - Fluxo de envio do formulário funciona.
 - Resultado clínico com reset funciona.
 - Build e testes passam.
+
+## 7) Critérios adicionais da fase 2
+- Rotas fora do escopo retornam `410` de forma consistente no backend e nos handlers serverless.
+- Testes automatizados cobrem explicitamente as respostas `410` para `medbot` e `study-pack`.

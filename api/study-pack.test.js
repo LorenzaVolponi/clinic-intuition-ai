@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import handler from './medbot.js';
+import handler from './study-pack.js';
 
 function createResponseCollector() {
   return {
@@ -16,7 +16,7 @@ function createResponseCollector() {
   };
 }
 
-describe('api/medbot handler', () => {
+describe('api/study-pack handler', () => {
   it('retorna endpoint desativado para manter escopo clínico enxuto', async () => {
     const req = { method: 'POST', headers: {}, body: {} };
     const res = createResponseCollector();

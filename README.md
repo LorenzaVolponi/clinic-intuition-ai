@@ -50,6 +50,7 @@ VITE_API_BASE_URL=
 - Não substitui avaliação médica real.
 - Em emergência real, acione SAMU 192.
 - Validação clínica defensiva no backend para bloquear respostas incompatíveis com sintomas explícitos e reduzir risco de alucinação.
+- Se a IA externa responder fora das regras de segurança, o backend força fallback local automaticamente.
 
 ## Documentação de refatoração
 

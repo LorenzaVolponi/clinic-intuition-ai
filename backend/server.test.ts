@@ -34,6 +34,44 @@ describe('backend server routes', () => {
     expect(response.body.error).toBe('Payload inválido.');
   });
 
+  it('POST /api/clinical-analysis retorna fallback local funcional sem provedor IA', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/clinical-analysis').send({
+      patientData: {
+        name: 'Caso Simulado',
+        age: 54,
+        gender: 'Masculino',
+        symptoms: 'Dor no peito e sudorese há 1 hora',
+        duration: '6-24h',
+      },
+      localAssessment: {
+        hypotheses: [
+          {
+            name: 'Síndrome Coronariana Aguda',
+            probability: 'Alta',
+            treatment: 'Conduta conforme protocolo institucional',
+            explanation: 'Dor torácica típica com sinais autonômicos.',
+            differentials: ['Pericardite'],
+            recommendedExams: ['ECG'],
+            redFlags: ['Dor torácica contínua'],
+            score: 82,
+          },
+        ],
+        triageLevel: 'Urgente',
+        triageReason: 'Dor torácica de risco.',
+        suggestedExams: ['ECG', 'Troponina'],
+        immediateActions: ['Monitorização contínua'],
+        clinicalSummary: 'Caso de risco cardiovascular em contexto educacional.',
+        analysisSource: 'local',
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.analysisSource).toBe('local');
+    expect(response.body.hypotheses?.length).toBeGreaterThan(0);
+    expect(response.body.triageLevel).toBeTruthy();
+  });
+
   it('POST /api/medbot retorna endpoint desativado', async () => {
     const app = createApp();
     const response = await request(app).post('/api/medbot').send({ topicId: 'cardiologia', question: 'oi' });

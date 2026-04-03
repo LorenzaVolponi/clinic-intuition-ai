@@ -798,9 +798,11 @@ export function createApp() {
       });
 
       if (!validation.valid) {
-        return res.status(422).json({
-          error: 'Resposta da IA reprovada nas validações clínicas.',
-          validationErrors: validation.errors,
+        metrics.fallbackUsage.clinical += 1;
+        return res.json({
+          ...parsed.data.localAssessment,
+          analysisSource: 'local',
+          validationWarnings: validation.errors,
         });
       }
 

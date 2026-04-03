@@ -104,9 +104,9 @@ const CLINICAL_CONTEXT_PATTERNS = {
 };
 
 const CATEGORY_REFERENCE_MAP: Record<string, string> = {
-  cardiovascular: 'ACC/AHA ACS 2025: https://www.ahajournals.org/doi/10.1161/CIR.0000000000001309',
-  neurologico: 'AHA/ASA Stroke 2021: https://www.ahajournals.org/doi/10.1161/STR.0000000000000375',
-  infeccioso: 'IDSA CAP: https://www.idsociety.org/practice-guideline/community-acquired-pneumonia-cap-in-adults/',
+  cardiovascular: 'Diretrizes cardiovasculares institucionais (base educacional)',
+  neurologico: 'Diretrizes neurológicas institucionais (base educacional)',
+  infeccioso: 'Diretrizes infecciosas institucionais (base educacional)',
   respiratorio: 'IDSA CAP + diretrizes institucionais locais',
   gastrointestinal: 'Diretrizes cirúrgicas e clínicas institucionais',
   genitourinario: 'Diretrizes de ITU baseadas em perfil local de resistência',
@@ -117,6 +117,34 @@ const MANDATORY_EVIDENCE_RULES: Array<{ condition: string; requiredSymptoms: str
   { condition: 'Síndrome Coronariana Aguda', requiredSymptoms: ['dor torácica', 'dor no peito', 'aperto no peito'], maxScoreWithoutEvidence: 35 },
   { condition: 'Apendicite Aguda', requiredSymptoms: ['dor abdominal', 'fossa ilíaca direita', 'dor em fossa ilíaca'], maxScoreWithoutEvidence: 35 },
 ];
+
+const CONDITION_MEDICATION_OPTIONS: Record<string, Array<{ name: string; why: string }>> = {
+  'Síndrome Coronariana Aguda': [
+    { name: 'Antiagregante plaquetário', why: 'Reduz progressão trombótica no contexto de síndrome coronariana.' },
+    { name: 'Estatina de alta potência', why: 'Diminui risco cardiovascular e estabiliza placa aterosclerótica.' },
+    { name: 'Nitrato/analgesia conforme protocolo', why: 'Auxilia no controle de dor isquêmica e conforto clínico inicial.' },
+  ],
+  'Asma Agudizada': [
+    { name: 'Broncodilatador de resgate (SABA)', why: 'Promove broncodilatação rápida em crise de broncoespasmo.' },
+    { name: 'Corticoterapia sistêmica conforme protocolo', why: 'Reduz inflamação de via aérea e risco de piora.' },
+    { name: 'Oxigenoterapia se hipoxemia', why: 'Corrige hipóxia e melhora segurança ventilatória inicial.' },
+  ],
+  'Pneumonia Adquirida na Comunidade': [
+    { name: 'Antibioticoterapia empírica inicial', why: 'Cobre etiologias bacterianas prováveis no início do tratamento.' },
+    { name: 'Antitérmico/analgesia', why: 'Controla febre e sintomas sistêmicos associados.' },
+    { name: 'Suporte respiratório conforme necessidade', why: 'Melhora oxigenação em casos com desconforto respiratório.' },
+  ],
+  'Apendicite Aguda': [
+    { name: 'Analgesia conforme protocolo', why: 'Controla dor enquanto o paciente é preparado para avaliação cirúrgica.' },
+    { name: 'Antiemético', why: 'Reduz náusea/vômito e melhora tolerância clínica inicial.' },
+    { name: 'Antibioticoprofilaxia perioperatória', why: 'Reduz risco infeccioso em contexto de abordagem cirúrgica.' },
+  ],
+  'Enxaqueca com Aura': [
+    { name: 'Analgésico/anti-inflamatório', why: 'Reduz intensidade da crise álgica de enxaqueca.' },
+    { name: 'Antiemético', why: 'Controla náusea frequentemente associada à crise.' },
+    { name: 'Triptano conforme protocolo', why: 'Pode abortar crise típica quando não houver contraindicação.' },
+  ],
+};
 
 export const MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
@@ -402,6 +430,13 @@ function referencesForCategory(category: string) {
   return CATEGORY_REFERENCE_MAP[category] || 'Referências clínicas públicas de sociedades médicas';
 }
 
+function medicationOptionsForCondition(condition: MedicalCondition) {
+  return CONDITION_MEDICATION_OPTIONS[condition.name] || [
+    { name: 'Tratamento sintomático conforme protocolo', why: 'Alivia sintomas enquanto diagnóstico é refinado.' },
+    { name: 'Suporte clínico e monitorização', why: 'Permite reavaliação contínua da evolução clínica.' },
+  ];
+}
+
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const ageGroup = getAgeGroup(patientData.age);
   const durationProfile = getDurationProfile(patientData.duration);
@@ -522,10 +557,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     probability: probabilityFromScore(score),
     probabilityPercent: scoreToProbabilityPercent(score, probabilityFromScore(score)),
     treatment: `${condition.treatments.slice(0, 3).join('; ')}. Indicadas porque o quadro descrito é compatível com ${condition.name.toLowerCase()} e exige abordagem inicial segura (sem dose neste simulador; validar com protocolo institucional e preceptor).`,
-    medicationOptions: condition.treatments.slice(0, 3).map((item) => ({
-      name: item,
-      why: `Opção educacional inicial por compatibilidade com o quadro sugestivo de ${condition.name.toLowerCase()}.`,
-    })),
+    medicationOptions: medicationOptionsForCondition(condition).slice(0, 3),
     explanation: `Compatível com ${condition.commonSymptoms.slice(0, 2).join(' e ')} no contexto informado.`,
     differentials: condition.differentials.slice(0, 4),
     recommendedExams: condition.recommendedExams.slice(0, 4),

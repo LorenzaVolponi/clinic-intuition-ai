@@ -32,9 +32,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] text-foreground">
-      <header className="border-b border-border/60 bg-white/70 backdrop-blur-sm">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-6 sm:px-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.98),_rgba(240,247,255,0.95)_55%,_rgba(232,244,255,0.9)_100%)] pb-[max(env(safe-area-inset-bottom),1rem)] pt-[max(env(safe-area-inset-top),0px)] text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-white/85 backdrop-blur-sm">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-4 sm:px-6 sm:py-6">
           <div className="rounded-xl bg-primary/10 p-2">
             <Stethoscope className="h-6 w-6 text-primary" />
           </div>
@@ -49,7 +49,7 @@ const Index = () => {
 
       <SafetyWarning />
 
-      <main className="mx-auto grid w-full max-w-6xl gap-6 px-4 pb-10 pt-2 sm:px-6">
+      <main className="mx-auto grid w-full max-w-6xl gap-4 px-3 pb-10 pt-2 sm:gap-6 sm:px-6">
         {!diagnosis || !patientData ? (
           <PatientForm onSubmit={handleFormSubmit} isAnalyzing={isAnalyzing} patientData={patientData} />
         ) : (

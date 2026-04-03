@@ -60,6 +60,7 @@ describe('buildLocalAssessment', () => {
     });
 
     expect(assessment.hypotheses[0]?.explanation).not.toMatch(/https?:\/\//i);
+    expect(assessment.hypotheses[0]?.referenceLabel || '').not.toMatch(/https?:\/\//i);
     expect(assessment.hypotheses[0]?.probabilityPercent).toBeGreaterThanOrEqual(70);
     expect(assessment.hypotheses[0]?.probabilityPercent).toBeLessThanOrEqual(95);
   });
@@ -123,5 +124,20 @@ describe('buildLocalAssessment', () => {
     expect(medium.probabilityPercent).toBeLessThanOrEqual(69);
     expect(low.probabilityPercent).toBeGreaterThanOrEqual(20);
     expect(low.probabilityPercent).toBeLessThanOrEqual(44);
+  });
+
+  it('fornece opções terapêuticas compatíveis no quadro de enxaqueca', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente H',
+      age: 30,
+      gender: 'Feminino',
+      duration: '1-7d',
+      symptoms: 'cefaleia pulsátil com aura visual, náusea e fotofobia',
+    });
+
+    const medicationText = (assessment.hypotheses[0]?.medicationOptions || []).map((item) => item.name.toLowerCase()).join(' | ');
+    expect(medicationText).toContain('analgésico');
+    expect(medicationText).toContain('antiemético');
+    expect(assessment.hypotheses[0]?.recommendedExams.length).toBeGreaterThanOrEqual(1);
   });
 });

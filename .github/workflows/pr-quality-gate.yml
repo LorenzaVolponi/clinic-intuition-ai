@@ -1,0 +1,74 @@
+name: PR Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pr-quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autofix-lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Auto-fix lint issues
+        run: npm run lint -- --fix
+
+      - name: Auto-commit lint fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(ci): apply automatic lint fixes"
+          branch: ${{ github.head_ref }}
+
+  validate:
+    needs: autofix-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Safety coherence guard
+        run: npm run safety:coherence:guard
+
+      - name: Build
+        run: npm run build

@@ -19,18 +19,9 @@ import {
 } from 'lucide-react';
 
 const REGULATORY_REFERENCES = [
-  {
-    label: 'Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)',
-    href: 'https://www.planalto.gov.br/ccivil_03/_Ato2015-2018/2018/Lei/L13709.htm',
-  },
-  {
-    label: 'Código de Ética Médica (Resolução CFM nº 2.217/2018)',
-    href: 'https://sistemas.cfm.org.br/normas/visualizar/resolucoes/BR/2018/2217',
-  },
-  {
-    label: 'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
-    href: 'https://sistemas.cfm.org.br/normas/arquivos/resolucoes/BR/2022/2314_2022.pdf',
-  },
+  'Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)',
+  'Código de Ética Médica (Resolução CFM nº 2.217/2018)',
+  'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
 ];
 
 interface DiagnosisResultProps {
@@ -227,10 +218,8 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
         <CardContent>
           <ul className="space-y-2 text-sm">
             {REGULATORY_REFERENCES.map((ref) => (
-              <li key={ref.href}>
-                <a href={ref.href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
-                  {ref.label}
-                </a>
+              <li key={ref} className="text-muted-foreground">
+                {ref}
               </li>
             ))}
           </ul>

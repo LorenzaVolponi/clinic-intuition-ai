@@ -33,6 +33,12 @@ const UNSUPPORTED_TERM_RULES = [
   { trigger: ['dor lombar'], symptomKeys: ['dor lombar', 'dor nas costas'] },
 ];
 
+const INCOMPATIBLE_HYPOTHESIS_RULES = [
+  { terms: ['apendicite', 'abdome agudo'], requiredSymptoms: ['dor abdominal', 'fossa ilíaca', 'epigastr'] },
+  { terms: ['sindrome coronariana', 'infarto', 'iam'], requiredSymptoms: ['dor no peito', 'dor toracica', 'aperto no peito', 'dispneia'] },
+  { terms: ['avc', 'acidente vascular'], requiredSymptoms: ['hemiparesia', 'deficit focal', 'afasia', 'paresia'] },
+];
+
 function normalize(value: string) {
   return value
     .toLowerCase()
@@ -82,6 +88,42 @@ export function validateClinicalResponse({
   );
   const primaryHypothesisBlob = normalize(response.hypotheses[0]?.name || '');
 
+  if (!Array.isArray(response.hypotheses) || response.hypotheses.length === 0 || response.hypotheses.length > 3) {
+    errors.push('Quantidade de hipóteses fora do limite seguro (1 a 3).');
+  }
+
+  if (!response.triageReason || response.triageReason.trim().length < 12) {
+    errors.push('Justificativa de triagem insuficiente.');
+  }
+
+  const legalNotice = normalize(response.conduct?.legalNotice || '');
+  if (!includesAny(legalNotice, ['educacional', 'preceptor', 'protocolo'])) {
+    errors.push('Aviso legal/educacional insuficiente na conduta.');
+  }
+
+  for (const hypothesis of response.hypotheses) {
+    if (!hypothesis.name || hypothesis.name.trim().length < 4) {
+      errors.push('Nome de hipótese insuficiente.');
+    }
+    if (!hypothesis.justification || hypothesis.justification.trim().length < 12) {
+      errors.push(`Justificativa insuficiente na hipótese: ${hypothesis.name || 'sem nome'}`);
+    }
+    if (hypothesis.confidenceScore > 95) {
+      errors.push(`ConfidenceScore excessivo para uso educacional seguro: ${hypothesis.name}`);
+    }
+  }
+
+  const narrativeBlob = normalize(
+    JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification}`)) + JSON.stringify(response.conduct),
+  );
+  const rawNarrativeBlob = JSON.stringify(response.hypotheses) + JSON.stringify(response.conduct);
+  if (includesAny(narrativeBlob, ['diagnostico definitivo', 'diagnostico fechado', 'certeza diagnostica'])) {
+    errors.push('Linguagem de diagnóstico definitivo não permitida em contexto educacional.');
+  }
+  if (/\b\d+([.,]\d+)?\s?(mg|g|mcg|µg|ml|mL)\b/i.test(rawNarrativeBlob) || /\b\d+\s?\/\s?\d+\s?h\b/i.test(rawNarrativeBlob)) {
+    errors.push('Dose/posologia explícita não permitida em contexto educacional.');
+  }
+
   for (const rule of UNSUPPORTED_TERM_RULES) {
     const mentionsRuleInPrimaryHypothesis = includesAny(primaryHypothesisBlob, rule.trigger);
     const mentionsRuleInJustification = includesAny(justificationBlob, rule.trigger);
@@ -89,6 +131,17 @@ export function validateClinicalResponse({
 
     if (mentionsRuleInPrimaryHypothesis && mentionsRuleInJustification && !symptomSupported) {
       errors.push(`Possível alucinação clínica ao mencionar: ${rule.trigger.join(', ')}`);
+    }
+  }
+
+  const hypothesisBlob = normalize(
+    JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification} ${item.physiopathology}`)),
+  );
+  for (const rule of INCOMPATIBLE_HYPOTHESIS_RULES) {
+    const mentionsCondition = includesAny(hypothesisBlob, rule.terms);
+    const hasCompatibleSymptoms = includesAny(symptoms, rule.requiredSymptoms);
+    if (mentionsCondition && !hasCompatibleSymptoms) {
+      errors.push(`Hipótese incompatível com sintomas explícitos: ${rule.terms.join(', ')}`);
     }
   }
 

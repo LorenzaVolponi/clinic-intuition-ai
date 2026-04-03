@@ -61,4 +61,16 @@ describe('buildLocalAssessment', () => {
     expect(assessment.hypotheses[0]?.referenceLabel).toBeTruthy();
     expect(assessment.hypotheses[0]?.referenceUrl).toMatch(/^https?:\/\//);
   });
+
+  it('evita classificar como emergência sintomas respiratórios leves sem red flags fortes', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente D',
+      age: 25,
+      gender: 'Masculino',
+      duration: '1-7d',
+      symptoms: 'Tosse seca, dor de garganta e catarro',
+    });
+
+    expect(assessment.triageLevel).not.toBe('Emergência');
+  });
 });

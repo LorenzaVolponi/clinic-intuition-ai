@@ -1,0 +1,69 @@
+name: CI Failure Alert
+
+on:
+  workflow_run:
+    workflows:
+      - PR Quality Gate
+      - Continuous Safety Guard
+      - Deploy Vercel (Auto)
+    types:
+      - completed
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  open-or-update-incident:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open or update CI incident issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const title = `🚨 CI incidente: ${run.name}`;
+            const marker = `<!-- ci-incident:${run.id} -->`;
+            const body = `${marker}
+            ## Falha detectada automaticamente
+            - Workflow: **${run.name}**
+            - Branch: \`${run.head_branch}\`
+            - Commit: \`${run.head_sha}\`
+            - Conclusão: **${run.conclusion}**
+            - URL da execução: ${run.html_url}
+            
+            Ação recomendada:
+            1. Revisar logs da execução.
+            2. Rodar \`npm run auto:repair:ci\` localmente.
+            3. Subir correção e reexecutar o pipeline.`;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ci,incident",
+              per_page: 100
+            });
+
+            const existing = issues.find((issue) => issue.title === title);
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body
+              });
+              core.info(`Issue existente atualizada: #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["ci", "incident", "auto-generated"]
+              });
+              core.info(`Issue criada: #${created.data.number}`);
+            }

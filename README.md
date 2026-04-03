@@ -1,13 +1,10 @@
-# MedInnova AI Lab
+# Dr. IA — Anamnese e Simulador Clínico
 
-Plataforma educacional em React + Vite com backend Node para estudo médico com:
+Aplicação educacional em React + Vite com backend Node focada **exclusivamente** em:
 
-- simulador de casos clínicos com triagem inteligente;
-- flashcards temáticos;
-- quiz por área;
-- MedBot para revisão guiada;
-- timeline da evolução da medicina;
-- backend de IA com prompt clínico rígido e validações de segurança.
+- coleta de anamnese estruturada;
+- simulação clínica com hipóteses diagnósticas;
+- suporte de triagem e condutas iniciais em contexto didático.
 
 ## Como rodar
 
@@ -17,10 +14,9 @@ cp .env.example .env
 npm run dev
 ```
 
-Isso sobe:
-
+Serviços locais:
 - frontend Vite em `http://localhost:8080`
-- backend MedInnova em `http://localhost:8787`
+- backend em `http://localhost:8787`
 
 ## Variáveis de ambiente
 
@@ -31,195 +27,43 @@ BACKEND_PORT=8787
 VITE_API_BASE_URL=
 ```
 
-> Segurança: mantenha a chave apenas no `.env` local (nunca commite chaves reais no repositório).
+## Fluxo principal
 
-### Configuração recomendada (local + Vercel)
+1. Preencha a anamnese (idade, gênero, sintomas e duração).
+2. Envie o caso para análise.
+3. Revise triagem, hipóteses, exames sugeridos e ações imediatas.
+4. Reinicie para novo caso simulado.
 
-- **Local**: crie `.env` com `cp .env.example .env` e preencha `GROQ_API_KEY`.
-- Se frontend e API estiverem em domínios diferentes, configure `VITE_API_BASE_URL` com o host da API (ex.: `https://seu-app.vercel.app`).
-- **Vercel**: adicione `GROQ_API_KEY` e `GROQ_MODEL` em **Project Settings → Environment Variables**.
-- Após deploy, valide em:
-  - `GET /api/health` → `providerConfigured: true` quando a chave estiver correta.
+## Endpoints ativos no escopo atual
 
-## Backend implementado
+- `GET /api/health`
+- `POST /api/clinical-analysis`
 
-- endpoint `POST /api/clinical-analysis` com prompt de sistema clínico rigoroso;
-- endpoint `POST /api/medbot` para tutor educacional;
-- endpoint `POST /api/study-pack` para gerar 10 aulas + 10 perguntas randomizadas;
-- endpoint `GET /api/health` com status do provedor;
-- temperatura baixa e `top_p` reduzido para conter alucinação;
-- validações backend para bloquear respostas inseguras (ex.: dor torácica sem ECG, mulher fértil com dor+nausea sem Beta-HCG, sintomas inventados).
-- fallback local no frontend quando backend/IA estiver indisponível.
-- fallback local também no backend para `clinical-analysis` e `medbot` quando o provedor externo falhar/estiver indisponível.
-- em deploy Vercel, os handlers `api/*.js` também possuem fallback local para manter a plataforma funcional sem provider.
-- rate limit básico por IP e `x-request-id` em todas as respostas para rastreabilidade.
+### Endpoints desativados por escopo
 
-## Testes
+- `POST /api/medbot` → `410`
+- `POST /api/study-pack` → `410`
 
-```bash
-npm test
-npm run build
-npm run verify
-npm run auto:guard
-npm run review:medbot:diagnosis
-```
+## Segurança
 
-Cobertura inicial inclui:
-- validação clínica de segurança (`backend/validators.test.ts`);
-- smoke tests dos endpoints (`backend/server.test.ts`) incluindo `study-pack`.
-- revisão guiada para fluidez do MedBot + variação de hipóteses (`scripts/review-medbot-diagnosis.sh`).
+- Uso estritamente educacional.
+- Não substitui avaliação médica real.
+- Em emergência real, acione SAMU 192.
+- Validação clínica defensiva no backend para bloquear respostas incompatíveis com sintomas explícitos e reduzir risco de alucinação.
+- Se a IA externa responder fora das regras de segurança, o backend força fallback local automaticamente.
 
-### Smoke test rápido local (API + frontend)
+### Referências regulatórias recomendadas (Brasil)
 
-Com `npm run dev` rodando:
+- LGPD (Lei nº 13.709/2018): https://www.planalto.gov.br/ccivil_03/_Ato2015-2018/2018/Lei/L13709.htm
+- Código de Ética Médica (CFM nº 2.217/2018): https://sistemas.cfm.org.br/normas/visualizar/resolucoes/BR/2018/2217
+- Telemedicina (CFM nº 2.314/2022): https://sistemas.cfm.org.br/normas/arquivos/resolucoes/BR/2022/2314_2022.pdf
 
-```bash
-curl http://localhost:8787/api/health
-curl http://localhost:8080/api/health
-curl -X POST http://localhost:8787/api/medbot \
-  -H "content-type: application/json" \
-  -d '{"topicId":"cardiologia","question":"resuma IAM"}'
-```
+## Documentação de refatoração
 
-## Próximas melhorias recomendadas
+- Plano de preparação e escopo da reestruturação: `docs/RESTRUCTURE_PREPARATION.md`.
 
-1. Persistir histórico de chats, casos e desempenho do quiz.
-2. Adicionar autenticação e trilhas por nível de formação.
-3. Salvar auditoria das respostas bloqueadas pelo validador clínico.
-4. Criar testes unitários/e2e para backend e frontend.
-5. Expandir a base de conteúdo e critérios clínicos.
+## Operação contínua (full time)
 
-## Runbook para subir atualização
-
-Se você quer um passo a passo direto para rodar, validar, commitar e subir PR sem erro:
-
-- Veja `docs/UPDATE_RUNBOOK.md`.
-- Documentação técnica completa: `docs/TECHNICAL_DOCUMENTATION.md`.
-
-## Automação diária de correções e validação
-
-Foi adicionado um guard automático em `scripts/auto-guard.sh` com dois modos:
-
-- **Rodada única** (CI/local): `npm run auto:guard`
-- **Loop contínuo** (quase real-time): `npm run auto:guard:watch`
-
-O guard executa em sequência:
-
-1. `npm ci`
-2. `npm run lint -- --fix`
-3. `npm test`
-4. `npm run build`
-
-Também foi incluído workflow diário em `.github/workflows/daily-auto-guard.yml` (cron) com upload de logs.
-
-## Orquestração automática de PR (corrigir + validar + fechar PRs abertas)
-
-Foi adicionado:
-
-- script: `scripts/auto-pr-orchestrator.sh`
-- workflow: `.github/workflows/auto-pr-orchestrator.yml`
-
-Fluxo automático ao subir PR:
-
-1. roda o pipeline definitivo (`scripts/definitive-auto-run.sh`) com auto-correção e retries;
-2. se houver ajustes, commita e faz push automático;
-3. habilita auto-merge da PR atual;
-4. fecha as demais PRs abertas no branch base para manter um único fluxo ativo de entrega.
-
-Rodar local/manual:
-
-```bash
-npm run auto:orchestrate:pr
-```
-
-Pipeline definitivo (manual/local):
-
-```bash
-npm run auto:definitive:run
-```
-
-Esse pipeline:
-- provisiona dependências;
-- tenta corrigir lint automaticamente;
-- roda testes/build/smoke/review com retry inteligente;
-- em CI pode commitar auto-fix e habilitar auto-merge da PR.
-
-## Resolver conflitos de merge e rodar direto (Actions)
-
-Workflow: `.github/workflows/auto-pr-merge.yml`
-
-Você pode disparar de 3 formas:
-
-1. automático ao atualizar a PR;
-2. manual em **Actions → Auto PR Conflict Fix + Merge**;
-3. comentando na PR:  
-   ` /resolve-merge `
-
-Esse fluxo tenta resolver conflitos automaticamente, roda validações mínimas (`npm test` + `npm run build`) e já habilita auto-merge.
-
-### Resolver conflito a partir de issue automática
-
-Para casos como issue `[auto] Resolver conflito de merge da PR #XX`, foi adicionado:
-
-- workflow: `.github/workflows/auto-conflict-issue-resolver.yml`
-- script: `scripts/auto-handle-conflict-issue.sh`
-
-Esse fluxo extrai o número da PR da issue, tenta resolver conflito, roda validação e fecha a issue automaticamente se der certo.
-
-Rodar manual:
-
-```bash
-ISSUE_NUMBER=60 npm run auto:resolve:conflict-issue
-```
-
-## Script único para atualizar/corrigir tudo automaticamente
-
-Se você quer um comando “faz tudo” para corrigir o projeto quando der problema, use:
-
-```bash
-npm run auto:update:everything
-```
-
-Esse script (`scripts/auto-update-everything.sh`) executa:
-
-1. `npm ci`
-2. `lint --fix`
-3. `test`
-4. `build`
-5. `smoke-e2e`
-6. `review-medbot-diagnosis`
-
-Opções extras:
-
-- `--apply-updates` → roda `npm update` e `npm audit fix`
-- `--commit` → cria commit automático se houver mudanças
-- `--push` → faz push para branch atual (ou `TARGET_BRANCH`)
-
-## Script “all-in-one” (tudo que foi sugerido)
-
-```bash
-npm run auto:run:all
-```
-
-Opcional:
-
-- `--issue=<n>` para tratar issue automática de conflito
-- `--pr=<n>` para disparar orquestração completa de PR
-
-## Deploy automático (Vercel)
-
-Agora o repositório possui workflow de deploy automático: `.github/workflows/deploy-vercel.yml`.
-
-- **PR para `main/master`**: gera deploy de **preview** e comenta a URL na PR.
-- **Push em `main/master`**: gera deploy de **produção** automaticamente.
-- **Manual**: pode ser disparado em **Actions → Deploy Vercel (Auto)**.
-
-### Secrets obrigatórios no GitHub
-
-Configure em **Settings → Secrets and variables → Actions**:
-
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
-
-Sem esses 3 secrets o workflow falha com mensagem explícita.
+- Guard contínuo local: `npm run auto:guard:watch`
+- Guard contínuo no GitHub Actions: `.github/workflows/continuous-safety-guard.yml` (a cada 6 horas)
+- Para correção assistida periódica: `.github/workflows/daily-auto-guard.yml`

@@ -101,6 +101,13 @@ Automação CI adicional ativa:
 - `CI Failure Alert`: abre/atualiza issue automaticamente quando workflow crítico falha.
 - `Backend Auto Maintenance`: manutenção automática a cada 2h com lint/test/guard/smoke/build.
 
+Pipeline completo “pau na máquina” (com auto-reparo em falha):
+
+```bash
+npm run auto:pau-na-maquina
+# opcional com auditoria de segurança: bash scripts/pau-na-maquina.sh --repair-on-fail --with-audit
+```
+
 Gerar base ampliada com mais de 10.000 possibilidades de hipóteses:
 
 ```bash

@@ -30,4 +30,4 @@ jobs:
         run: npm ci
 
       - name: Run backend maintenance pipeline
-        run: npm run auto:backend:maintain
+        run: npm run auto:pau-na-maquina

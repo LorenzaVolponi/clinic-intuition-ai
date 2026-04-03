@@ -52,6 +52,12 @@ VITE_API_BASE_URL=
 - Validação clínica defensiva no backend para bloquear respostas incompatíveis com sintomas explícitos e reduzir risco de alucinação.
 - Se a IA externa responder fora das regras de segurança, o backend força fallback local automaticamente.
 
+### Referências regulatórias recomendadas (Brasil)
+
+- LGPD (Lei nº 13.709/2018): https://www.planalto.gov.br/ccivil_03/_Ato2015-2018/2018/Lei/L13709.htm
+- Código de Ética Médica (CFM nº 2.217/2018): https://sistemas.cfm.org.br/normas/visualizar/resolucoes/BR/2018/2217
+- Telemedicina (CFM nº 2.314/2022): https://sistemas.cfm.org.br/normas/arquivos/resolucoes/BR/2022/2314_2022.pdf
+
 ## Documentação de refatoração
 
 - Plano de preparação e escopo da reestruturação: `docs/RESTRUCTURE_PREPARATION.md`.

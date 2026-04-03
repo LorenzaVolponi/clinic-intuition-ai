@@ -18,6 +18,21 @@ import {
   Activity,
 } from 'lucide-react';
 
+const REGULATORY_REFERENCES = [
+  {
+    label: 'Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)',
+    href: 'https://www.planalto.gov.br/ccivil_03/_Ato2015-2018/2018/Lei/L13709.htm',
+  },
+  {
+    label: 'Código de Ética Médica (Resolução CFM nº 2.217/2018)',
+    href: 'https://sistemas.cfm.org.br/normas/visualizar/resolucoes/BR/2018/2217',
+  },
+  {
+    label: 'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
+    href: 'https://sistemas.cfm.org.br/normas/arquivos/resolucoes/BR/2022/2314_2022.pdf',
+  },
+];
+
 interface DiagnosisResultProps {
   diagnosis: ClinicalAssessment;
   patientData: PatientData;
@@ -201,6 +216,26 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           </CardContent>
         </Card>
       )}
+
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Referências regulatórias (Brasil)</CardTitle>
+          <CardDescription>
+            Base legal e ética para uso educacional seguro do simulador com dados de saúde no contexto brasileiro.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2 text-sm">
+            {REGULATORY_REFERENCES.map((ref) => (
+              <li key={ref.href}>
+                <a href={ref.href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+                  {ref.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
       <div className="space-y-4 sm:space-y-6">
         <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">

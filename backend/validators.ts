@@ -96,6 +96,11 @@ export function validateClinicalResponse({
     errors.push('Justificativa de triagem insuficiente.');
   }
 
+  const legalNotice = normalize(response.conduct?.legalNotice || '');
+  if (!includesAny(legalNotice, ['educacional', 'preceptor', 'protocolo'])) {
+    errors.push('Aviso legal/educacional insuficiente na conduta.');
+  }
+
   for (const hypothesis of response.hypotheses) {
     if (hypothesis.confidenceScore > 95) {
       errors.push(`ConfidenceScore excessivo para uso educacional seguro: ${hypothesis.name}`);

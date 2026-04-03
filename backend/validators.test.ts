@@ -31,7 +31,7 @@ const validResponse = {
   conduct: {
     immediateActions: ['Oxigênio se necessário'],
     monitoring: ['Monitor cardíaco'],
-    legalNotice: 'Buscar avaliação presencial.',
+    legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
   },
 };
 
@@ -121,6 +121,20 @@ describe('validateClinicalResponse', () => {
     const result = validateClinicalResponse({ patientData: basePatient, response: overconfident });
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('ConfidenceScore excessivo');
+  });
+
+  it('reprova ausência de aviso legal/educacional adequado', () => {
+    const withoutLegalNotice = {
+      ...validResponse,
+      conduct: {
+        ...validResponse.conduct,
+        legalNotice: 'seguir conduta',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: basePatient, response: withoutLegalNotice });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Aviso legal/educacional insuficiente');
   });
 
   it('reprova hipótese incompatível com sintomas explícitos', () => {

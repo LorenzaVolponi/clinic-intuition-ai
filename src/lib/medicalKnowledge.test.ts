@@ -61,4 +61,30 @@ describe('buildLocalAssessment', () => {
     expect(assessment.hypotheses[0]?.referenceLabel).toBeTruthy();
     expect(assessment.hypotheses[0]?.referenceUrl).toMatch(/^https?:\/\//);
   });
+
+  it('evita classificar como emergência sintomas respiratórios leves sem red flags fortes', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente D',
+      age: 25,
+      gender: 'Masculino',
+      duration: '1-7d',
+      symptoms: 'Tosse seca, dor de garganta e catarro',
+    });
+
+    expect(assessment.triageLevel).not.toBe('Emergência');
+  });
+
+  it('não sugere hipóteses desconexas (asma/apendicite) em quadro típico de enxaqueca', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente E',
+      age: 29,
+      gender: 'Feminino',
+      duration: '1-7d',
+      symptoms: 'Crises fortes de enxaqueca ao redor da cabeça, aura visual e palpitações',
+    });
+
+    const hypothesisNames = assessment.hypotheses.map((item) => item.name.toLowerCase()).join(' | ');
+    expect(hypothesisNames).not.toContain('asma');
+    expect(hypothesisNames).not.toContain('apendicite');
+  });
 });

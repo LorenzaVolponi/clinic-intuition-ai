@@ -45,6 +45,7 @@ export interface ClinicalAssessment {
   immediateActions: string[];
   clinicalSummary: string;
   analysisSource: 'local' | 'groq';
+  validationWarnings?: string[];
 }
 
 const DURATION_MAP: Record<string, 'hiperagudo' | 'agudo' | 'subagudo' | 'cronico'> = {
@@ -425,6 +426,7 @@ export function findMatchingConditions(patientData: PatientData) {
 export function buildLocalAssessment(patientData: PatientData): ClinicalAssessment {
   const rankedConditions = findMatchingConditions(patientData);
   const normalizedSymptoms = normalizeText(patientData.symptoms);
+  const context = inferClinicalContext(patientData.symptoms);
   const genericRedFlags = RED_FLAG_PATTERNS.filter((flag) => normalizedSymptoms.includes(normalizeText(flag)));
 
   if (rankedConditions.length === 0) {
@@ -458,32 +460,29 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   }
 
   const topMatches = rankedConditions.slice(0, 3);
-  const diversifiedTopMatches = topMatches.length < 3
-    ? rankedConditions
-    : (() => {
-      const selected: typeof rankedConditions = [];
-      const categories = new Set<string>();
-      for (const candidate of rankedConditions) {
-        if (selected.length >= 3) break;
-        if (!categories.has(candidate.condition.category)) {
-          selected.push(candidate);
-          categories.add(candidate.condition.category);
-        }
-      }
-      for (const candidate of rankedConditions) {
-        if (selected.length >= 3) break;
-        if (!selected.some((item) => item.condition.name === candidate.condition.name)) {
-          selected.push(candidate);
-        }
-      }
-      return selected.slice(0, 3);
-    })();
-  const topUrgency = diversifiedTopMatches.reduce<MedicalCondition['urgencyLevel']>((current, { condition }) => {
-    const order = { emergencia: 4, alta: 3, moderada: 2, baixa: 1 };
-    return order[condition.urgencyLevel] > order[current] ? condition.urgencyLevel : current;
-  }, 'baixa');
+  const topScore = topMatches[0]?.score ?? 0;
+  const clinicallyCoherentMatches = topMatches.filter(({ score }) => score >= Math.max(35, topScore - 20));
+  const selectedMatches = clinicallyCoherentMatches.length > 0 ? clinicallyCoherentMatches : topMatches.slice(0, 1);
+  const primaryMatch = selectedMatches[0];
+  const hasStrongEmergencySignal =
+    genericRedFlags.length >= 2 ||
+    context.severeHypotension ||
+    context.hypoxia ||
+    context.focalDeficit ||
+    selectedMatches.some(({ condition, score }) => condition.urgencyLevel === 'emergencia' && score >= 65);
 
-  const hypotheses = diversifiedTopMatches.map(({ condition, score }) => ({
+  const hasStrongUrgentSignal =
+    hasStrongEmergencySignal ||
+    genericRedFlags.length >= 1 ||
+    selectedMatches.some(({ condition, score }) => condition.urgencyLevel === 'alta' && score >= 55);
+
+  const derivedUrgency: MedicalCondition['urgencyLevel'] = hasStrongEmergencySignal
+    ? 'emergencia'
+    : hasStrongUrgentSignal
+      ? 'alta'
+      : primaryMatch?.condition.urgencyLevel || 'baixa';
+
+  const hypotheses = selectedMatches.map(({ condition, score }) => ({
     name: condition.name,
     probability: probabilityFromScore(score),
     treatment: `${condition.treatments.slice(0, 3).join(', ')} (sem dose neste simulador; sempre validar conduta e posologia com protocolo institucional e preceptor).`,
@@ -496,13 +495,13 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     referenceUrl: referenceUrlForCategory(condition.category),
   }));
 
-  const emergencyWarning = diversifiedTopMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
+  const emergencyWarning = selectedMatches.some(({ condition }) => condition.urgencyLevel === 'emergencia') || genericRedFlags.length >= 2
     ? '🚨 Atenção: o quadro contém sinais compatíveis com possível emergência médica. Recomenda-se avaliação presencial IMEDIATA. Em situação real, procure pronto-socorro ou acione o SAMU (192).'
     : undefined;
 
-  const suggestedExams = [...new Set(diversifiedTopMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
+  const suggestedExams = [...new Set(selectedMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
   const immediateActions = [
-    topUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
+    derivedUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
     'Revisar fatores de risco, medicações em uso e comorbidades.',
     'Correlacionar anamnese com exame físico antes de definir conduta real.',
   ];
@@ -510,13 +509,13 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   return {
     hypotheses,
     emergencyWarning,
-    triageLevel: urgencyToTriage(topUrgency),
+    triageLevel: urgencyToTriage(derivedUrgency),
     triageReason: topMatches.length > 0
-      ? `Prioridade definida pela hipótese principal (${diversifiedTopMatches[0].condition.name}) e pelos sinais de alarme associados.`
+      ? `Prioridade definida pela hipótese principal (${selectedMatches[0].condition.name}) e pelos sinais de alarme associados.`
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(diversifiedTopMatches[0]?.condition.category || 'geral')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => item.name).join(', ')}. Base educacional: diretrizes clínicas públicas e revisão por sinais de alarme. Referência principal: ${referencesForCategory(selectedMatches[0]?.condition.category || 'geral')}.`,
     analysisSource: 'local',
   };
 }

@@ -67,3 +67,7 @@ mantendo o objetivo educacional original da plataforma.
 ## 7) Critérios adicionais da fase 2
 - Rotas fora do escopo retornam `410` de forma consistente no backend e nos handlers serverless.
 - Testes automatizados cobrem explicitamente as respostas `410` para `medbot` e `study-pack`.
+
+## 8) Estrutura de segurança clínica (fase 3)
+- Módulo dedicado em `backend/clinical-safety/` para concentrar prompt e regras de validação.
+- Arquivos de compatibilidade (`backend/prompts.ts`, `backend/validators.ts`) mantidos como re-export para transição sem quebra.

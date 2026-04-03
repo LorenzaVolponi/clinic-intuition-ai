@@ -798,9 +798,11 @@ export function createApp() {
       });
 
       if (!validation.valid) {
-        return res.status(422).json({
-          error: 'Resposta da IA reprovada nas validações clínicas.',
-          validationErrors: validation.errors,
+        metrics.fallbackUsage.clinical += 1;
+        return res.json({
+          ...parsed.data.localAssessment,
+          analysisSource: 'local',
+          validationWarnings: validation.errors,
         });
       }
 
@@ -815,195 +817,18 @@ export function createApp() {
     }
   });
 
-  app.post('/api/medbot', async (req, res) => {
-    const parsed = medbotRequestSchema.safeParse(req.body);
-
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
-    }
-    const sanitized = sanitizeMedbotInput(parsed.data.question);
-    if (!sanitized.valid) {
-      return res.status(400).json({ error: sanitized.error });
-    }
-    const sessionId = (req.sessionData as SessionData).sessionUuid;
-    const sessionState = getSessionState(sessionId);
-    const userLevel = parsed.data.userLevel || parsed.data.context?.userLevel || sessionState.userLevel;
-    sessionState.userLevel = userLevel;
-    sessionState.topics.add(parsed.data.topicId);
-
-    if (!groqApiKey) {
-      metrics.fallbackUsage.medbot += 1;
-      const fallback = buildLocalMedbotAnswer({
-        topicId: parsed.data.topicId,
-        question: sanitized.sanitized,
-        history: parsed.data.history,
-        objective: parsed.data.context?.objective,
-        quickFacts: parsed.data.context?.quickFacts,
-        clinicalSummary: parsed.data.context?.clinicalSummary,
-        sessionData: req.sessionData as SessionData,
-        userLevel,
-        source: 'local',
-        priorIntent: sessionState.lastIntent,
-      });
-      sessionState.interactions.push(fallback.response.interaction_id);
-      sessionState.usedIds.add(fallback.response.interaction_id);
-      sessionState.lastIntent = fallback.response.intent;
-      updateSessionState(sessionId, sessionState);
-
-      return res.json({
-        answer: fallback.response.content.text,
-        response: {
-          ...fallback.response,
-          session_state: {
-            ...fallback.response.session_state,
-            total_interactions: sessionState.interactions.length,
-            topics_covered: [...sessionState.topics],
-            used_ids: [...sessionState.usedIds],
-          },
-        },
-        source: 'local',
-        suggestions: fallback.response.suggestions,
-        intent: fallback.response.intent,
-      });
-    }
-
-    try {
-      const historyText = (parsed.data.history || []).slice(-6).map((item) => `${item.role}: ${item.content}`).join('\n');
-      const contextText = parsed.data.context
-        ? `Objetivo: ${parsed.data.context.objective || 'não informado'}\nPontos-chave: ${(parsed.data.context.quickFacts || []).join(' | ') || 'não informado'}\nResumo clínico: ${parsed.data.context.clinicalSummary || 'não informado'}`
-        : 'Sem contexto adicional.';
-      const rawResponse = await callGroq([
-        { role: 'system', content: MEDBOT_SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Tema: ${parsed.data.topicId}\nNível: ${userLevel}\nContexto:\n${contextText}\nHistórico recente:\n${historyText || 'Sem histórico'}\nPergunta atual: ${sanitized.sanitized}\nSession UUID: ${(req.sessionData as SessionData).sessionUuid}\nTimestamp: ${(req.sessionData as SessionData).timestamp}\nInteraction: ${(req.sessionData as SessionData).interactionNumber}`,
-        },
-      ]);
-      const response = medbotModelResponseSchema.safeParse(rawResponse);
-      const fallback = buildLocalMedbotAnswer({
-        topicId: parsed.data.topicId,
-        question: sanitized.sanitized,
-        history: parsed.data.history,
-        objective: parsed.data.context?.objective,
-        quickFacts: parsed.data.context?.quickFacts,
-        clinicalSummary: parsed.data.context?.clinicalSummary,
-        sessionData: req.sessionData as SessionData,
-        userLevel,
-        source: 'groq',
-        priorIntent: sessionState.lastIntent,
-      });
-      const modelAnswerSafe = response.success
-        ? isMedbotAnswerSafe({ topicId: parsed.data.topicId, text: response.data.response.content.text })
-        : false;
-      const useModelResponse = response.success && modelAnswerSafe;
-      const normalized = useModelResponse ? response.data.response : fallback.response;
-      sessionState.interactions.push(normalized.interaction_id);
-      sessionState.usedIds.add(normalized.interaction_id);
-      sessionState.lastIntent = normalized.intent;
-      updateSessionState(sessionId, sessionState);
-
-      const responseSource = useModelResponse ? 'groq' : 'local';
-      return res.json({
-        answer: normalized.content.text,
-        response: {
-          ...normalized,
-          session_state: {
-            ...normalized.session_state,
-            total_interactions: sessionState.interactions.length,
-            topics_covered: [...sessionState.topics],
-            used_ids: [...sessionState.usedIds],
-          },
-        },
-        source: responseSource,
-        suggestions: normalized.suggestions,
-        intent: normalized.intent,
-      });
-    } catch (error) {
-      console.error('medbot error', error);
-      metrics.fallbackUsage.medbot += 1;
-      const fallback = buildLocalMedbotAnswer({
-        topicId: parsed.data.topicId,
-        question: sanitized.sanitized,
-        history: parsed.data.history,
-        objective: parsed.data.context?.objective,
-        quickFacts: parsed.data.context?.quickFacts,
-        clinicalSummary: parsed.data.context?.clinicalSummary,
-        sessionData: req.sessionData as SessionData,
-        userLevel,
-        source: 'local',
-        priorIntent: sessionState.lastIntent,
-      });
-      sessionState.interactions.push(fallback.response.interaction_id);
-      sessionState.usedIds.add(fallback.response.interaction_id);
-      sessionState.lastIntent = fallback.response.intent;
-      updateSessionState(sessionId, sessionState);
-      return res.json({
-        answer: fallback.response.content.text,
-        response: {
-          ...fallback.response,
-          session_state: {
-            ...fallback.response.session_state,
-            total_interactions: sessionState.interactions.length,
-            topics_covered: [...sessionState.topics],
-            used_ids: [...sessionState.usedIds],
-          },
-        },
-        source: 'local',
-        suggestions: fallback.response.suggestions,
-        intent: fallback.response.intent,
-      });
-    }
+  app.post('/api/medbot', (_req, res) => {
+    return res.status(410).json({
+      error: 'Endpoint desativado nesta versão.',
+      message: 'O escopo atual mantém apenas anamnese e simulador clínico.',
+    });
   });
 
-  app.post('/api/study-pack', async (req, res) => {
-    const parsed = studyPackRequestSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
-    }
-
-    if (!groqApiKey) {
-      metrics.fallbackUsage.studyPack += 1;
-      return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
-    }
-
-    try {
-      const rawResponse = await callGroq([
-        {
-          role: 'system',
-          content: `${STUDY_PACK_SYSTEM_PROMPT}\n\n${QUICK_LESSON_SYSTEM_PROMPT}`,
-        },
-        {
-          role: 'user',
-          content: `Gere um pacote de estudo para o tema ${parsed.data.topicId}. Objetivo descrito: ${parsed.data.objective || 'não informado'}. Foco prioritário: ${parsed.data.focus || 'all'}. Nonce de variação: ${parsed.data.nonce || Date.now()}. Inclua lessons[] (10) no formato de aula rápida quando possível, flashcards[] (>=5) e quiz[] (>=7), com JSON válido. Evite repetição literal.`,
-        },
-      ]);
-      const response = studyPackModelResponseSchema.safeParse(rawResponse);
-      if (!response.success) {
-        metrics.fallbackUsage.studyPack += 1;
-        return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
-      }
-      const focus = parsed.data.focus || 'all';
-      const ai = response.data;
-      const hasEnoughForFocus =
-        focus === 'flashcards'
-          ? (ai.flashcards?.length || 0) >= 5
-          : focus === 'quiz'
-            ? (ai.quiz?.length || 0) >= 5
-            : focus === 'lessons'
-              ? (ai.lessons?.length || 0) >= 5
-              : (ai.lessons?.length || 0) >= 5 && (ai.quiz?.length || 0) >= 5 && (ai.flashcards?.length || 0) >= 5;
-
-      if (!hasEnoughForFocus) {
-        metrics.fallbackUsage.studyPack += 1;
-        return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
-      }
-
-      return res.json(applyStudyPackFocus(normalizeStudyPackForClient(parsed.data.topicId, ai), parsed.data.focus || 'all'));
-    } catch (error) {
-      console.error('study-pack error', error);
-      metrics.fallbackUsage.studyPack += 1;
-      return res.json(applyStudyPackFocus(buildLocalStudyPack(parsed.data.topicId, parsed.data.objective, parsed.data.nonce), parsed.data.focus || 'all'));
-    }
+  app.post('/api/study-pack', (_req, res) => {
+    return res.status(410).json({
+      error: 'Endpoint desativado nesta versão.',
+      message: 'O escopo atual mantém apenas anamnese e simulador clínico.',
+    });
   });
 
   return app;

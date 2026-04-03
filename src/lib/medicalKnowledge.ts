@@ -425,6 +425,7 @@ export function findMatchingConditions(patientData: PatientData) {
 export function buildLocalAssessment(patientData: PatientData): ClinicalAssessment {
   const rankedConditions = findMatchingConditions(patientData);
   const normalizedSymptoms = normalizeText(patientData.symptoms);
+  const context = inferClinicalContext(patientData.symptoms);
   const genericRedFlags = RED_FLAG_PATTERNS.filter((flag) => normalizedSymptoms.includes(normalizeText(flag)));
 
   if (rankedConditions.length === 0) {
@@ -478,10 +479,24 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       }
       return selected.slice(0, 3);
     })();
-  const topUrgency = diversifiedTopMatches.reduce<MedicalCondition['urgencyLevel']>((current, { condition }) => {
-    const order = { emergencia: 4, alta: 3, moderada: 2, baixa: 1 };
-    return order[condition.urgencyLevel] > order[current] ? condition.urgencyLevel : current;
-  }, 'baixa');
+  const primaryMatch = diversifiedTopMatches[0];
+  const hasStrongEmergencySignal =
+    genericRedFlags.length >= 2 ||
+    context.severeHypotension ||
+    context.hypoxia ||
+    context.focalDeficit ||
+    diversifiedTopMatches.some(({ condition, score }) => condition.urgencyLevel === 'emergencia' && score >= 65);
+
+  const hasStrongUrgentSignal =
+    hasStrongEmergencySignal ||
+    genericRedFlags.length >= 1 ||
+    diversifiedTopMatches.some(({ condition, score }) => condition.urgencyLevel === 'alta' && score >= 55);
+
+  const derivedUrgency: MedicalCondition['urgencyLevel'] = hasStrongEmergencySignal
+    ? 'emergencia'
+    : hasStrongUrgentSignal
+      ? 'alta'
+      : primaryMatch?.condition.urgencyLevel || 'baixa';
 
   const hypotheses = diversifiedTopMatches.map(({ condition, score }) => ({
     name: condition.name,
@@ -502,7 +517,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
 
   const suggestedExams = [...new Set(diversifiedTopMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
   const immediateActions = [
-    topUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
+    derivedUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
     'Revisar fatores de risco, medicações em uso e comorbidades.',
     'Correlacionar anamnese com exame físico antes de definir conduta real.',
   ];
@@ -510,7 +525,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
   return {
     hypotheses,
     emergencyWarning,
-    triageLevel: urgencyToTriage(topUrgency),
+    triageLevel: urgencyToTriage(derivedUrgency),
     triageReason: topMatches.length > 0
       ? `Prioridade definida pela hipótese principal (${diversifiedTopMatches[0].condition.name}) e pelos sinais de alarme associados.`
       : 'Prioridade baseada em sintomas relatados.',

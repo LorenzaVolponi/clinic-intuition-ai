@@ -16,7 +16,6 @@ import {
   FlaskConical,
   ClipboardCheck,
   Activity,
-  Cpu,
 } from 'lucide-react';
 
 interface DiagnosisResultProps {
@@ -128,14 +127,6 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                 </div>
                 <Badge className={getTriageColor(diagnosis.triageLevel)}>{diagnosis.triageLevel}</Badge>
                 <p className="text-sm text-muted-foreground mt-2">{diagnosis.triageReason}</p>
-              </div>
-              <div className="rounded-lg border p-4 bg-background/70">
-                <div className="flex items-center gap-2 mb-2">
-                  <Cpu className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-semibold">Fonte da análise</p>
-                </div>
-                <p className="text-sm font-medium capitalize">{diagnosis.analysisSource === 'groq' ? 'Groq + base local' : 'Base local'}</p>
-                <p className="text-xs text-muted-foreground mt-1">Se a API não estiver configurada, o app mantém fallback seguro e funcional.</p>
               </div>
             </div>
           </div>

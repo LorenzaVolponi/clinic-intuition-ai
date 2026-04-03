@@ -6,6 +6,7 @@ import { promises as fs } from 'node:fs';
 import { z } from 'zod';
 import { buildClinicalUserPrompt, CLINICAL_SYSTEM_PROMPT, MEDBOT_SYSTEM_PROMPT, QUICK_LESSON_SYSTEM_PROMPT, STUDY_PACK_SYSTEM_PROMPT } from './prompts';
 import { validateClinicalResponse, type BackendClinicalModelResponse } from './validators';
+import { extractCaseFacts } from './clinical-safety/parser';
 import { mergeClinicalWithFallback } from '../shared/clinicalResponse.js';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 import { getTopicReferences } from '../shared/clinicalReferences.js';
@@ -785,10 +786,17 @@ export function createApp() {
       const contextBlock = parsed.data.context
         ? `Tema educacional: ${parsed.data.context.topicId || 'não informado'}\nObjetivo de estudo: ${parsed.data.context.objective || 'não informado'}`
         : 'Sem contexto educacional adicional.';
+      const caseFacts = extractCaseFacts({
+        symptoms: parsed.data.patientData.symptoms,
+        duration: parsed.data.patientData.duration,
+      });
 
       const rawAiResponse = await callGroq([
         { role: 'system', content: CLINICAL_SYSTEM_PROMPT },
-        { role: 'user', content: `${buildClinicalUserPrompt(parsed.data)}\n${contextBlock}\nSe o tema for emergências clínicas, detalhe red flags e priorização de risco.` },
+        {
+          role: 'user',
+          content: `${buildClinicalUserPrompt(parsed.data)}\n${contextBlock}\nFATOS ESTRUTURADOS OBRIGATÓRIOS:\n${JSON.stringify(caseFacts)}\nConsidere explicitamente cada item detectado. Se faltar evidência, assuma incerteza e não invente.\nSe o tema for emergências clínicas, detalhe red flags e priorização de risco.`,
+        },
       ]);
       const aiResponse = clinicalModelResponseSchema.parse(rawAiResponse);
 

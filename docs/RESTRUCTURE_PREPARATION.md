@@ -71,3 +71,4 @@ mantendo o objetivo educacional original da plataforma.
 ## 8) Estrutura de segurança clínica (fase 3)
 - Módulo dedicado em `backend/clinical-safety/` para concentrar prompt e regras de validação.
 - Arquivos de compatibilidade (`backend/prompts.ts`, `backend/validators.ts`) mantidos como re-export para transição sem quebra.
+- Versionamento inicial de regras em `backend/clinical-safety/rules/v1.ts` para evolução controlada (sem quebrar comportamento atual).

@@ -8,6 +8,7 @@ import {
   MAX_HYPOTHESES,
   UNSUPPORTED_TERM_RULES,
 } from './rules/v1';
+import { extractCaseFacts } from './parser';
 
 type BackendHypothesis = {
   name: string;
@@ -74,6 +75,7 @@ export function validateClinicalResponse({
   }
 
   const symptoms = normalize(patientData.symptoms || '');
+  const caseFacts = extractCaseFacts({ symptoms: patientData.symptoms });
   const isFertileWoman = normalize(patientData.gender) === 'feminino' && patientData.age >= 12 && patientData.age <= 55;
   const hasPain = includesAny(symptoms, ['dor', 'dor no peito', 'dor toracica', 'dor abdominal']);
   const hasNausea = includesAny(symptoms, ['nausea', 'enjoo', 'vomito']);
@@ -129,6 +131,22 @@ export function validateClinicalResponse({
 
     if (mentionsRuleInPrimaryHypothesis && mentionsRuleInJustification && !symptomSupported) {
       errors.push(`Possível alucinação clínica ao mencionar: ${rule.trigger.join(', ')}`);
+    }
+  }
+
+  const modelEvidenceBlob = normalize(
+    `${response.triageReason} ${JSON.stringify(response.hypotheses.map((item) => `${item.name} ${item.justification}`))} ${JSON.stringify(response.investigationPlan)} ${JSON.stringify(response.conduct)}`,
+  );
+
+  for (const symptom of caseFacts.explicitSymptoms) {
+    if (!modelEvidenceBlob.includes(normalize(symptom))) {
+      errors.push(`Sintoma explícito não considerado na resposta: ${symptom}`);
+    }
+  }
+
+  for (const medication of caseFacts.mentionedMedications) {
+    if (!modelEvidenceBlob.includes(normalize(medication))) {
+      errors.push(`Medicação citada no caso não foi considerada: ${medication}`);
     }
   }
 

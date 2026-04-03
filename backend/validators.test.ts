@@ -205,4 +205,38 @@ describe('validateClinicalResponse', () => {
     expect(result.valid).toBe(false);
     expect(result.errors.join(' ')).toContain('Dose/posologia explícita não permitida');
   });
+
+  it('reprova quando medicação citada no caso não aparece na justificativa/plano', () => {
+    const patientWithMedication = {
+      age: 30,
+      gender: 'Feminino',
+      symptoms: 'Crises de enxaqueca com aura visual e palpitações; usou ceffalium e dipirona.',
+    };
+
+    const responseWithoutMedicationTrace = {
+      ...validResponse,
+      triageReason: 'Cefaleia com sintomas neurológicos associados.',
+      hypotheses: [
+        {
+          ...validResponse.hypotheses[0],
+          name: 'Enxaqueca com aura',
+          justification: 'Cefaleia pulsátil com fenômeno visual.',
+        },
+      ],
+      investigationPlan: {
+        immediate: ['Exame neurológico'],
+        complementary: ['Avaliar gatilhos clínicos'],
+        specialAttention: ['Reavaliação se piora'],
+      },
+      conduct: {
+        immediateActions: ['Hidratação e observação'],
+        monitoring: ['Monitorar intensidade da dor'],
+        legalNotice: 'Conteúdo educacional: validar conduta com preceptor e protocolo local.',
+      },
+    };
+
+    const result = validateClinicalResponse({ patientData: patientWithMedication, response: responseWithoutMedicationTrace });
+    expect(result.valid).toBe(false);
+    expect(result.errors.join(' ')).toContain('Medicação citada no caso não foi considerada');
+  });
 });

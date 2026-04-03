@@ -67,3 +67,11 @@ VITE_API_BASE_URL=
 - Guard contínuo local: `npm run auto:guard:watch`
 - Guard contínuo no GitHub Actions: `.github/workflows/continuous-safety-guard.yml` (a cada 6 horas)
 - Para correção assistida periódica: `.github/workflows/daily-auto-guard.yml`
+
+## Checagem determinística de interpretação do caso
+
+Para validar o que o parser clínico extrai do relato livre antes da IA:
+
+```bash
+CASE_TEXT=\"relato clínico aqui\" CASE_DURATION=\"6-24h\" npm run safety:parse:case
+```

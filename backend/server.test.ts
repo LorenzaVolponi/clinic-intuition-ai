@@ -26,6 +26,57 @@ describe('backend server routes', () => {
     expect(typeof response.body.sessionCacheSize).toBe('number');
   });
 
+
+  it('GET /api/evidence/status expõe agente de evidências educacional', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/evidence/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body.records).toBeGreaterThan(10_000);
+    expect(response.body.sources).toBeGreaterThan(0);
+    expect(response.body.massiveSeedRecords).toBeGreaterThan(10_000);
+    expect(response.body.internalMode).toBe(true);
+    expect(response.body.internalContexts).toBeGreaterThan(10);
+    expect(response.body.safety).toContain('educacional');
+  });
+
+
+  it('GET /api/evidence/catalog entrega mapa interno offline da base', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/evidence/catalog');
+
+    expect(response.status).toBe(200);
+    expect(response.body.offlineReady).toBe(true);
+    expect(response.body.totalGeneratedRecords).toBeGreaterThan(10_000);
+    expect(response.body.domains.length).toBeGreaterThan(10);
+    expect(response.body.contexts.length).toBeGreaterThan(10);
+    expect(response.body.dimensions.length).toBeGreaterThan(5);
+    expect(response.body.safety).toContain('simulação');
+  });
+
+  it('GET /api/evidence/search retorna resultados por tema', async () => {
+    const app = createApp();
+    const response = await request(app)
+      .get('/api/evidence/search')
+      .query({ q: 'dor torácica ECG', topic: 'cardiologia', domain: 'cardiologia', context: 'emergência', dimension: 'red-flags' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.count).toBeGreaterThan(0);
+    expect(response.body.results[0].title).toBeTruthy();
+    expect(response.body.domain).toBe('cardiologia');
+    expect(response.body.context).toBe('emergência');
+    expect(response.body.educationalWarning).toContain('educacional');
+  });
+
+  it('POST /api/evidence/refresh respeita flag de atualização remota', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/evidence/refresh').send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.refreshed).toBe(false);
+    expect(response.body.reason).toContain('EVIDENCE_AGENT_ALLOW_REMOTE');
+  });
+
   it('POST /api/clinical-analysis retorna 400 para payload inválido', async () => {
     const app = createApp();
     const response = await request(app).post('/api/clinical-analysis').send({});

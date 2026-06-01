@@ -6,7 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { Loader2, UserCheck, ClipboardList, Stethoscope } from "lucide-react";
+
+interface PatientVitalSigns {
+  temperature?: number;
+  heartRate?: number;
+  systolicBp?: number;
+  diastolicBp?: number;
+  respiratoryRate?: number;
+  oxygenSaturation?: number;
+}
 
 interface PatientData {
   name: string;
@@ -14,6 +24,12 @@ interface PatientData {
   gender: string;
   symptoms: string;
   duration: string;
+  vitalSigns?: PatientVitalSigns;
+  comorbidities?: string;
+  medications?: string;
+  allergies?: string;
+  pregnancyPossibility?: 'sim' | 'nao' | 'nao-se-aplica' | '';
+  physicalExamNotes?: string;
 }
 
 interface PatientFormProps {
@@ -57,13 +73,25 @@ const DURATION_OPTIONS = [
   { value: "> 4sem", label: "Mais de 4 semanas", severity: "cronico" }
 ];
 
+const parseOptionalNumber = (value: string) => {
+  if (value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormProps) => {
   const [formData, setFormData] = useState<PatientData>({
     name: "",
     age: 0,
     gender: "",
     symptoms: "",
-    duration: ""
+    duration: "",
+    vitalSigns: {},
+    comorbidities: "",
+    medications: "",
+    allergies: "",
+    pregnancyPossibility: "",
+    physicalExamNotes: ""
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -100,12 +128,26 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     }
   };
 
+  const appendSymptomsText = (text: string) => {
+    const currentSymptoms = formData.symptoms.trim();
+    const nextSymptoms = currentSymptoms
+      ? `${currentSymptoms}, ${text}`
+      : text;
+    setFormData({ ...formData, symptoms: nextSymptoms });
+  };
+
   const addSymptom = (symptom: string) => {
-    const currentSymptoms = formData.symptoms;
-    const newSymptoms = currentSymptoms 
-      ? `${currentSymptoms}, ${symptom}` 
-      : symptom;
-    setFormData({ ...formData, symptoms: newSymptoms });
+    appendSymptomsText(symptom);
+  };
+
+  const updateVitalSign = (key: keyof PatientVitalSigns, value: string) => {
+    setFormData({
+      ...formData,
+      vitalSigns: {
+        ...formData.vitalSigns,
+        [key]: parseOptionalNumber(value),
+      },
+    });
   };
 
   // Mobile detection
@@ -243,6 +285,14 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
               className={`text-base min-h-[100px] focus:ring-2 focus:ring-primary/20 ${errors.symptoms ? "border-destructive" : "border-border"}`}
             />
             {errors.symptoms && <p className="text-sm text-destructive">{errors.symptoms}</p>}
+
+            <VoiceAssistant
+              title="Ditado clínico"
+              description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
+              listenLabel="Falar sintomas"
+              onTranscript={appendSymptomsText}
+              disabled={isAnalyzing}
+            />
             
             {/* Sugestões de Sintomas por Sistema */}
             <div className="space-y-3">
@@ -316,6 +366,146 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+
+
+          {/* Contexto estruturado opcional */}
+          <div className="space-y-4 rounded-2xl border border-primary/15 bg-primary-soft/20 p-4">
+            <div>
+              <h3 className="text-base font-semibold">Contexto clínico opcional</h3>
+              <p className="text-sm text-muted-foreground">
+                Use para deixar o raciocínio mais seguro sem perder o fluxo rápido: sinais vitais, comorbidades, medicações e exame físico.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+              <div className="space-y-1">
+                <Label htmlFor="temperature" className="text-xs">Temp. °C</Label>
+                <Input
+                  id="temperature"
+                  type="number"
+                  step="0.1"
+                  placeholder="38.2"
+                  value={formData.vitalSigns?.temperature ?? ""}
+                  onChange={(e) => updateVitalSign("temperature", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="heartRate" className="text-xs">FC</Label>
+                <Input
+                  id="heartRate"
+                  type="number"
+                  placeholder="110"
+                  value={formData.vitalSigns?.heartRate ?? ""}
+                  onChange={(e) => updateVitalSign("heartRate", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="systolicBp" className="text-xs">PAS</Label>
+                <Input
+                  id="systolicBp"
+                  type="number"
+                  placeholder="120"
+                  value={formData.vitalSigns?.systolicBp ?? ""}
+                  onChange={(e) => updateVitalSign("systolicBp", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="diastolicBp" className="text-xs">PAD</Label>
+                <Input
+                  id="diastolicBp"
+                  type="number"
+                  placeholder="80"
+                  value={formData.vitalSigns?.diastolicBp ?? ""}
+                  onChange={(e) => updateVitalSign("diastolicBp", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="respiratoryRate" className="text-xs">FR</Label>
+                <Input
+                  id="respiratoryRate"
+                  type="number"
+                  placeholder="22"
+                  value={formData.vitalSigns?.respiratoryRate ?? ""}
+                  onChange={(e) => updateVitalSign("respiratoryRate", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="oxygenSaturation" className="text-xs">SatO₂ %</Label>
+                <Input
+                  id="oxygenSaturation"
+                  type="number"
+                  placeholder="96"
+                  value={formData.vitalSigns?.oxygenSaturation ?? ""}
+                  onChange={(e) => updateVitalSign("oxygenSaturation", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="comorbidities">Comorbidades</Label>
+                <Input
+                  id="comorbidities"
+                  placeholder="Ex.: HAS, DM, DPOC..."
+                  value={formData.comorbidities || ""}
+                  onChange={(e) => setFormData({ ...formData, comorbidities: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medications">Medicações em uso</Label>
+                <Input
+                  id="medications"
+                  placeholder="Ex.: AAS, metformina..."
+                  value={formData.medications || ""}
+                  onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="allergies">Alergias</Label>
+                <Input
+                  id="allergies"
+                  placeholder="Ex.: dipirona, penicilina ou nega"
+                  value={formData.allergies || ""}
+                  onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pregnancyPossibility">Possibilidade de gravidez</Label>
+                <Select
+                  value={formData.pregnancyPossibility || ""}
+                  onValueChange={(value: PatientData["pregnancyPossibility"]) => setFormData({ ...formData, pregnancyPossibility: value })}
+                >
+                  <SelectTrigger id="pregnancyPossibility" className="bg-background">
+                    <SelectValue placeholder="Não informado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    <SelectItem value="sim">Sim</SelectItem>
+                    <SelectItem value="nao">Não</SelectItem>
+                    <SelectItem value="nao-se-aplica">Não se aplica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="physicalExamNotes">Exame físico / observações dirigidas</Label>
+              <Textarea
+                id="physicalExamNotes"
+                placeholder="Ex.: ausculta, perfusão, Glasgow, dor à palpação, déficits focais..."
+                value={formData.physicalExamNotes || ""}
+                onChange={(e) => setFormData({ ...formData, physicalExamNotes: e.target.value })}
+                rows={isMobile ? 2 : 3}
+                className="bg-background"
+              />
             </div>
           </div>
 

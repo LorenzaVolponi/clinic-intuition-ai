@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-06-01",
+  "sourcePolicy": "Curated educational facts only; no copyrighted long-form text is stored.",
+  "conditions": [
+    {
+      "id": "sepsis-suspeita-v1",
+      "name": "Sepse / Choque Séptico Suspeito",
+      "icd10": "A41",
+      "category": "infeccioso",
+      "commonSymptoms": ["febre", "calafrios", "confusão mental", "dispneia", "mal-estar", "hipotensão"],
+      "riskFactors": ["idade avançada", "imunossupressão", "infecção recente", "diabetes", "cateter ou dispositivo invasivo"],
+      "ageGroups": ["crianca", "adolescente", "adulto", "idoso"],
+      "urgencyLevel": "emergencia",
+      "treatments": ["Reconhecimento precoce e protocolo institucional de sepse", "Coleta de culturas conforme protocolo antes de antimicrobiano se não atrasar conduta", "Reposição volêmica, antimicrobiano e suporte hemodinâmico conforme equipe/protocolo"],
+      "differentials": ["Pneumonia grave", "Meningite", "Choque hipovolêmico", "Anafilaxia"],
+      "redFlags": ["hipotensão", "confusão mental", "oligúria", "lactato elevado", "extremidades frias"],
+      "clinicalPearls": ["qSOFA/SOFA apoiam estratificação", "tempo até antimicrobiano impacta desfecho", "reavaliar perfusão e lactato seriado"],
+      "recommendedExams": ["Sinais vitais seriados", "Lactato", "Hemoculturas", "Hemograma", "Função renal", "Gasometria conforme gravidade"],
+      "durationProfile": ["hiperagudo", "agudo"],
+      "sources": [
+        {
+          "label": "Surviving Sepsis Campaign 2021",
+          "url": "https://www.sccm.org/SurvivingSepsisCampaign/Guidelines/Adult-Patients",
+          "license": "link/reference only",
+          "retrievedAt": "2026-06-01"
+        }
+      ],
+      "review": { "status": "published", "lastReviewedAt": "2026-06-01" }
+    },
+    {
+      "id": "meningite-aguda-v1",
+      "name": "Meningite Aguda Suspeita",
+      "icd10": "G03",
+      "category": "infeccioso",
+      "commonSymptoms": ["febre", "cefaleia", "rigidez nucal", "fotofobia", "vômito", "confusão mental"],
+      "riskFactors": ["imunossupressão", "contato com caso infeccioso", "otite ou sinusite recente", "idade extrema"],
+      "ageGroups": ["crianca", "adolescente", "adulto", "idoso"],
+      "urgencyLevel": "emergencia",
+      "treatments": ["Avaliação emergencial e isolamento conforme protocolo", "Antimicrobiano empírico conforme protocolo institucional", "Suporte clínico e investigação etiológica urgente"],
+      "differentials": ["Encefalite", "Sepse", "Hemorragia subaracnoide", "Enxaqueca"],
+      "redFlags": ["rigidez nucal", "rebaixamento do nível de consciência", "petéquias", "convulsões", "sepse associada"],
+      "clinicalPearls": ["não atrasar tratamento se forte suspeita", "avaliar contraindicações antes de punção lombar", "neuroimagem antes de punção em cenários selecionados"],
+      "recommendedExams": ["Hemoculturas", "Punção lombar quando segura", "Análise de líquor", "TC de crânio se indicado", "Hemograma"],
+      "durationProfile": ["hiperagudo", "agudo"],
+      "sources": [
+        {
+          "label": "CDC meningitis clinical overview",
+          "url": "https://www.cdc.gov/meningitis/hcp/clinical-overview/index.html",
+          "license": "public health reference",
+          "retrievedAt": "2026-06-01"
+        }
+      ],
+      "review": { "status": "published", "lastReviewedAt": "2026-06-01" }
+    },
+    {
+      "id": "gravidez-ectopica-v1",
+      "name": "Gravidez Ectópica Suspeita",
+      "icd10": "O00",
+      "category": "ginecologico",
+      "commonSymptoms": ["dor abdominal", "dor pélvica", "sangramento vaginal", "náusea", "síncope", "atraso menstrual"],
+      "riskFactors": ["idade fértil", "história de ectópica", "DIP prévia", "cirurgia tubária", "uso de DIU"],
+      "ageGroups": ["adolescente", "adulto"],
+      "genderPreference": "feminino",
+      "urgencyLevel": "emergencia",
+      "treatments": ["Avaliação ginecológica emergencial", "Estabilização hemodinâmica se instabilidade", "Conduta clínica/cirúrgica conforme protocolo e estabilidade"],
+      "differentials": ["Apendicite", "Cisto ovariano roto", "DIP", "Litíase urinária"],
+      "redFlags": ["síncope", "hipotensão", "dor pélvica intensa", "sangramento vaginal", "sinais de irritação peritoneal"],
+      "clinicalPearls": ["beta-HCG é obrigatório em pessoa com potencial gestacional", "USG transvaginal auxilia localização gestacional", "instabilidade hemodinâmica muda prioridade"],
+      "recommendedExams": ["Beta-HCG", "USG transvaginal", "Hemograma", "Tipagem sanguínea", "Sinais vitais seriados"],
+      "durationProfile": ["hiperagudo", "agudo", "subagudo"],
+      "sources": [
+        {
+          "label": "ACOG ectopic pregnancy clinical guidance",
+          "url": "https://www.acog.org/clinical",
+          "license": "link/reference only",
+          "retrievedAt": "2026-06-01"
+        }
+      ],
+      "review": { "status": "published", "lastReviewedAt": "2026-06-01" }
+    }
+  ]
+}

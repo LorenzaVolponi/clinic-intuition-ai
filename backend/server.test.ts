@@ -26,6 +26,26 @@ describe('backend server routes', () => {
     expect(typeof response.body.sessionCacheSize).toBe('number');
   });
 
+  it('GET /api/knowledge/stats expõe estatísticas da base clínica versionada', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/knowledge/stats');
+
+    expect(response.status).toBe(200);
+    expect(response.body.totalConditions).toBeGreaterThanOrEqual(3);
+    expect(response.body.publishedConditions).toBeGreaterThanOrEqual(3);
+    expect(response.body.byUrgency.emergencia).toBeGreaterThanOrEqual(1);
+  });
+
+  it('GET /api/knowledge/conditions permite buscar condições publicadas', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/knowledge/conditions').query({ q: 'sepse', limit: 5 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.count).toBeGreaterThanOrEqual(1);
+    expect(response.body.conditions[0].name).toContain('Sepse');
+    expect(response.body.conditions[0].sourceCount).toBeGreaterThanOrEqual(1);
+  });
+
   it('POST /api/clinical-analysis retorna 400 para payload inválido', async () => {
     const app = createApp();
     const response = await request(app).post('/api/clinical-analysis').send({});

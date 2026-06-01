@@ -11,6 +11,7 @@ import { mergeClinicalWithFallback } from '../shared/clinicalResponse.js';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 import { getTopicReferences } from '../shared/clinicalReferences.js';
 import { isMedbotAnswerSafe } from '../shared/medbotSafety.js';
+import { clinicalKnowledgeRepository } from './knowledge/clinicalKnowledgeRepository';
 
 dotenv.config();
 
@@ -20,12 +21,27 @@ const preferredModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatil
 const modelFallbackChain = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 const SESSION_STORE_FILE = process.env.SESSION_STORE_FILE || '/tmp/medinnova-session-cache.json';
 
+const vitalSignsSchema = z.object({
+  temperature: z.number().optional(),
+  heartRate: z.number().optional(),
+  systolicBp: z.number().optional(),
+  diastolicBp: z.number().optional(),
+  respiratoryRate: z.number().optional(),
+  oxygenSaturation: z.number().optional(),
+}).optional();
+
 const patientDataSchema = z.object({
   name: z.string().optional(),
   age: z.number(),
   gender: z.string(),
   symptoms: z.string(),
   duration: z.string(),
+  vitalSigns: vitalSignsSchema,
+  comorbidities: z.string().optional(),
+  medications: z.string().optional(),
+  allergies: z.string().optional(),
+  pregnancyPossibility: z.enum(['sim', 'nao', 'nao-se-aplica', '']).optional(),
+  physicalExamNotes: z.string().optional(),
 });
 
 const diagnosisHypothesisSchema = z.object({
@@ -82,6 +98,14 @@ const studyPackRequestSchema = z.object({
   focus: z.enum(['all', 'flashcards', 'quiz', 'lessons']).optional(),
   nonce: z.string().max(100).optional(),
 });
+
+const knowledgeQuerySchema = z.object({
+  q: z.string().max(120).optional(),
+  category: z.string().max(80).optional(),
+  urgency: z.enum(['baixa', 'moderada', 'alta', 'emergencia']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 
 type LocalAssessment = z.infer<typeof localAssessmentSchema>;
 
@@ -765,6 +789,31 @@ export function createApp() {
       sessionCacheSize: sessionCache.size,
       timestamp: new Date().toISOString(),
     });
+  });
+
+  app.get('/api/knowledge/stats', async (_req, res) => {
+    try {
+      const stats = await clinicalKnowledgeRepository.getStats();
+      return res.json({ ...stats, timestamp: new Date().toISOString() });
+    } catch (error) {
+      console.error('knowledge stats error', error);
+      return res.status(500).json({ error: 'Falha ao carregar estatísticas da base clínica.' });
+    }
+  });
+
+  app.get('/api/knowledge/conditions', async (req, res) => {
+    const parsed = knowledgeQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Query inválida.', details: parsed.error.flatten() });
+    }
+
+    try {
+      const conditions = await clinicalKnowledgeRepository.searchConditions(parsed.data);
+      return res.json({ conditions, count: conditions.length, timestamp: new Date().toISOString() });
+    } catch (error) {
+      console.error('knowledge conditions error', error);
+      return res.status(500).json({ error: 'Falha ao consultar base clínica.' });
+    }
   });
 
   app.post('/api/clinical-analysis', async (req, res) => {

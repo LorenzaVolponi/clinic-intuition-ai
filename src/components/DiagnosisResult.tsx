@@ -2,6 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
+import { formatAssessmentForSpeech } from '@/lib/spokenClinicalFormatter';
 import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
 import {
   Stethoscope,
@@ -31,6 +33,8 @@ interface DiagnosisResultProps {
 }
 
 export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
+  const spokenAssessment = formatAssessmentForSpeech(diagnosis, patientData);
+
   const getProbabilityColor = (probability: string) => {
     switch (probability.toLowerCase()) {
       case 'alta':
@@ -163,29 +167,38 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           <CardTitle className="text-lg sm:text-xl">Resumo clínico</CardTitle>
           <CardDescription>{diagnosis.clinicalSummary}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border bg-primary-soft/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FlaskConical className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold">Exames sugeridos</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {diagnosis.suggestedExams.map((exam) => (
-                <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
-              ))}
-            </div>
-          </div>
+        <CardContent className="space-y-4">
+          <VoiceAssistant
+            title="Leitura segura do resultado"
+            description="Ouça uma versão curta da triagem, hipóteses, exames e ações, mantendo o aviso educacional."
+            speechText={spokenAssessment}
+            speakLabel="Ler resultado"
+          />
 
-          <div className="rounded-lg border bg-success-soft/40 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ClipboardCheck className="h-4 w-4 text-success" />
-              <h3 className="font-semibold">Ações imediatas</h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border bg-primary-soft/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FlaskConical className="h-4 w-4 text-primary" />
+                <h3 className="font-semibold">Exames sugeridos</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {diagnosis.suggestedExams.map((exam) => (
+                  <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
+                ))}
+              </div>
             </div>
-            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-              {diagnosis.immediateActions.map((action) => (
-                <li key={action}>{action}</li>
-              ))}
-            </ul>
+
+            <div className="rounded-lg border bg-success-soft/40 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardCheck className="h-4 w-4 text-success" />
+                <h3 className="font-semibold">Ações imediatas</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                {diagnosis.immediateActions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </CardContent>
       </Card>

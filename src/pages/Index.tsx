@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ClinicalAssistantPanel } from '@/components/assistant/ClinicalAssistantPanel';
 import { DiagnosisResult } from '@/components/DiagnosisResult';
 import { PatientForm } from '@/components/PatientForm';
 import { SafetyWarning } from '@/components/SafetyWarning';
@@ -65,6 +66,8 @@ const Index = () => {
       <SafetyWarning />
 
       <main className="mx-auto grid w-full max-w-6xl gap-4 px-3 pb-10 pt-2 sm:gap-6 sm:px-6">
+        <ClinicalAssistantPanel patientData={patientData} diagnosis={diagnosis} onReset={handleReset} />
+
         {!diagnosis || !patientData ? (
           <PatientForm onSubmit={handleFormSubmit} isAnalyzing={isAnalyzing} patientData={patientData} />
         ) : (

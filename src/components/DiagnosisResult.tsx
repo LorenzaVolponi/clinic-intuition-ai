@@ -1,24 +1,34 @@
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
+import { Progress } from '@/components/ui/progress';
 import { formatAssessmentForSpeech } from '@/lib/spokenClinicalFormatter';
-import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
+import type { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
 import {
-  Stethoscope,
-  Pill,
-  BookOpen,
-  Search,
-  AlertTriangle,
-  RotateCcw,
-  User,
-  Calendar,
-  Users,
-  FlaskConical,
-  ClipboardCheck,
   Activity,
+  AlertTriangle,
+  BookOpen,
+  Calendar,
+  CheckCircle2,
+  ClipboardCheck,
+  Copy,
+  FlaskConical,
+  Gauge,
+  Pill,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Stethoscope,
+  User,
+  Users,
+  type LucideIcon,
 } from 'lucide-react';
+
+const VoiceAssistant = lazy(() =>
+  import('@/components/voice/VoiceAssistant').then((module) => ({ default: module.VoiceAssistant })),
+);
 
 const REGULATORY_REFERENCES = [
   'Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD)',
@@ -32,253 +42,306 @@ interface DiagnosisResultProps {
   onReset: () => void;
 }
 
+const voiceFallback = (
+  <div className="rounded-2xl border border-primary/10 bg-primary-soft/20 p-4 text-sm font-medium text-muted-foreground">
+    Preparando leitura em voz alta...
+  </div>
+);
+
+const getProbabilityColor = (probability: string) => {
+  switch (probability.toLowerCase()) {
+    case 'alta':
+      return 'bg-destructive text-destructive-foreground';
+    case 'moderada':
+      return 'bg-warning text-warning-foreground';
+    case 'baixa':
+      return 'bg-success text-success-foreground';
+    default:
+      return 'bg-muted text-muted-foreground';
+  }
+};
+
+const getTriageColor = (triageLevel: ClinicalAssessment['triageLevel']) => {
+  switch (triageLevel) {
+    case 'Emergência':
+      return 'bg-destructive text-destructive-foreground';
+    case 'Urgente':
+      return 'bg-orange-500 text-white';
+    case 'Prioritário':
+      return 'bg-warning text-warning-foreground';
+    default:
+      return 'bg-success text-success-foreground';
+  }
+};
+
+const getTriageProgress = (triageLevel: ClinicalAssessment['triageLevel']) => {
+  switch (triageLevel) {
+    case 'Emergência':
+      return 100;
+    case 'Urgente':
+      return 78;
+    case 'Prioritário':
+      return 55;
+    default:
+      return 28;
+  }
+};
+
+const formatClinicalReport = (diagnosis: ClinicalAssessment, patientData: PatientData) => {
+  const hypotheses = diagnosis.hypotheses
+    .map((hypothesis, index) => {
+      const probability = typeof hypothesis.probabilityPercent === 'number'
+        ? `${hypothesis.probability} (${hypothesis.probabilityPercent}%)`
+        : hypothesis.probability;
+
+      return [
+        `${index + 1}. ${hypothesis.name} — ${probability} | score ${hypothesis.score}`,
+        `   Conduta educacional: ${hypothesis.treatment}`,
+        `   Exames: ${hypothesis.recommendedExams.join(', ') || 'não informado'}`,
+        `   Red flags: ${hypothesis.redFlags.join(', ') || 'não informado'}`,
+      ].join('\n');
+    })
+    .join('\n\n');
+
+  return [
+    'Dr. IA — Resumo educacional do caso',
+    `Paciente: ${patientData.name || 'Não informado'} | ${patientData.age} anos | ${patientData.gender || 'gênero não informado'} | duração: ${patientData.duration}`,
+    `Sintomas: ${patientData.symptoms}`,
+    '',
+    `Triagem: ${diagnosis.triageLevel}`,
+    `Motivo: ${diagnosis.triageReason}`,
+    '',
+    `Resumo clínico: ${diagnosis.clinicalSummary}`,
+    '',
+    `Ações imediatas simuladas: ${diagnosis.immediateActions.join('; ') || 'não informado'}`,
+    `Exames sugeridos: ${diagnosis.suggestedExams.join('; ') || 'não informado'}`,
+    '',
+    'Hipóteses:',
+    hypotheses || 'Sem hipóteses listadas.',
+    '',
+    'Aviso: conteúdo exclusivamente educacional; não constitui diagnóstico, prescrição ou conduta médica real.',
+  ].join('\n');
+};
+
 export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
+  const [copyStatus, setCopyStatus] = useState('');
   const spokenAssessment = formatAssessmentForSpeech(diagnosis, patientData);
+  const primaryHypothesis = diagnosis.hypotheses[0];
+  const triageProgress = getTriageProgress(diagnosis.triageLevel);
+  const clinicalReport = useMemo(() => formatClinicalReport(diagnosis, patientData), [diagnosis, patientData]);
 
-  const getProbabilityColor = (probability: string) => {
-    switch (probability.toLowerCase()) {
-      case 'alta':
-        return 'bg-destructive text-destructive-foreground';
-      case 'moderada':
-        return 'bg-warning text-warning-foreground';
-      case 'baixa':
-        return 'bg-success text-success-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
-  };
+  const summaryStats = [
+    { label: 'Hipóteses', value: diagnosis.hypotheses.length, icon: Stethoscope },
+    { label: 'Exames', value: diagnosis.suggestedExams.length, icon: FlaskConical },
+    { label: 'Ações', value: diagnosis.immediateActions.length, icon: ClipboardCheck },
+    { label: 'Alertas', value: diagnosis.validationWarnings?.length || 0, icon: ShieldAlert },
+  ];
 
-  const getTriageColor = (triageLevel: ClinicalAssessment['triageLevel']) => {
-    switch (triageLevel) {
-      case 'Emergência':
-        return 'bg-destructive text-destructive-foreground';
-      case 'Urgente':
-        return 'bg-orange-500 text-white';
-      case 'Prioritário':
-        return 'bg-warning text-warning-foreground';
-      default:
-        return 'bg-success text-success-foreground';
+  const handleCopyReport = async () => {
+    if (!navigator.clipboard) {
+      setCopyStatus('Cópia indisponível neste navegador.');
+      return;
     }
+
+    await navigator.clipboard.writeText(clinicalReport);
+    setCopyStatus('Resumo copiado.');
+    window.setTimeout(() => setCopyStatus(''), 2200);
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 animate-fade-in">
-      <Card className="border-primary/20 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-primary-soft via-primary-soft/80 to-accent border-b">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/20 rounded-lg">
-                <User className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+    <div className="animate-fade-in space-y-5 sm:space-y-6">
+      <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-slate-200 bg-white p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                <User className="h-6 w-6" />
               </div>
               <div>
-                <CardTitle className="text-lg sm:text-xl">Resumo do Paciente</CardTitle>
-                <CardDescription className="text-sm sm:text-base">Caso analisado pelo sistema Dr. IA</CardDescription>
+                <Badge variant="outline" className="mb-2 border-slate-200 bg-slate-50 text-slate-600">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  Resultado educacional
+                </Badge>
+                <CardTitle className="text-xl font-semibold text-slate-950 sm:text-2xl">Resumo do Paciente</CardTitle>
+                <CardDescription className="mt-1 text-sm sm:text-base">
+                  Caso analisado pelo Dr. IA com triagem, hipóteses e próximos passos simulados.
+                </CardDescription>
               </div>
             </div>
-            <Button
-              onClick={onReset}
-              variant="outline"
-              size="sm"
-              className="gap-2 hover:bg-primary/10 hover:text-primary transition-colors shrink-0"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span className="hidden sm:inline">Novo Caso</span>
-              <span className="sm:hidden">Novo</span>
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row lg:self-center">
+              <Button
+                onClick={handleCopyReport}
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-xl border-slate-200 bg-white px-4 font-medium transition-colors hover:bg-primary/10 hover:text-primary"
+              >
+                {copyStatus ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                {copyStatus ? 'Copiado' : 'Copiar resumo'}
+              </Button>
+              <Button
+                onClick={onReset}
+                variant="outline"
+                size="sm"
+                className="h-10 rounded-xl border-slate-200 bg-white px-4 font-medium transition-colors hover:bg-primary/10 hover:text-primary"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Novo Caso
+              </Button>
+            </div>
           </div>
+          {copyStatus && <p className="mt-3 text-sm font-medium text-emerald-600">{copyStatus}</p>}
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Nome</p>
-                <p className="font-medium">{patientData.name || 'Não informado'}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Idade</p>
-                <p className="font-medium">{patientData.age} anos</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Gênero</p>
-                <p className="font-medium capitalize">{patientData.gender}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Duração</p>
-                <p className="font-medium">{patientData.duration}</p>
-              </div>
-            </div>
+
+        <CardContent className="space-y-5 p-4 sm:p-6 lg:p-8">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <InfoTile icon={User} label="Nome" value={patientData.name || 'Não informado'} />
+            <InfoTile icon={Calendar} label="Idade" value={`${patientData.age} anos`} />
+            <InfoTile icon={Users} label="Gênero" value={patientData.gender} capitalize />
+            <InfoTile icon={AlertTriangle} label="Duração" value={patientData.duration} />
           </div>
 
-          <Separator />
-
-          <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Sintomas relatados</p>
-              <div className="bg-gradient-to-r from-muted/50 to-muted p-3 sm:p-4 rounded-lg border border-border/50">
-                <p className="text-sm sm:text-base leading-relaxed">{patientData.symptoms}</p>
-              </div>
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sintomas relatados</p>
+              <p className="text-sm leading-7 text-slate-700 sm:text-base">{patientData.symptoms}</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3">
-              <div className="rounded-lg border p-4 bg-background/70">
-                <div className="flex items-center gap-2 mb-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <p className="text-sm font-semibold">Triagem</p>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  <p className="font-semibold text-slate-900">Triagem</p>
                 </div>
                 <Badge className={getTriageColor(diagnosis.triageLevel)}>{diagnosis.triageLevel}</Badge>
-                <p className="text-sm text-muted-foreground mt-2">{diagnosis.triageReason}</p>
               </div>
+              <Progress value={triageProgress} className="h-2.5" />
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{diagnosis.triageReason}</p>
             </div>
           </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {summaryStats.map(({ label, value, icon: Icon }) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+                <Icon className="mb-3 h-5 w-5 text-primary" />
+                <p className="text-2xl font-semibold text-slate-950">{value}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {primaryHypothesis && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Hipótese líder</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-950">{primaryHypothesis.name}</p>
+                </div>
+                <Badge className={getProbabilityColor(primaryHypothesis.probability)}>
+                  {primaryHypothesis.probability}
+                  {typeof primaryHypothesis.probabilityPercent === 'number' ? ` ${primaryHypothesis.probabilityPercent}%` : ''}
+                </Badge>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {diagnosis.emergencyWarning && (
-        <Card className="border-destructive bg-gradient-to-r from-destructive/5 to-red-50/50 shadow-lg animate-pulse">
+        <Card className="overflow-hidden rounded-2xl border-destructive/30 bg-rose-50 shadow-sm">
           <CardContent className="p-4 sm:p-6">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-destructive/20 rounded-full">
-                <AlertTriangle className="h-6 w-6 text-destructive flex-shrink-0" />
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-6 w-6" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-destructive text-lg sm:text-xl mb-3 flex items-center gap-2">🚨 ALERTA DE EMERGÊNCIA</h3>
-                <p className="text-destructive/90 text-sm sm:text-base leading-relaxed">{diagnosis.emergencyWarning}</p>
-                <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                  <p className="text-xs sm:text-sm font-medium text-destructive">📞 Em caso de emergência real: SAMU 192 | Bombeiros 193</p>
-                </div>
+              <div>
+                <h3 className="text-lg font-semibold text-destructive sm:text-xl">Alerta de emergência</h3>
+                <p className="mt-2 text-sm leading-7 text-destructive/90 sm:text-base">{diagnosis.emergencyWarning}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Card className="shadow-sm border-primary/15">
-        <CardHeader>
-          <CardTitle className="text-lg sm:text-xl">Resumo clínico</CardTitle>
-          <CardDescription>{diagnosis.clinicalSummary}</CardDescription>
+      <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <CardHeader className="border-b border-slate-200 bg-white p-5 sm:p-6">
+          <CardTitle className="flex items-center gap-2 text-xl font-semibold text-slate-950 sm:text-2xl">
+            <Gauge className="h-6 w-6 text-primary" />
+            Síntese clínica e plano de estudo
+          </CardTitle>
+          <CardDescription>Resumo narrativo, ações imediatas simuladas, exames sugeridos e conformidade educacional.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <VoiceAssistant
-            title="Leitura segura do resultado"
-            description="Ouça uma versão curta da triagem, hipóteses, exames e ações, mantendo o aviso educacional."
-            speechText={spokenAssessment}
-            speakLabel="Ler resultado"
-          />
+        <CardContent className="grid gap-4 p-4 sm:p-6 lg:grid-cols-2 lg:p-8">
+          <InsightCard title="Resumo clínico" icon={BookOpen} tone="primary">
+            <p>{diagnosis.clinicalSummary}</p>
+          </InsightCard>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-lg border bg-primary-soft/30 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FlaskConical className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">Exames sugeridos</h3>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {diagnosis.suggestedExams.map((exam) => (
-                  <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
-                ))}
-              </div>
-            </div>
+          <InsightCard title="Ações imediatas simuladas" icon={ClipboardCheck} tone="success">
+            <ListItems items={diagnosis.immediateActions} emptyText="Sem ações imediatas adicionais." />
+          </InsightCard>
 
-            <div className="rounded-lg border bg-success-soft/40 p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <ClipboardCheck className="h-4 w-4 text-success" />
-                <h3 className="font-semibold">Ações imediatas</h3>
-              </div>
-              <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                {diagnosis.immediateActions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
+          <InsightCard title="Exames sugeridos" icon={FlaskConical} tone="neutral">
+            <ListItems items={diagnosis.suggestedExams} emptyText="Sem exames adicionais sugeridos." badge />
+          </InsightCard>
+
+          <InsightCard title="Referências regulatórias" icon={ShieldAlert} tone="warning">
+            <ListItems items={REGULATORY_REFERENCES} emptyText="Sem referências regulatórias." />
+          </InsightCard>
+
+          {diagnosis.validationWarnings && diagnosis.validationWarnings.length > 0 && (
+            <div className="lg:col-span-2">
+              <InsightCard title="Validações de segurança" icon={AlertTriangle} tone="danger">
+                <ListItems items={diagnosis.validationWarnings} emptyText="Sem avisos de validação." />
+              </InsightCard>
             </div>
+          )}
+
+          <div className="lg:col-span-2">
+            <Suspense fallback={voiceFallback}>
+              <VoiceAssistant
+                title="Resumo por voz"
+                description="Ouça a síntese clínica simulada em português para revisar o raciocínio sem sair da tela."
+                speechText={spokenAssessment}
+                speakLabel="Ouvir resumo"
+              />
+            </Suspense>
           </div>
         </CardContent>
       </Card>
 
-      {diagnosis.validationWarnings && diagnosis.validationWarnings.length > 0 && (
-        <Card className="border-warning/50 bg-warning-soft/30">
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Validações de segurança aplicadas</CardTitle>
-            <CardDescription>
-              A resposta externa foi filtrada e o sistema priorizou dados locais seguros para evitar inconsistências.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-              {diagnosis.validationWarnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <div className="space-y-4">
+        {diagnosis.hypotheses.map((hypothesis, index) => {
+          const probabilityValue = typeof hypothesis.probabilityPercent === 'number' ? hypothesis.probabilityPercent : hypothesis.score;
 
-      <Card className="border-border/60">
-        <CardHeader>
-          <CardTitle className="text-base sm:text-lg">Referências regulatórias (Brasil)</CardTitle>
-          <CardDescription>
-            Base legal e ética para uso educacional seguro do simulador com dados de saúde no contexto brasileiro.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2 text-sm">
-            {REGULATORY_REFERENCES.map((ref) => (
-              <li key={ref} className="text-muted-foreground">
-                {ref}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4 sm:space-y-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center gap-2">
-          <div className="p-2 bg-primary/20 rounded-lg">
-            <Stethoscope className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          </div>
-          Análise diagnóstica
-        </h2>
-
-        {diagnosis.hypotheses.map((hypothesis, index) => (
-          <Card key={`${hypothesis.name}-${index}`} className="border-l-4 border-l-primary shadow-sm">
-            <CardHeader className="pb-3">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div className="flex-1">
-                  <CardTitle className="text-lg sm:text-xl flex items-start gap-2 leading-tight">
-                    <span className="text-2xl">🩺</span>
-                    <div>
-                      <div className="font-bold">Hipótese {index + 1}</div>
-                      <div className="text-base sm:text-lg font-semibold text-primary">{hypothesis.name}</div>
+          return (
+            <Card key={`${hypothesis.name}-${index}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <CardHeader className="border-b border-slate-200 bg-white p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Stethoscope className="h-5 w-5" />
                     </div>
-                  </CardTitle>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Hipótese {index + 1}</p>
+                      <CardTitle className="mt-1 text-lg font-semibold text-primary sm:text-xl">{hypothesis.name}</CardTitle>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={getProbabilityColor(hypothesis.probability)}>
+                      {hypothesis.probability}
+                      {typeof hypothesis.probabilityPercent === 'number' ? ` ${hypothesis.probabilityPercent}%` : ''}
+                    </Badge>
+                    <Badge variant="outline" className="bg-white">Score {hypothesis.score}</Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge className={`${getProbabilityColor(hypothesis.probability)} text-xs sm:text-sm`}>
-                    {hypothesis.probability}
-                    {typeof hypothesis.probabilityPercent === 'number' ? ` ${hypothesis.probabilityPercent}%` : ''}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">Score {hypothesis.score}</Badge>
-                </div>
-              </div>
-            </CardHeader>
+                <Progress value={Math.min(Math.max(probabilityValue, 0), 100)} className="mt-4 h-2" />
+              </CardHeader>
 
-            <CardContent className="space-y-4 pt-0">
-              <div className="bg-success-soft p-3 sm:p-4 rounded-lg border border-success/20">
-                <div className="flex items-start gap-3">
-                  <Pill className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-success mb-2 text-sm sm:text-base">💊 Possível conduta terapêutica</h4>
-                    <p className="text-success/90 text-sm leading-relaxed">{hypothesis.treatment}</p>
+              <CardContent className="space-y-4 p-4 sm:p-6">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <InsightCard title="Possível conduta terapêutica" icon={Pill} tone="success">
+                    <p>{hypothesis.treatment}</p>
                     {hypothesis.medicationOptions && hypothesis.medicationOptions.length > 0 && (
-                      <ul className="mt-3 space-y-1 text-xs sm:text-sm text-success/90 list-disc pl-5">
+                      <ul className="mt-3 list-disc space-y-1 pl-5">
                         {hypothesis.medicationOptions.slice(0, 3).map((option) => (
                           <li key={`${option.name}-${option.why}`}>
                             <strong>{option.name}:</strong> {option.why}
@@ -286,71 +349,52 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
                         ))}
                       </ul>
                     )}
-                  </div>
-                </div>
-              </div>
+                  </InsightCard>
 
-              <div className="bg-primary-soft p-3 sm:p-4 rounded-lg border border-primary/20">
-                <div className="flex items-start gap-3">
-                  <BookOpen className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-primary mb-2 text-sm sm:text-base">📌 Explicação clínica</h4>
-                    <p className="text-primary/90 text-sm leading-relaxed">{hypothesis.explanation}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="bg-accent p-3 sm:p-4 rounded-lg border border-accent/20">
-                  <div className="flex items-start gap-3">
-                    <Search className="h-5 w-5 text-accent-foreground mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-accent-foreground mb-3 text-sm sm:text-base">🔍 Diagnósticos diferenciais</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {hypothesis.differentials.map((diff) => (
-                          <Badge key={diff} variant="outline" className="text-xs py-1 px-2">{diff}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <InsightCard title="Explicação clínica" icon={BookOpen} tone="primary">
+                    <p>{hypothesis.explanation}</p>
+                  </InsightCard>
                 </div>
 
-                <div className="bg-muted/50 p-3 sm:p-4 rounded-lg border border-border/70">
-                  <h4 className="font-semibold mb-3 text-sm sm:text-base">🧪 Exames e red flags</h4>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="font-medium mb-2">Exames</p>
-                      <div className="flex flex-wrap gap-2">
-                        {hypothesis.recommendedExams.map((exam) => (
-                          <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
-                        ))}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <InsightCard title="Diagnósticos diferenciais" icon={Search} tone="neutral">
+                    <ListItems items={hypothesis.differentials} emptyText="Sem diferenciais listados." badge />
+                  </InsightCard>
+
+                  <InsightCard title="Exames e red flags" icon={AlertTriangle} tone="warning">
+                    <div className="space-y-3">
+                      <div>
+                        <p className="mb-2 font-bold text-slate-800">Exames</p>
+                        <ListItems items={hypothesis.recommendedExams} emptyText="Sem exames específicos." badge />
+                      </div>
+                      <div>
+                        <p className="mb-2 font-bold text-slate-800">Sinais de alarme</p>
+                        <div className="flex flex-wrap gap-2">
+                          {hypothesis.redFlags.map((flag) => (
+                            <Badge key={flag} variant="outline" className="border-destructive/30 bg-rose-50 text-destructive">
+                              {flag}
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <p className="font-medium mb-2">Sinais de alarme</p>
-                      <div className="flex flex-wrap gap-2">
-                        {hypothesis.redFlags.map((flag) => (
-                          <Badge key={flag} variant="outline" className="text-xs border-destructive/30 text-destructive">{flag}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  </InsightCard>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
-      <Card className="bg-gradient-to-r from-warning-soft/50 to-orange-50/50 border-warning shadow-lg">
+      <Card className="overflow-hidden rounded-2xl border-warning/40 bg-warning-soft/60 shadow-sm">
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-start gap-3">
-            <div className="p-2 bg-warning/20 rounded-full">
-              <AlertTriangle className="h-6 w-6 text-warning flex-shrink-0" />
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+              <AlertTriangle className="h-6 w-6" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-warning text-lg sm:text-xl mb-3">⚠️ Aviso educacional importante</h3>
-              <p className="text-warning/90 leading-relaxed text-sm sm:text-base">
+            <div>
+              <h3 className="text-lg font-semibold text-warning sm:text-xl">Aviso educacional importante</h3>
+              <p className="mt-2 text-sm leading-7 text-warning/90 sm:text-base">
                 Este simulador é uma ferramenta <strong>exclusivamente educacional</strong>. As sugestões apresentadas não constituem diagnóstico médico definitivo nem prescrição terapêutica. Sempre consulte um profissional qualificado antes de tomar qualquer decisão clínica real.
               </p>
             </div>
@@ -358,5 +402,79 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+interface InfoTileProps {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+  capitalize?: boolean;
+}
+
+const InfoTile = ({ icon: Icon, label, value, capitalize = false }: InfoTileProps) => (
+  <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+    <Icon className="h-5 w-5 flex-shrink-0 text-primary" />
+    <div className="min-w-0">
+      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`truncate font-bold text-slate-900 ${capitalize ? 'capitalize' : ''}`}>{value}</p>
+    </div>
+  </div>
+);
+
+interface InsightCardProps {
+  title: string;
+  icon: LucideIcon;
+  tone: 'primary' | 'success' | 'warning' | 'danger' | 'neutral';
+  children: ReactNode;
+}
+
+const toneClasses: Record<InsightCardProps['tone'], string> = {
+  primary: 'border-primary/15 bg-primary-soft/40 text-primary',
+  success: 'border-success/15 bg-success-soft/60 text-success',
+  warning: 'border-warning/20 bg-warning-soft/60 text-warning',
+  danger: 'border-destructive/20 bg-rose-50 text-destructive',
+  neutral: 'border-slate-200/80 bg-slate-50/80 text-slate-700',
+};
+
+const InsightCard = ({ title, icon: Icon, tone, children }: InsightCardProps) => (
+  <div className={`rounded-xl border p-4 text-sm leading-7 ${toneClasses[tone]}`}>
+    <div className="mb-3 flex items-center gap-2 font-semibold">
+      <Icon className="h-5 w-5 flex-shrink-0" />
+      <h4>{title}</h4>
+    </div>
+    <div className="text-current/90">{children}</div>
+  </div>
+);
+
+interface ListItemsProps {
+  items: string[];
+  emptyText: string;
+  badge?: boolean;
+}
+
+const ListItems = ({ items, emptyText, badge = false }: ListItemsProps) => {
+  if (items.length === 0) {
+    return <p className="text-sm opacity-80">{emptyText}</p>;
+  }
+
+  if (badge) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <Badge key={item} variant="outline" className="border-current/20 bg-white text-current">
+            {item}
+          </Badge>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <ul className="list-disc space-y-1 pl-5">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
   );
 };

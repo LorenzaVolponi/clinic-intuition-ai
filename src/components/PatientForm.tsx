@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { AlertCircle, CheckCircle2, ClipboardList, Loader2, Mic2, Sparkles, Stethoscope, UserCheck } from "lucide-react";
+
+
+const VoiceAssistant = lazy(() =>
+  import("@/components/voice/VoiceAssistant").then((module) => ({ default: module.VoiceAssistant })),
+);
+
+const voiceFallback = (
+  <div className="rounded-2xl border border-primary/10 bg-primary-soft/20 p-4 text-sm font-medium text-muted-foreground">
+    Preparando ditado clínico...
+  </div>
+);
 
 interface PatientData {
   name: string;
@@ -294,13 +304,15 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
               />
               {errors.symptoms && <FieldError message={errors.symptoms} />}
 
-              <VoiceAssistant
-                title="Ditado clínico"
-                description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
-                listenLabel="Falar sintomas"
-                onTranscript={appendSymptomsText}
-                disabled={isAnalyzing}
-              />
+              <Suspense fallback={voiceFallback}>
+                <VoiceAssistant
+                  title="Ditado clínico"
+                  description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
+                  listenLabel="Falar sintomas"
+                  onTranscript={appendSymptomsText}
+                  disabled={isAnalyzing}
+                />
+              </Suspense>
             </div>
           </div>
 

@@ -20,12 +20,27 @@ const preferredModel = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatil
 const modelFallbackChain = [preferredModel, 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
 const SESSION_STORE_FILE = process.env.SESSION_STORE_FILE || '/tmp/medinnova-session-cache.json';
 
+const vitalSignsSchema = z.object({
+  temperature: z.number().optional(),
+  heartRate: z.number().optional(),
+  systolicBp: z.number().optional(),
+  diastolicBp: z.number().optional(),
+  respiratoryRate: z.number().optional(),
+  oxygenSaturation: z.number().optional(),
+}).optional();
+
 const patientDataSchema = z.object({
   name: z.string().optional(),
   age: z.number(),
   gender: z.string(),
   symptoms: z.string(),
   duration: z.string(),
+  vitalSigns: vitalSignsSchema,
+  comorbidities: z.string().optional(),
+  medications: z.string().optional(),
+  allergies: z.string().optional(),
+  pregnancyPossibility: z.enum(['sim', 'nao', 'nao-se-aplica', '']).optional(),
+  physicalExamNotes: z.string().optional(),
 });
 
 const diagnosisHypothesisSchema = z.object({

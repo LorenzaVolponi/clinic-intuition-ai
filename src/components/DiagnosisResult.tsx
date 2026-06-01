@@ -2,6 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { VoiceAssistant } from '@/components/voice/VoiceAssistant';
+import { formatAssessmentForSpeech } from '@/lib/spokenClinicalFormatter';
 import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
 import {
   Stethoscope,
@@ -24,6 +26,19 @@ const REGULATORY_REFERENCES = [
   'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
 ];
 
+function formatVitalSigns(patientData: PatientData) {
+  const vitalSigns = patientData.vitalSigns;
+  if (!vitalSigns) return [];
+
+  return [
+    vitalSigns.temperature !== undefined ? `Temp. ${vitalSigns.temperature}°C` : '',
+    vitalSigns.heartRate !== undefined ? `FC ${vitalSigns.heartRate} bpm` : '',
+    vitalSigns.systolicBp !== undefined ? `PA ${vitalSigns.systolicBp}/${vitalSigns.diastolicBp ?? '?'} mmHg` : '',
+    vitalSigns.respiratoryRate !== undefined ? `FR ${vitalSigns.respiratoryRate} irpm` : '',
+    vitalSigns.oxygenSaturation !== undefined ? `SatO₂ ${vitalSigns.oxygenSaturation}%` : '',
+  ].filter(Boolean);
+}
+
 interface DiagnosisResultProps {
   diagnosis: ClinicalAssessment;
   patientData: PatientData;
@@ -31,6 +46,10 @@ interface DiagnosisResultProps {
 }
 
 export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
+  const spokenAssessment = formatAssessmentForSpeech(diagnosis, patientData);
+  const vitalSigns = formatVitalSigns(patientData);
+  const hasStructuredContext = vitalSigns.length > 0 || Boolean(patientData.comorbidities || patientData.medications || patientData.allergies || patientData.pregnancyPossibility || patientData.physicalExamNotes);
+
   const getProbabilityColor = (probability: string) => {
     switch (probability.toLowerCase()) {
       case 'alta':
@@ -136,6 +155,30 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
               </div>
             </div>
           </div>
+
+          {hasStructuredContext && (
+            <>
+              <Separator />
+              <div className="space-y-3 rounded-lg border border-primary/15 bg-primary-soft/20 p-4">
+                <p className="text-sm font-semibold">Contexto clínico estruturado</p>
+                {vitalSigns.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {vitalSigns.map((item) => (
+                      <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+                  {patientData.comorbidities && <p><strong>Comorbidades:</strong> {patientData.comorbidities}</p>}
+                  {patientData.medications && <p><strong>Medicações:</strong> {patientData.medications}</p>}
+                  {patientData.allergies && <p><strong>Alergias:</strong> {patientData.allergies}</p>}
+                  {patientData.pregnancyPossibility && <p><strong>Possibilidade de gravidez:</strong> {patientData.pregnancyPossibility}</p>}
+                  {patientData.physicalExamNotes && <p className="md:col-span-2"><strong>Exame físico/notas:</strong> {patientData.physicalExamNotes}</p>}
+                </div>
+              </div>
+            </>
+          )}
+
         </CardContent>
       </Card>
 
@@ -163,29 +206,38 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
           <CardTitle className="text-lg sm:text-xl">Resumo clínico</CardTitle>
           <CardDescription>{diagnosis.clinicalSummary}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-lg border bg-primary-soft/30 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <FlaskConical className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold">Exames sugeridos</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {diagnosis.suggestedExams.map((exam) => (
-                <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
-              ))}
-            </div>
-          </div>
+        <CardContent className="space-y-4">
+          <VoiceAssistant
+            title="Leitura segura do resultado"
+            description="Ouça uma versão curta da triagem, hipóteses, exames e ações, mantendo o aviso educacional."
+            speechText={spokenAssessment}
+            speakLabel="Ler resultado"
+          />
 
-          <div className="rounded-lg border bg-success-soft/40 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ClipboardCheck className="h-4 w-4 text-success" />
-              <h3 className="font-semibold">Ações imediatas</h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-lg border bg-primary-soft/30 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <FlaskConical className="h-4 w-4 text-primary" />
+                <h3 className="font-semibold">Exames sugeridos</h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {diagnosis.suggestedExams.map((exam) => (
+                  <Badge key={exam} variant="secondary" className="text-xs">{exam}</Badge>
+                ))}
+              </div>
             </div>
-            <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-              {diagnosis.immediateActions.map((action) => (
-                <li key={action}>{action}</li>
-              ))}
-            </ul>
+
+            <div className="rounded-lg border bg-success-soft/40 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ClipboardCheck className="h-4 w-4 text-success" />
+                <h3 className="font-semibold">Ações imediatas</h3>
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
+                {diagnosis.immediateActions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </CardContent>
       </Card>

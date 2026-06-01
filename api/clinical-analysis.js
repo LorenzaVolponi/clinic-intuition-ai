@@ -42,12 +42,27 @@ function validateClinicalResponse({ patientData, response }) {
   return { valid: errors.length === 0, errors };
 }
 
+const vitalSignsSchema = z.object({
+  temperature: z.number().optional(),
+  heartRate: z.number().optional(),
+  systolicBp: z.number().optional(),
+  diastolicBp: z.number().optional(),
+  respiratoryRate: z.number().optional(),
+  oxygenSaturation: z.number().optional(),
+}).optional();
+
 const patientDataSchema = z.object({
   name: z.string().optional(),
   age: z.number(),
   gender: z.string(),
   symptoms: z.string(),
   duration: z.string(),
+  vitalSigns: vitalSignsSchema,
+  comorbidities: z.string().optional(),
+  medications: z.string().optional(),
+  allergies: z.string().optional(),
+  pregnancyPossibility: z.enum(['sim', 'nao', 'nao-se-aplica', '']).optional(),
+  physicalExamNotes: z.string().optional(),
 });
 
 const diagnosisHypothesisSchema = z.object({

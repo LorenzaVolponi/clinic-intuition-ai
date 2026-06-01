@@ -15,12 +15,27 @@ export interface MedicalCondition {
   durationProfile?: Array<'hiperagudo' | 'agudo' | 'subagudo' | 'cronico'>;
 }
 
+export interface PatientVitalSigns {
+  temperature?: number;
+  heartRate?: number;
+  systolicBp?: number;
+  diastolicBp?: number;
+  respiratoryRate?: number;
+  oxygenSaturation?: number;
+}
+
 export interface PatientData {
   name: string;
   age: number;
   gender: string;
   symptoms: string;
   duration: string;
+  vitalSigns?: PatientVitalSigns;
+  comorbidities?: string;
+  medications?: string;
+  allergies?: string;
+  pregnancyPossibility?: 'sim' | 'nao' | 'nao-se-aplica' | '';
+  physicalExamNotes?: string;
 }
 
 export interface DiagnosisHypothesis {
@@ -437,14 +452,60 @@ function medicationOptionsForCondition(condition: MedicalCondition) {
   ];
 }
 
+
+function formatVitalSignsForContext(vitalSigns?: PatientVitalSigns) {
+  if (!vitalSigns) return '';
+
+  const entries = [
+    vitalSigns.temperature !== undefined ? `temperatura ${vitalSigns.temperature}°C` : '',
+    vitalSigns.heartRate !== undefined ? `FC ${vitalSigns.heartRate} bpm` : '',
+    vitalSigns.systolicBp !== undefined ? `PA ${vitalSigns.systolicBp}/${vitalSigns.diastolicBp ?? '?'} mmHg` : '',
+    vitalSigns.respiratoryRate !== undefined ? `FR ${vitalSigns.respiratoryRate} irpm` : '',
+    vitalSigns.oxygenSaturation !== undefined ? `SatO2 ${vitalSigns.oxygenSaturation}%` : '',
+  ].filter(Boolean);
+
+  return entries.join(', ');
+}
+
+function inferVitalSignRiskText(vitalSigns?: PatientVitalSigns) {
+  if (!vitalSigns) return '';
+
+  const risks: string[] = [];
+  if (vitalSigns.systolicBp !== undefined && vitalSigns.systolicBp < 90) risks.push('hipotensão choque');
+  if (vitalSigns.oxygenSaturation !== undefined && vitalSigns.oxygenSaturation < 92) risks.push('hipoxemia saturação baixa cianose');
+  if (vitalSigns.heartRate !== undefined && vitalSigns.heartRate >= 120) risks.push('taquicardia grave pulso rápido');
+  if (vitalSigns.respiratoryRate !== undefined && vitalSigns.respiratoryRate >= 30) risks.push('taquipneia desconforto respiratório');
+  if (vitalSigns.temperature !== undefined && vitalSigns.temperature >= 38) risks.push('febre temperatura alta');
+  return risks.join(' ');
+}
+
+export function buildPatientClinicalContext(patientData: PatientData) {
+  const vitalSigns = formatVitalSignsForContext(patientData.vitalSigns);
+  const pregnancy = patientData.pregnancyPossibility && patientData.pregnancyPossibility !== 'nao-se-aplica'
+    ? `possibilidade de gravidez: ${patientData.pregnancyPossibility}`
+    : '';
+
+  return [
+    patientData.symptoms,
+    patientData.physicalExamNotes ? `exame físico: ${patientData.physicalExamNotes}` : '',
+    vitalSigns ? `sinais vitais: ${vitalSigns}` : '',
+    inferVitalSignRiskText(patientData.vitalSigns),
+    patientData.comorbidities ? `comorbidades: ${patientData.comorbidities}` : '',
+    patientData.medications ? `medicações em uso: ${patientData.medications}` : '',
+    patientData.allergies ? `alergias: ${patientData.allergies}` : '',
+    pregnancy,
+  ].filter(Boolean).join('. ');
+}
+
 function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
   const ageGroup = getAgeGroup(patientData.age);
   const durationProfile = getDurationProfile(patientData.duration);
-  const context = inferClinicalContext(patientData.symptoms);
+  const clinicalContextText = buildPatientClinicalContext(patientData);
+  const context = inferClinicalContext(clinicalContextText);
   const normalizedGender = normalizeGender(patientData.gender);
-  const symptomHits = condition.commonSymptoms.filter((symptom) => matchesTerm(patientData.symptoms, symptom)).length;
-  const redFlagHits = condition.redFlags.filter((flag) => matchesTerm(patientData.symptoms, flag)).length;
-  const tokens = new Set(tokenizeClinicalText(patientData.symptoms));
+  const symptomHits = condition.commonSymptoms.filter((symptom) => matchesTerm(clinicalContextText, symptom)).length;
+  const redFlagHits = condition.redFlags.filter((flag) => matchesTerm(clinicalContextText, flag)).length;
+  const tokens = new Set(tokenizeClinicalText(clinicalContextText));
   const lexicalHits = [...new Set([...condition.commonSymptoms, ...condition.redFlags, ...condition.differentials])]
     .map((item) => tokenizeClinicalText(item))
     .flat()
@@ -475,7 +536,7 @@ function scoreCondition(condition: MedicalCondition, patientData: PatientData) {
 
   for (const rule of MANDATORY_EVIDENCE_RULES) {
     if (condition.name !== rule.condition) continue;
-    const hasRequiredEvidence = rule.requiredSymptoms.some((symptom) => matchesTerm(patientData.symptoms, symptom));
+    const hasRequiredEvidence = rule.requiredSymptoms.some((symptom) => matchesTerm(clinicalContextText, symptom));
     if (!hasRequiredEvidence) {
       score = Math.min(score, rule.maxScoreWithoutEvidence);
     }
@@ -495,8 +556,9 @@ export function findMatchingConditions(patientData: PatientData) {
 
 export function buildLocalAssessment(patientData: PatientData): ClinicalAssessment {
   const rankedConditions = findMatchingConditions(patientData);
-  const normalizedSymptoms = normalizeText(patientData.symptoms);
-  const context = inferClinicalContext(patientData.symptoms);
+  const clinicalContextText = buildPatientClinicalContext(patientData);
+  const normalizedSymptoms = normalizeText(clinicalContextText);
+  const context = inferClinicalContext(clinicalContextText);
   const genericRedFlags = RED_FLAG_PATTERNS.filter((flag) => normalizedSymptoms.includes(normalizeText(flag)));
 
   if (rankedConditions.length === 0) {
@@ -524,7 +586,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       immediateActions: genericRedFlags.length > 0
         ? ['Priorizar avaliação presencial', 'Registrar sinais vitais imediatamente', 'Escalonar se houver piora clínica']
         : ['Complementar história clínica', 'Registrar comorbidades e medicações', 'Definir hipótese após exame físico'],
-      clinicalSummary: `Paciente ${patientData.age} anos com sintomas descritos como ${patientData.symptoms}. Caso sem correspondência robusta na base local.`,
+      clinicalSummary: `Paciente ${patientData.age} anos com sintomas descritos como ${patientData.symptoms}. Caso sem correspondência robusta na base local${formatVitalSignsForContext(patientData.vitalSigns) ? `, com sinais vitais registrados: ${formatVitalSignsForContext(patientData.vitalSigns)}` : ''}.`,
       analysisSource: 'local',
     };
   }
@@ -631,7 +693,7 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
       : 'Prioridade baseada em sintomas relatados.',
     suggestedExams,
     immediateActions,
-    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas. Principais hipóteses locais: ${hypotheses.map((item) => `${item.name} (${item.probability} ${item.probabilityPercent}%)`).join(', ')}.`,
+    clinicalSummary: `Paciente ${patientData.age} anos, ${patientData.gender}, com ${patientData.duration} de sintomas${formatVitalSignsForContext(patientData.vitalSigns) ? ` e sinais vitais: ${formatVitalSignsForContext(patientData.vitalSigns)}` : ''}. Principais hipóteses locais: ${hypotheses.map((item) => `${item.name} (${item.probability} ${item.probabilityPercent}%)`).join(', ')}.`,
     analysisSource: 'local',
   };
 }
@@ -646,6 +708,13 @@ CASO:
 - Gênero: ${patientData.gender}
 - Duração: ${patientData.duration}
 - Sintomas: ${patientData.symptoms}
+- Sinais vitais: ${formatVitalSignsForContext(patientData.vitalSigns) || 'Não informados'}
+- Comorbidades: ${patientData.comorbidities || 'Não informadas'}
+- Medicações em uso: ${patientData.medications || 'Não informadas'}
+- Alergias: ${patientData.allergies || 'Não informadas'}
+- Possibilidade de gravidez: ${patientData.pregnancyPossibility || 'Não informada'}
+- Exame físico/notas: ${patientData.physicalExamNotes || 'Não informado'}
+- Contexto clínico consolidado: ${buildPatientClinicalContext(patientData)}
 
 RESUMO LOCAL:
 - Triagem: ${localAssessment.triageLevel}

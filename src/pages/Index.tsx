@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { ClinicalAssistantPanel } from '@/components/assistant/ClinicalAssistantPanel';
 import { DiagnosisResult } from '@/components/DiagnosisResult';
 import { PatientForm } from '@/components/PatientForm';
 import { SafetyWarning } from '@/components/SafetyWarning';
 import { analyzeClinicalCase } from '@/lib/aiClient';
+import { clearStoredClinicalSession, getStoredClinicalSession, saveClinicalSession } from '@/lib/sessionStore';
 import { ClinicalAssessment, PatientData } from '@/lib/medicalKnowledge';
 
 const Index = () => {
   const [patientData, setPatientData] = useState<PatientData | null>(null);
   const [diagnosis, setDiagnosis] = useState<ClinicalAssessment | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  useEffect(() => {
+    const storedSession = getStoredClinicalSession();
+    if (!storedSession) return;
+
+    setPatientData(storedSession.patientData);
+    setDiagnosis(storedSession.diagnosis);
+  }, []);
 
   const handleFormSubmit = async (data: PatientData) => {
     setIsAnalyzing(true);
@@ -20,12 +30,14 @@ const Index = () => {
         objective: 'simulacao-clinica',
       });
       setDiagnosis(nextDiagnosis);
+      saveClinicalSession(data, nextDiagnosis);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleReset = () => {
+    clearStoredClinicalSession();
     setPatientData(null);
     setDiagnosis(null);
   };
@@ -54,6 +66,8 @@ const Index = () => {
       <SafetyWarning />
 
       <main className="mx-auto grid w-full max-w-6xl gap-4 px-3 pb-10 pt-2 sm:gap-6 sm:px-6">
+        <ClinicalAssistantPanel patientData={patientData} diagnosis={diagnosis} onReset={handleReset} />
+
         {!diagnosis || !patientData ? (
           <PatientForm onSubmit={handleFormSubmit} isAnalyzing={isAnalyzing} patientData={patientData} />
         ) : (

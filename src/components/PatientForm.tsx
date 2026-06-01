@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
 import { Loader2, UserCheck, ClipboardList, Stethoscope } from "lucide-react";
 
 interface PatientData {
@@ -100,12 +101,16 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     }
   };
 
+  const appendSymptomsText = (text: string) => {
+    const currentSymptoms = formData.symptoms.trim();
+    const nextSymptoms = currentSymptoms
+      ? `${currentSymptoms}, ${text}`
+      : text;
+    setFormData({ ...formData, symptoms: nextSymptoms });
+  };
+
   const addSymptom = (symptom: string) => {
-    const currentSymptoms = formData.symptoms;
-    const newSymptoms = currentSymptoms 
-      ? `${currentSymptoms}, ${symptom}` 
-      : symptom;
-    setFormData({ ...formData, symptoms: newSymptoms });
+    appendSymptomsText(symptom);
   };
 
   // Mobile detection
@@ -243,6 +248,14 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
               className={`text-base min-h-[100px] focus:ring-2 focus:ring-primary/20 ${errors.symptoms ? "border-destructive" : "border-border"}`}
             />
             {errors.symptoms && <p className="text-sm text-destructive">{errors.symptoms}</p>}
+
+            <VoiceAssistant
+              title="Ditado clínico"
+              description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
+              listenLabel="Falar sintomas"
+              onTranscript={appendSymptomsText}
+              disabled={isAnalyzing}
+            />
             
             {/* Sugestões de Sintomas por Sistema */}
             <div className="space-y-3">

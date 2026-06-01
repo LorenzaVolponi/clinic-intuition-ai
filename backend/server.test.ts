@@ -26,6 +26,36 @@ describe('backend server routes', () => {
     expect(typeof response.body.sessionCacheSize).toBe('number');
   });
 
+
+  it('GET /api/evidence/status expõe agente de evidências educacional', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/evidence/status');
+
+    expect(response.status).toBe(200);
+    expect(response.body.records).toBeGreaterThan(0);
+    expect(response.body.sources).toBeGreaterThan(0);
+    expect(response.body.safety).toContain('educacional');
+  });
+
+  it('GET /api/evidence/search retorna resultados por tema', async () => {
+    const app = createApp();
+    const response = await request(app).get('/api/evidence/search').query({ q: 'dor torácica ECG', topic: 'cardiologia' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.count).toBeGreaterThan(0);
+    expect(response.body.results[0].title).toBeTruthy();
+    expect(response.body.educationalWarning).toContain('educacional');
+  });
+
+  it('POST /api/evidence/refresh respeita flag de atualização remota', async () => {
+    const app = createApp();
+    const response = await request(app).post('/api/evidence/refresh').send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.refreshed).toBe(false);
+    expect(response.body.reason).toContain('EVIDENCE_AGENT_ALLOW_REMOTE');
+  });
+
   it('POST /api/clinical-analysis retorna 400 para payload inválido', async () => {
     const app = createApp();
     const response = await request(app).post('/api/clinical-analysis').send({});

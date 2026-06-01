@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { lazy, Suspense, useMemo, useState, type FormEvent } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
-import { AlertCircle, CheckCircle2, ClipboardList, Loader2, Mic2, Sparkles, Stethoscope, UserCheck } from "lucide-react";
+import { AlertCircle, CheckCircle2, ClipboardList, Loader2, Mic2, Sparkles, Stethoscope, Target, UserCheck } from "lucide-react";
+
+const VoiceAssistant = lazy(() =>
+  import("@/components/voice/VoiceAssistant").then((module) => ({ default: module.VoiceAssistant })),
+);
+
+const voiceFallback = (
+  <div className="rounded-2xl border border-primary/10 bg-primary-soft/20 p-4 text-sm font-medium text-muted-foreground">
+    Preparando ditado clínico...
+  </div>
+);
 
 interface PatientData {
   name: string;
@@ -100,6 +109,39 @@ const requiredFields: Array<keyof Pick<PatientData, "age" | "gender" | "symptoms
   "duration",
 ];
 
+const QUALITY_CRITERIA = [
+  {
+    label: "Cronologia",
+    hint: "quando começou e como evoluiu",
+    patterns: ["início", "iniciou", "começou", "desde", "há ", "evoluiu", "evolução"],
+  },
+  {
+    label: "Intensidade",
+    hint: "leve/moderada/intensa ou escala de dor",
+    patterns: ["leve", "moderada", "intensa", "forte", "escala", "/10", "nota"],
+  },
+  {
+    label: "Fatores",
+    hint: "melhora, piora, gatilhos ou relação com esforço",
+    patterns: ["melhora", "piora", "gatilho", "esforço", "repouso", "aliment", "movimento"],
+  },
+  {
+    label: "Associados",
+    hint: "sintomas acompanhando a queixa principal",
+    patterns: ["associad", "junto", "também", "náuse", "febre", "dispneia", "sudorese", "vômit"],
+  },
+  {
+    label: "Negativos",
+    hint: "nega sintomas importantes e red flags ausentes",
+    patterns: ["nega", "sem ", "ausência", "não apresenta", "não refere"],
+  },
+  {
+    label: "Contexto",
+    hint: "antecedentes, medicações, alergias ou risco",
+    patterns: ["anteced", "medica", "alerg", "comorb", "hipert", "diabet", "tabag", "gest"],
+  },
+];
+
 export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormProps) => {
   const [formData, setFormData] = useState<PatientData>({
     name: "",
@@ -120,6 +162,22 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
 
     return Math.round((completed / requiredFields.length) * 100);
   }, [formData]);
+
+  const qualityChecks = useMemo(() => {
+    const normalizedSymptoms = formData.symptoms.toLowerCase();
+
+    return QUALITY_CRITERIA.map((criterion) => ({
+      ...criterion,
+      done: criterion.patterns.some((pattern) => normalizedSymptoms.includes(pattern)),
+    }));
+  }, [formData.symptoms]);
+
+  const qualityScore = useMemo(() => {
+    const done = qualityChecks.filter((check) => check.done).length;
+    return Math.round((done / qualityChecks.length) * 100);
+  }, [qualityChecks]);
+
+  const qualityLabel = qualityScore >= 85 ? "Anamnese elite" : qualityScore >= 55 ? "Boa base clínica" : "Enriqueça o caso";
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -294,17 +352,46 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
               />
               {errors.symptoms && <FieldError message={errors.symptoms} />}
 
-              <VoiceAssistant
-                title="Ditado clínico"
-                description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
-                listenLabel="Falar sintomas"
-                onTranscript={appendSymptomsText}
-                disabled={isAnalyzing}
-              />
+              <Suspense fallback={voiceFallback}>
+                <VoiceAssistant
+                  title="Ditado clínico"
+                  description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
+                  listenLabel="Falar sintomas"
+                  onTranscript={appendSymptomsText}
+                  disabled={isAnalyzing}
+                />
+              </Suspense>
             </div>
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
+            <div className="rounded-[1.75rem] border border-violet-100 bg-gradient-to-br from-white via-violet-50/70 to-sky-50/70 p-4 shadow-lg shadow-violet-900/5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-slate-900">
+                    <Target className="h-4 w-4 text-violet-600" />
+                    Qualidade da anamnese
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{qualityLabel} • {qualityScore}% de contexto clínico</p>
+                </div>
+                <Badge variant="outline" className="border-violet-200 bg-white/80 text-violet-700">
+                  {qualityChecks.filter((check) => check.done).length}/{qualityChecks.length}
+                </Badge>
+              </div>
+              <Progress value={qualityScore} className="mb-3 h-2.5" />
+              <div className="grid gap-2">
+                {qualityChecks.map((check) => (
+                  <div key={check.label} className="flex items-start gap-2 rounded-2xl border border-white/70 bg-white/70 p-2.5">
+                    <CheckCircle2 className={`mt-0.5 h-4 w-4 flex-shrink-0 ${check.done ? "text-emerald-500" : "text-slate-300"}`} />
+                    <div>
+                      <p className="text-xs font-black text-slate-800">{check.label}</p>
+                      <p className="text-[11px] leading-4 text-muted-foreground">{check.hint}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-[1.75rem] border border-slate-200/80 bg-slate-50/70 p-4 shadow-inner shadow-white">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>

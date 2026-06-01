@@ -21,10 +21,20 @@ export function formatAssessmentForSpeech(assessment: ClinicalAssessment, patien
   const exams = joinLimited(assessment.suggestedExams, 'exames serão definidos conforme avaliação presencial');
   const actions = joinLimited(assessment.immediateActions, 'reavaliar sinais vitais, complementar anamnese e observar evolução');
   const symptoms = patientData?.symptoms ? `Sintomas relatados: ${patientData.symptoms}. ` : '';
+  const vitalSigns = patientData?.vitalSigns
+    ? [
+      patientData.vitalSigns.temperature !== undefined ? `temperatura ${patientData.vitalSigns.temperature} graus` : '',
+      patientData.vitalSigns.heartRate !== undefined ? `frequência cardíaca ${patientData.vitalSigns.heartRate}` : '',
+      patientData.vitalSigns.systolicBp !== undefined ? `pressão ${patientData.vitalSigns.systolicBp} por ${patientData.vitalSigns.diastolicBp ?? 'não informada'}` : '',
+      patientData.vitalSigns.respiratoryRate !== undefined ? `frequência respiratória ${patientData.vitalSigns.respiratoryRate}` : '',
+      patientData.vitalSigns.oxygenSaturation !== undefined ? `saturação ${patientData.vitalSigns.oxygenSaturation} por cento` : '',
+    ].filter(Boolean).join(', ')
+    : '';
 
   return [
     buildEmergencyIntro(assessment),
     symptoms,
+    vitalSigns ? `Sinais vitais informados: ${vitalSigns}. ` : '',
     `Triagem: ${assessment.triageLevel}. ${assessment.triageReason}. `,
     `Resumo clínico: ${assessment.clinicalSummary}. `,
     `Hipóteses principais: ${topHypotheses.length > 0 ? topHypotheses.join('; ') : 'quadro inespecífico que exige mais dados'}. `,

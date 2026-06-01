@@ -140,4 +140,29 @@ describe('buildLocalAssessment', () => {
     expect(medicationText).toContain('antiemético');
     expect(assessment.hypotheses[0]?.recommendedExams.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('usa sinais vitais estruturados para elevar risco mesmo quando o texto livre é inespecífico', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente I',
+      age: 70,
+      gender: 'Feminino',
+      duration: '< 6h',
+      symptoms: 'mal-estar súbito e cansaço intenso',
+      vitalSigns: {
+        systolicBp: 82,
+        diastolicBp: 48,
+        oxygenSaturation: 88,
+        heartRate: 132,
+        respiratoryRate: 32,
+      },
+      comorbidities: 'insuficiência cardíaca e diabetes',
+      medications: 'diurético de alça',
+      allergies: 'nega',
+      pregnancyPossibility: 'nao-se-aplica',
+      physicalExamNotes: 'extremidades frias e perfusão lentificada',
+    });
+
+    expect(assessment.triageLevel).toBe('Emergência');
+    expect(assessment.clinicalSummary).toContain('sinais vitais');
+  });
 });

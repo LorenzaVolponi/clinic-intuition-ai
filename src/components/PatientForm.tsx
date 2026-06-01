@@ -1,14 +1,22 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useState } from "react";
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { VoiceAssistant } from "@/components/voice/VoiceAssistant";
-import { AlertCircle, CheckCircle2, ClipboardList, Loader2, Mic2, Sparkles, Stethoscope, UserCheck } from "lucide-react";
+import { Loader2, UserCheck, ClipboardList, Stethoscope } from "lucide-react";
+
+interface PatientVitalSigns {
+  temperature?: number;
+  heartRate?: number;
+  systolicBp?: number;
+  diastolicBp?: number;
+  respiratoryRate?: number;
+  oxygenSaturation?: number;
+}
 
 interface PatientData {
   name: string;
@@ -16,6 +24,12 @@ interface PatientData {
   gender: string;
   symptoms: string;
   duration: string;
+  vitalSigns?: PatientVitalSigns;
+  comorbidities?: string;
+  medications?: string;
+  allergies?: string;
+  pregnancyPossibility?: 'sim' | 'nao' | 'nao-se-aplica' | '';
+  physicalExamNotes?: string;
 }
 
 interface PatientFormProps {
@@ -26,63 +40,29 @@ interface PatientFormProps {
 
 const SYMPTOM_CATEGORIES = {
   cardiovascular: [
-    "Dor torácica",
-    "Palpitações",
-    "Dispneia",
-    "Edema de membros inferiores",
-    "Síncope",
-    "Cianose",
-    "Claudicação intermitente",
+    "Dor torácica", "Palpitações", "Dispneia", "Edema de membros inferiores", 
+    "Síncope", "Cianose", "Claudicação intermitente"
   ],
   respiratorio: [
-    "Tosse seca",
-    "Tosse produtiva",
-    "Dispneia aos esforços",
-    "Dispneia de repouso",
-    "Hemoptise",
-    "Dor pleurítica",
-    "Sibilos",
+    "Tosse seca", "Tosse produtiva", "Dispneia aos esforços", "Dispneia de repouso",
+    "Hemoptise", "Dor pleurítica", "Sibilos"
   ],
   gastrointestinal: [
-    "Dor epigástrica",
-    "Dor em hipocôndrio direito",
-    "Dor em fossa ilíaca direita",
-    "Náuseas",
-    "Vômitos",
-    "Diarreia",
-    "Constipação",
-    "Melena",
-    "Hematoquezia",
+    "Dor epigástrica", "Dor em hipocôndrio direito", "Dor em fossa ilíaca direita",
+    "Náuseas", "Vômitos", "Diarreia", "Constipação", "Melena", "Hematoquezia"
   ],
   neurologico: [
-    "Cefaleia",
-    "Tontura",
-    "Vertigem",
-    "Parestesias",
-    "Paresia",
-    "Convulsões",
-    "Alteração da consciência",
-    "Distúrbios visuais",
+    "Cefaleia", "Tontura", "Vertigem", "Parestesias", "Paresia", "Convulsões",
+    "Alteração da consciência", "Distúrbios visuais"
   ],
   genitourinario: [
-    "Disúria",
-    "Polaciúria",
-    "Hematúria",
-    "Dor lombar",
-    "Retenção urinária",
-    "Oligúria",
-    "Anúria",
+    "Disúria", "Polaciúria", "Hematúria", "Dor lombar", "Retenção urinária",
+    "Oligúria", "Anúria"
   ],
-  sistemico: ["Febre", "Calafrios", "Sudorese", "Fadiga", "Perda de peso", "Anorexia", "Mialgia", "Artralgia"],
-};
-
-const CATEGORY_LABELS: Record<keyof typeof SYMPTOM_CATEGORIES, string> = {
-  cardiovascular: "Cardio",
-  respiratorio: "Resp.",
-  gastrointestinal: "Gastro",
-  neurologico: "Neuro",
-  genitourinario: "GU",
-  sistemico: "Sistêmico",
+  sistemico: [
+    "Febre", "Calafrios", "Sudorese", "Fadiga", "Perda de peso", "Anorexia",
+    "Mialgia", "Artralgia"
+  ]
 };
 
 const DURATION_OPTIONS = [
@@ -90,15 +70,14 @@ const DURATION_OPTIONS = [
   { value: "6-24h", label: "6 a 24 horas", severity: "agudo" },
   { value: "1-7d", label: "1 a 7 dias", severity: "agudo" },
   { value: "1-4sem", label: "1 a 4 semanas", severity: "subagudo" },
-  { value: "> 4sem", label: "Mais de 4 semanas", severity: "crônico" },
+  { value: "> 4sem", label: "Mais de 4 semanas", severity: "cronico" }
 ];
 
-const requiredFields: Array<keyof Pick<PatientData, "age" | "gender" | "symptoms" | "duration">> = [
-  "age",
-  "gender",
-  "symptoms",
-  "duration",
-];
+const parseOptionalNumber = (value: string) => {
+  if (value.trim() === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
 
 export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormProps) => {
   const [formData, setFormData] = useState<PatientData>({
@@ -107,19 +86,17 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     gender: "",
     symptoms: "",
     duration: "",
+    vitalSigns: {},
+    comorbidities: "",
+    medications: "",
+    allergies: "",
+    pregnancyPossibility: "",
+    physicalExamNotes: ""
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeCategory, setActiveCategory] = useState<keyof typeof SYMPTOM_CATEGORIES>("cardiovascular");
-
-  const completion = useMemo(() => {
-    const completed = requiredFields.filter((field) => {
-      const value = formData[field];
-      return typeof value === "number" ? value > 0 : Boolean(value.trim());
-    }).length;
-
-    return Math.round((completed / requiredFields.length) * 100);
-  }, [formData]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -144,7 +121,7 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
       onSubmit(formData);
@@ -153,26 +130,46 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
 
   const appendSymptomsText = (text: string) => {
     const currentSymptoms = formData.symptoms.trim();
-    const nextSymptoms = currentSymptoms ? `${currentSymptoms}, ${text}` : text;
+    const nextSymptoms = currentSymptoms
+      ? `${currentSymptoms}, ${text}`
+      : text;
     setFormData({ ...formData, symptoms: nextSymptoms });
   };
 
+  const addSymptom = (symptom: string) => {
+    appendSymptomsText(symptom);
+  };
+
+  const updateVitalSign = (key: keyof PatientVitalSigns, value: string) => {
+    setFormData({
+      ...formData,
+      vitalSigns: {
+        ...formData.vitalSigns,
+        [key]: parseOptionalNumber(value),
+      },
+    });
+  };
+
+  // Mobile detection
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   if (patientData && isAnalyzing) {
     return (
-      <Card className="overflow-hidden rounded-[2rem] border-primary/20 bg-white/90 shadow-2xl shadow-sky-900/10 backdrop-blur-xl">
-        <CardContent className="p-6 sm:p-10">
-          <div className="mx-auto max-w-2xl space-y-5 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-soft text-primary ring-1 ring-primary/15">
-              <Loader2 className="h-9 w-9 animate-spin" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-black text-slate-950">Analisando caso clínico...</h3>
-              <p className="mt-2 text-muted-foreground">
-                Processando dados do paciente <strong>{patientData.name || "fictício"}</strong> com foco educacional.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-primary/10 bg-primary-soft/70 p-4 text-left">
-              <p className="text-sm leading-6 text-primary/90">
+      <Card className="border-primary/20">
+        <CardContent className="p-8">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+            <h3 className="text-xl font-semibold">Analisando caso clínico...</h3>
+            <p className="text-muted-foreground">
+              Processando dados do paciente <strong>{patientData.name}</strong>
+            </p>
+            <div className="bg-primary-soft p-4 rounded-lg">
+              <p className="text-sm">
                 <strong>Sintomas:</strong> {patientData.symptoms}
               </p>
             </div>
@@ -183,192 +180,350 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
   }
 
   return (
-    <Card className="animate-fade-in overflow-hidden rounded-[2rem] border-white/70 bg-white/90 shadow-2xl shadow-sky-900/10 backdrop-blur-xl">
-      <CardHeader className="border-b border-slate-200/70 bg-gradient-to-r from-white via-sky-50 to-indigo-50 p-5 sm:p-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
-              <ClipboardList className="h-6 w-6" />
-            </div>
-            <div>
-              <Badge variant="outline" className="mb-2 border-primary/20 bg-white/70 text-primary">
-                <Sparkles className="mr-1 h-3 w-3" />
-                Fluxo premium de anamnese
-              </Badge>
-              <CardTitle className="text-xl font-black text-slate-950 sm:text-2xl">Anamnese do Paciente</CardTitle>
-              <CardDescription className="mt-1 text-sm sm:text-base">
-                Preencha o caso clínico fictício com campos amplos, toque confortável e atalhos por sistema.
-              </CardDescription>
-            </div>
+    <Card className="border-primary/20 shadow-lg animate-fade-in">
+      <CardHeader className="bg-gradient-to-r from-primary-soft via-primary-soft/80 to-accent border-b">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/20 rounded-lg">
+            <ClipboardList className="h-6 w-6 text-primary" />
           </div>
-
-          <div className="min-w-[12rem] rounded-2xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
-            <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wide text-slate-500">
-              <span>Completude</span>
-              <span>{completion}%</span>
-            </div>
-            <Progress value={completion} className="h-2.5" />
+          <div>
+            <CardTitle className="text-lg sm:text-xl">Anamnese do Paciente</CardTitle>
+            <CardDescription className="text-sm sm:text-base">
+              Preencha os dados do caso clínico fictício para análise
+            </CardDescription>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="p-4 pb-28 sm:p-6 sm:pb-6 lg:p-8">
-        <form onSubmit={handleSubmit} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
-          <div className="space-y-5">
+      <CardContent className="p-4 pb-24 sm:p-6 sm:pb-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          {/* Nome do Paciente */}
+          <div className="space-y-2">
+            <Label htmlFor="name" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Nome do Paciente (Fictício)
+            </Label>
+            <Input
+              id="name"
+              placeholder="Ex: João Silva (caso simulado)"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="h-11 sm:h-12 text-base border-border focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+
+          {/* Idade e Gênero */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="flex items-center gap-2 text-sm font-bold text-slate-800">
-                <UserCheck className="h-4 w-4 text-primary" />
-                Nome do paciente (fictício)
-              </Label>
+              <Label htmlFor="age" className="text-base font-medium">Idade *</Label>
               <Input
-                id="name"
-                autoComplete="off"
-                placeholder="Ex: João Silva (caso simulado)"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="h-12 rounded-2xl border-slate-200 bg-white/80 text-base shadow-sm focus-visible:ring-primary/25"
+                id="age"
+                type="number"
+                min="1"
+                max="120"
+                placeholder="Ex: 35"
+                value={formData.age || ""}
+                onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value) || 0 })}
+                className={`h-11 sm:h-12 text-base focus:ring-2 focus:ring-primary/20 ${errors.age ? "border-destructive" : "border-border"}`}
               />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="age" className="text-sm font-bold text-slate-800">Idade *</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min="1"
-                  max="120"
-                  inputMode="numeric"
-                  placeholder="Ex: 35"
-                  value={formData.age || ""}
-                  onChange={(e) => setFormData({ ...formData, age: parseInt(e.target.value, 10) || 0 })}
-                  className={`h-12 rounded-2xl bg-white/80 text-base shadow-sm focus-visible:ring-primary/25 ${errors.age ? "border-destructive" : "border-slate-200"}`}
-                />
-                {errors.age && <FieldError message={errors.age} />}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="gender" className="text-sm font-bold text-slate-800">Gênero *</Label>
-                <Select value={formData.gender} onValueChange={(value) => setFormData({ ...formData, gender: value })}>
-                  <SelectTrigger className={`h-12 rounded-2xl bg-white/80 text-base shadow-sm focus:ring-primary/25 ${errors.gender ? "border-destructive" : "border-slate-200"}`}>
-                    <SelectValue placeholder="Selecione o gênero" />
-                  </SelectTrigger>
-                  <SelectContent className="z-50 bg-background">
-                    <SelectItem value="masculino">Masculino</SelectItem>
-                    <SelectItem value="feminino">Feminino</SelectItem>
-                    <SelectItem value="outro">Outro</SelectItem>
-                    <SelectItem value="nao-informar">Prefiro não informar</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.gender && <FieldError message={errors.gender} />}
-              </div>
+              {errors.age && <p className="text-sm text-destructive">{errors.age}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration" className="text-sm font-bold text-slate-800">Duração dos sintomas *</Label>
-              <Select value={formData.duration} onValueChange={(value) => setFormData({ ...formData, duration: value })}>
-                <SelectTrigger className={`h-12 rounded-2xl bg-white/80 text-base shadow-sm focus:ring-primary/25 ${errors.duration ? "border-destructive" : "border-slate-200"}`}>
-                  <SelectValue placeholder="Há quanto tempo os sintomas começaram?" />
+              <Label htmlFor="gender" className="text-base font-medium">Gênero *</Label>
+              <Select
+                value={formData.gender}
+                onValueChange={(value) => setFormData({ ...formData, gender: value })}
+              >
+                <SelectTrigger className={`h-11 sm:h-12 text-base focus:ring-2 focus:ring-primary/20 ${errors.gender ? "border-destructive" : "border-border"}`}>
+                  <SelectValue placeholder="Selecione o gênero" />
                 </SelectTrigger>
-                <SelectContent className="z-50 bg-background">
-                  {DURATION_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                      <span className="ml-2 text-xs text-muted-foreground">({option.severity})</span>
-                    </SelectItem>
-                  ))}
+                <SelectContent className="bg-background z-50">
+                  <SelectItem value="masculino">Masculino</SelectItem>
+                  <SelectItem value="feminino">Feminino</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                  <SelectItem value="nao-informar">Prefiro não informar</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.duration && <FieldError message={errors.duration} />}
+              {errors.gender && <p className="text-sm text-destructive">{errors.gender}</p>}
+            </div>
+          </div>
+
+          {/* Duração dos Sintomas */}
+          <div className="space-y-2">
+            <Label htmlFor="duration" className="text-base font-medium">Duração dos Sintomas *</Label>
+            <Select
+              value={formData.duration}
+              onValueChange={(value) => setFormData({ ...formData, duration: value })}
+            >
+              <SelectTrigger className={`h-11 sm:h-12 text-base focus:ring-2 focus:ring-primary/20 ${errors.duration ? "border-destructive" : "border-border"}`}>
+                <SelectValue placeholder="Há quanto tempo os sintomas começaram?" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {DURATION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({option.severity})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.duration && <p className="text-sm text-destructive">{errors.duration}</p>}
+          </div>
+
+          {/* Sintomas */}
+          <div className="space-y-4">
+            <Label htmlFor="symptoms" className="text-base font-medium">Sintomas Apresentados *</Label>
+            <Textarea
+              id="symptoms"
+              placeholder="Descreva detalhadamente os sintomas do paciente..."
+              value={formData.symptoms}
+              onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
+              rows={isMobile ? 3 : 4}
+              className={`text-base min-h-[100px] focus:ring-2 focus:ring-primary/20 ${errors.symptoms ? "border-destructive" : "border-border"}`}
+            />
+            {errors.symptoms && <p className="text-sm text-destructive">{errors.symptoms}</p>}
+
+            <VoiceAssistant
+              title="Ditado clínico"
+              description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
+              listenLabel="Falar sintomas"
+              onTranscript={appendSymptomsText}
+              disabled={isAnalyzing}
+            />
+            
+            {/* Sugestões de Sintomas por Sistema */}
+            <div className="space-y-3">
+              <p className="text-sm font-medium text-foreground">Sugestões por sistema:</p>
+              
+              {/* Category buttons for mobile */}
+              {isMobile ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(SYMPTOM_CATEGORIES).map(([category, symptoms]) => (
+                      <Button
+                        key={category}
+                        type="button"
+                        variant={activeCategory === category ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setActiveCategory(activeCategory === category ? null : category)}
+                        className="h-10 text-xs capitalize"
+                      >
+                        {category.replace(/([A-Z])/g, ' $1').trim()}
+                        <span className="ml-1 text-xs">({symptoms.length})</span>
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  {/* Active category symptoms */}
+                  {activeCategory && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground capitalize font-medium">
+                        Sistema {activeCategory}:
+                      </p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {SYMPTOM_CATEGORIES[activeCategory as keyof typeof SYMPTOM_CATEGORIES].map((symptom) => (
+                          <Button
+                            key={symptom}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addSymptom(symptom)}
+                            className="h-10 text-xs justify-start"
+                          >
+                            + {symptom}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Desktop view */
+                <div className="space-y-3">
+                  {Object.entries(SYMPTOM_CATEGORIES).map(([category, symptoms]) => (
+                    <div key={category} className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground capitalize">
+                        {category.replace(/([A-Z])/g, ' $1').trim()}:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {symptoms.map((symptom) => (
+                          <Button
+                            key={symptom}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => addSymptom(symptom)}
+                            className="h-8 text-xs"
+                          >
+                            + {symptom}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+
+
+          {/* Contexto estruturado opcional */}
+          <div className="space-y-4 rounded-2xl border border-primary/15 bg-primary-soft/20 p-4">
+            <div>
+              <h3 className="text-base font-semibold">Contexto clínico opcional</h3>
+              <p className="text-sm text-muted-foreground">
+                Use para deixar o raciocínio mais seguro sem perder o fluxo rápido: sinais vitais, comorbidades, medicações e exame físico.
+              </p>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="symptoms" className="text-sm font-bold text-slate-800">Sintomas apresentados *</Label>
-              <Textarea
-                id="symptoms"
-                placeholder="Descreva sintomas, início, fatores de melhora/piora, antecedentes e contexto do caso fictício..."
-                value={formData.symptoms}
-                onChange={(e) => setFormData({ ...formData, symptoms: e.target.value })}
-                rows={5}
-                className={`min-h-[9rem] rounded-3xl bg-white/80 p-4 text-base leading-7 shadow-sm focus-visible:ring-primary/25 ${errors.symptoms ? "border-destructive" : "border-slate-200"}`}
-              />
-              {errors.symptoms && <FieldError message={errors.symptoms} />}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+              <div className="space-y-1">
+                <Label htmlFor="temperature" className="text-xs">Temp. °C</Label>
+                <Input
+                  id="temperature"
+                  type="number"
+                  step="0.1"
+                  placeholder="38.2"
+                  value={formData.vitalSigns?.temperature ?? ""}
+                  onChange={(e) => updateVitalSign("temperature", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="heartRate" className="text-xs">FC</Label>
+                <Input
+                  id="heartRate"
+                  type="number"
+                  placeholder="110"
+                  value={formData.vitalSigns?.heartRate ?? ""}
+                  onChange={(e) => updateVitalSign("heartRate", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="systolicBp" className="text-xs">PAS</Label>
+                <Input
+                  id="systolicBp"
+                  type="number"
+                  placeholder="120"
+                  value={formData.vitalSigns?.systolicBp ?? ""}
+                  onChange={(e) => updateVitalSign("systolicBp", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="diastolicBp" className="text-xs">PAD</Label>
+                <Input
+                  id="diastolicBp"
+                  type="number"
+                  placeholder="80"
+                  value={formData.vitalSigns?.diastolicBp ?? ""}
+                  onChange={(e) => updateVitalSign("diastolicBp", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="respiratoryRate" className="text-xs">FR</Label>
+                <Input
+                  id="respiratoryRate"
+                  type="number"
+                  placeholder="22"
+                  value={formData.vitalSigns?.respiratoryRate ?? ""}
+                  onChange={(e) => updateVitalSign("respiratoryRate", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="oxygenSaturation" className="text-xs">SatO₂ %</Label>
+                <Input
+                  id="oxygenSaturation"
+                  type="number"
+                  placeholder="96"
+                  value={formData.vitalSigns?.oxygenSaturation ?? ""}
+                  onChange={(e) => updateVitalSign("oxygenSaturation", e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
 
-              <VoiceAssistant
-                title="Ditado clínico"
-                description="Toque no microfone para ditar sintomas em português. O texto capturado será anexado à anamnese."
-                listenLabel="Falar sintomas"
-                onTranscript={appendSymptomsText}
-                disabled={isAnalyzing}
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="comorbidities">Comorbidades</Label>
+                <Input
+                  id="comorbidities"
+                  placeholder="Ex.: HAS, DM, DPOC..."
+                  value={formData.comorbidities || ""}
+                  onChange={(e) => setFormData({ ...formData, comorbidities: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="medications">Medicações em uso</Label>
+                <Input
+                  id="medications"
+                  placeholder="Ex.: AAS, metformina..."
+                  value={formData.medications || ""}
+                  onChange={(e) => setFormData({ ...formData, medications: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="allergies">Alergias</Label>
+                <Input
+                  id="allergies"
+                  placeholder="Ex.: dipirona, penicilina ou nega"
+                  value={formData.allergies || ""}
+                  onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pregnancyPossibility">Possibilidade de gravidez</Label>
+                <Select
+                  value={formData.pregnancyPossibility || ""}
+                  onValueChange={(value: PatientData["pregnancyPossibility"]) => setFormData({ ...formData, pregnancyPossibility: value })}
+                >
+                  <SelectTrigger id="pregnancyPossibility" className="bg-background">
+                    <SelectValue placeholder="Não informado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    <SelectItem value="sim">Sim</SelectItem>
+                    <SelectItem value="nao">Não</SelectItem>
+                    <SelectItem value="nao-se-aplica">Não se aplica</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="physicalExamNotes">Exame físico / observações dirigidas</Label>
+              <Textarea
+                id="physicalExamNotes"
+                placeholder="Ex.: ausculta, perfusão, Glasgow, dor à palpação, déficits focais..."
+                value={formData.physicalExamNotes || ""}
+                onChange={(e) => setFormData({ ...formData, physicalExamNotes: e.target.value })}
+                rows={isMobile ? 2 : 3}
+                className="bg-background"
               />
             </div>
           </div>
 
-          <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
-            <div className="rounded-[1.75rem] border border-slate-200/80 bg-slate-50/70 p-4 shadow-inner shadow-white">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-black text-slate-900">Sugestões por sistema</p>
-                  <p className="text-xs text-muted-foreground">Toque para adicionar sem digitar.</p>
-                </div>
-                <Mic2 className="h-5 w-5 text-primary" />
-              </div>
-
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-2 lg:grid lg:grid-cols-2 lg:overflow-visible">
-                {(Object.keys(SYMPTOM_CATEGORIES) as Array<keyof typeof SYMPTOM_CATEGORIES>).map((category) => (
-                  <Button
-                    key={category}
-                    type="button"
-                    variant={activeCategory === category ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setActiveCategory(category)}
-                    className="h-10 flex-shrink-0 rounded-full px-4 text-xs font-bold lg:w-full"
-                  >
-                    {CATEGORY_LABELS[category]}
-                    <span className="ml-1 opacity-70">({SYMPTOM_CATEGORIES[category].length})</span>
-                  </Button>
-                ))}
-              </div>
-
-              <div className="mt-3 grid gap-2">
-                {SYMPTOM_CATEGORIES[activeCategory].map((symptom) => (
-                  <Button
-                    key={symptom}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => appendSymptomsText(symptom)}
-                    className="min-h-10 justify-start rounded-2xl border-slate-200 bg-white/80 px-3 text-left text-xs font-semibold shadow-sm hover:border-primary/30 hover:bg-primary-soft"
-                  >
-                    + {symptom}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[1.75rem] border border-emerald-100 bg-emerald-50/70 p-4 text-sm text-emerald-900">
-              <div className="mb-2 flex items-center gap-2 font-black">
-                <CheckCircle2 className="h-4 w-4" />
-                Dica premium
-              </div>
-              Inclua cronologia, intensidade, fatores associados e sinais negativos relevantes para enriquecer o raciocínio.
-            </div>
-          </aside>
-
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur-xl md:static md:col-span-full md:border-0 md:bg-transparent md:p-0">
+          {/* Submit Button */}
+          <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
             <Button
               type="submit"
-              className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary via-sky-500 to-cyan-500 text-base font-black shadow-xl shadow-sky-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl"
+              className="w-full h-11 sm:h-12 text-base bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary font-medium shadow-lg hover:shadow-xl transition-all duration-200"
               disabled={isAnalyzing}
             >
               {isAnalyzing ? (
                 <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Analisando caso clínico...
                 </>
               ) : (
                 <>
-                  <Stethoscope className="mr-2 h-5 w-5" />
+                  <Stethoscope className="h-5 w-5 mr-2" />
                   Analisar Caso Clínico
                 </>
               )}
@@ -379,10 +534,3 @@ export const PatientForm = ({ onSubmit, isAnalyzing, patientData }: PatientFormP
     </Card>
   );
 };
-
-const FieldError = ({ message }: { message: string }) => (
-  <p className="flex items-center gap-1.5 text-sm font-medium text-destructive">
-    <AlertCircle className="h-4 w-4" />
-    {message}
-  </p>
-);

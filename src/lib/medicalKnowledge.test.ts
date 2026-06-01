@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildLocalAssessment } from './medicalKnowledge';
+import { buildLocalAssessment, EXTERNAL_MEDICAL_CONDITIONS, MEDICAL_CONDITIONS } from './medicalKnowledge';
+
+describe('clinical knowledge loading', () => {
+  it('carrega condições publicadas da base JSON versionada', () => {
+    expect(EXTERNAL_MEDICAL_CONDITIONS.length).toBeGreaterThanOrEqual(3);
+    expect(MEDICAL_CONDITIONS.some((condition) => condition.name === 'Sepse / Choque Séptico Suspeito')).toBe(true);
+  });
+});
 
 describe('buildLocalAssessment', () => {
   it('normaliza gênero e mantém alta suspeita cardiovascular para dor torácica', () => {
@@ -139,5 +146,30 @@ describe('buildLocalAssessment', () => {
     expect(medicationText).toContain('analgésico');
     expect(medicationText).toContain('antiemético');
     expect(assessment.hypotheses[0]?.recommendedExams.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('usa sinais vitais estruturados para elevar risco mesmo quando o texto livre é inespecífico', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente I',
+      age: 70,
+      gender: 'Feminino',
+      duration: '< 6h',
+      symptoms: 'mal-estar súbito e cansaço intenso',
+      vitalSigns: {
+        systolicBp: 82,
+        diastolicBp: 48,
+        oxygenSaturation: 88,
+        heartRate: 132,
+        respiratoryRate: 32,
+      },
+      comorbidities: 'insuficiência cardíaca e diabetes',
+      medications: 'diurético de alça',
+      allergies: 'nega',
+      pregnancyPossibility: 'nao-se-aplica',
+      physicalExamNotes: 'extremidades frias e perfusão lentificada',
+    });
+
+    expect(assessment.triageLevel).toBe('Emergência');
+    expect(assessment.clinicalSummary).toContain('sinais vitais');
   });
 });

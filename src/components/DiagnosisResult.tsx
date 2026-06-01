@@ -26,6 +26,19 @@ const REGULATORY_REFERENCES = [
   'Telemedicina no Brasil (Resolução CFM nº 2.314/2022)',
 ];
 
+function formatVitalSigns(patientData: PatientData) {
+  const vitalSigns = patientData.vitalSigns;
+  if (!vitalSigns) return [];
+
+  return [
+    vitalSigns.temperature !== undefined ? `Temp. ${vitalSigns.temperature}°C` : '',
+    vitalSigns.heartRate !== undefined ? `FC ${vitalSigns.heartRate} bpm` : '',
+    vitalSigns.systolicBp !== undefined ? `PA ${vitalSigns.systolicBp}/${vitalSigns.diastolicBp ?? '?'} mmHg` : '',
+    vitalSigns.respiratoryRate !== undefined ? `FR ${vitalSigns.respiratoryRate} irpm` : '',
+    vitalSigns.oxygenSaturation !== undefined ? `SatO₂ ${vitalSigns.oxygenSaturation}%` : '',
+  ].filter(Boolean);
+}
+
 interface DiagnosisResultProps {
   diagnosis: ClinicalAssessment;
   patientData: PatientData;
@@ -34,6 +47,8 @@ interface DiagnosisResultProps {
 
 export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisResultProps) => {
   const spokenAssessment = formatAssessmentForSpeech(diagnosis, patientData);
+  const vitalSigns = formatVitalSigns(patientData);
+  const hasStructuredContext = vitalSigns.length > 0 || Boolean(patientData.comorbidities || patientData.medications || patientData.allergies || patientData.pregnancyPossibility || patientData.physicalExamNotes);
 
   const getProbabilityColor = (probability: string) => {
     switch (probability.toLowerCase()) {
@@ -140,6 +155,30 @@ export const DiagnosisResult = ({ diagnosis, patientData, onReset }: DiagnosisRe
               </div>
             </div>
           </div>
+
+          {hasStructuredContext && (
+            <>
+              <Separator />
+              <div className="space-y-3 rounded-lg border border-primary/15 bg-primary-soft/20 p-4">
+                <p className="text-sm font-semibold">Contexto clínico estruturado</p>
+                {vitalSigns.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {vitalSigns.map((item) => (
+                      <Badge key={item} variant="secondary" className="text-xs">{item}</Badge>
+                    ))}
+                  </div>
+                )}
+                <div className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
+                  {patientData.comorbidities && <p><strong>Comorbidades:</strong> {patientData.comorbidities}</p>}
+                  {patientData.medications && <p><strong>Medicações:</strong> {patientData.medications}</p>}
+                  {patientData.allergies && <p><strong>Alergias:</strong> {patientData.allergies}</p>}
+                  {patientData.pregnancyPossibility && <p><strong>Possibilidade de gravidez:</strong> {patientData.pregnancyPossibility}</p>}
+                  {patientData.physicalExamNotes && <p className="md:col-span-2"><strong>Exame físico/notas:</strong> {patientData.physicalExamNotes}</p>}
+                </div>
+              </div>
+            </>
+          )}
+
         </CardContent>
       </Card>
 

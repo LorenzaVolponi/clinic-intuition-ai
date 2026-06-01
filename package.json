@@ -32,6 +32,7 @@
     "safety:check:ladder": "tsx scripts/check-probability-ladder.ts",
     "safety:coherence:guard": "tsx scripts/clinical-coherence-guard.ts",
     "safety:generate:10k": "tsx scripts/generate-disease-possibilities.ts",
+    "knowledge:validate": "tsx scripts/validate-clinical-knowledge.ts",
     "preview": "vite preview",
     "start:server": "npx tsx backend/server.ts"
   },

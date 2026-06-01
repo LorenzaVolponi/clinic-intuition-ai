@@ -1,6 +1,10 @@
+import { loadPublishedMedicalConditions } from './clinicalKnowledgeSchema';
+
 export interface MedicalCondition {
+  id?: string;
   name: string;
   icd10?: string;
+  icd11?: string;
   category: string;
   commonSymptoms: string[];
   riskFactors: string[];
@@ -13,6 +17,9 @@ export interface MedicalCondition {
   clinicalPearls: string[];
   recommendedExams: string[];
   durationProfile?: Array<'hiperagudo' | 'agudo' | 'subagudo' | 'cronico'>;
+  version?: number;
+  status?: 'draft' | 'reviewed' | 'published' | 'deprecated';
+  lastReviewedAt?: string;
 }
 
 export interface PatientData {
@@ -146,7 +153,7 @@ const CONDITION_MEDICATION_OPTIONS: Record<string, Array<{ name: string; why: st
   ],
 };
 
-export const MEDICAL_CONDITIONS: MedicalCondition[] = [
+const FALLBACK_MEDICAL_CONDITIONS: MedicalCondition[] = [
   {
     name: 'Síndrome Coronariana Aguda',
     icd10: 'I20-I25',
@@ -315,6 +322,10 @@ export const MEDICAL_CONDITIONS: MedicalCondition[] = [
     durationProfile: ['agudo'],
   },
 ];
+
+export const MEDICAL_CONDITIONS: MedicalCondition[] = loadPublishedMedicalConditions(FALLBACK_MEDICAL_CONDITIONS);
+
+export const CLINICAL_KNOWLEDGE_FALLBACK_CONDITIONS: MedicalCondition[] = FALLBACK_MEDICAL_CONDITIONS;
 
 export const CLINICAL_SCALES = {
   CURB65: {

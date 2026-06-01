@@ -1,0 +1,620 @@
+{
+  "version": "1.0.0",
+  "status": "published",
+  "generatedFrom": "src/lib/medicalKnowledge.ts",
+  "generatedAt": "2026-06-01",
+  "conditions": [
+    {
+      "id": "sindrome-coronariana-aguda",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Síndrome Coronariana Aguda",
+      "icd10": "I20-I25",
+      "category": "cardiovascular",
+      "commonSymptoms": [
+        "dor torácica",
+        "dor no peito",
+        "dispneia",
+        "sudorese",
+        "náusea"
+      ],
+      "riskFactors": [
+        "idade > 40 anos",
+        "diabetes",
+        "hipertensão",
+        "tabagismo",
+        "dislipidemia"
+      ],
+      "ageGroups": [
+        "adulto",
+        "idoso"
+      ],
+      "genderPreference": "masculino",
+      "urgencyLevel": "emergencia",
+      "treatments": [
+        "Antiagregação plaquetária conforme protocolo",
+        "Estatina de alta potência conforme protocolo",
+        "Controle de sintomas e monitorização",
+        "Avaliação de reperfusão pela equipe"
+      ],
+      "differentials": [
+        "Pericardite",
+        "Embolia pulmonar",
+        "Pneumotórax",
+        "Dissecção aórtica"
+      ],
+      "redFlags": [
+        "dor em aperto/peso",
+        "irradiação para braço esquerdo",
+        "sudorese profusa"
+      ],
+      "clinicalPearls": [
+        "ECG em até 10min",
+        "Troponinas seriadas",
+        "Score TIMI/GRACE"
+      ],
+      "recommendedExams": [
+        "ECG",
+        "Troponina seriada",
+        "RX de tórax",
+        "Monitorização cardíaca"
+      ],
+      "durationProfile": [
+        "hiperagudo",
+        "agudo"
+      ]
+    },
+    {
+      "id": "insuficiencia-cardiaca-aguda",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Insuficiência Cardíaca Aguda",
+      "icd10": "I50",
+      "category": "cardiovascular",
+      "commonSymptoms": [
+        "dispneia",
+        "edema",
+        "ortopneia",
+        "dispneia paroxística noturna"
+      ],
+      "riskFactors": [
+        "hipertensão",
+        "diabetes",
+        "cardiopatia isquêmica",
+        "idade > 65"
+      ],
+      "ageGroups": [
+        "adulto",
+        "idoso"
+      ],
+      "urgencyLevel": "alta",
+      "treatments": [
+        "Diurético de alça conforme protocolo",
+        "Vasodilatador/inibidor do SRAA conforme protocolo",
+        "Ajuste de terapia de insuficiência cardíaca"
+      ],
+      "differentials": [
+        "Pneumonia",
+        "DPOC",
+        "Embolia pulmonar"
+      ],
+      "redFlags": [
+        "sat O2 < 90%",
+        "crepitantes bibasais",
+        "B3 audível"
+      ],
+      "clinicalPearls": [
+        "BNP/NT-proBNP",
+        "Ecocardiograma",
+        "Classificação NYHA"
+      ],
+      "recommendedExams": [
+        "BNP/NT-proBNP",
+        "Ecocardiograma",
+        "RX de tórax",
+        "Função renal"
+      ],
+      "durationProfile": [
+        "agudo",
+        "subagudo"
+      ]
+    },
+    {
+      "id": "pneumonia-adquirida-na-comunidade",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Pneumonia Adquirida na Comunidade",
+      "icd10": "J18",
+      "category": "respiratorio",
+      "commonSymptoms": [
+        "febre",
+        "tosse produtiva",
+        "dispneia",
+        "dor pleurítica"
+      ],
+      "riskFactors": [
+        "idade > 65",
+        "DPOC",
+        "diabetes",
+        "etilismo",
+        "tabagismo"
+      ],
+      "ageGroups": [
+        "adulto",
+        "idoso"
+      ],
+      "urgencyLevel": "moderada",
+      "treatments": [
+        "Antibioticoterapia empírica guiada por gravidade e perfil local",
+        "Suporte respiratório conforme necessidade",
+        "Reavaliação clínica seriada"
+      ],
+      "differentials": [
+        "Bronquite aguda",
+        "COVID-19",
+        "Tuberculose"
+      ],
+      "redFlags": [
+        "sat O2 < 90%",
+        "confusão mental",
+        "hipotensão"
+      ],
+      "clinicalPearls": [
+        "Score CURB-65",
+        "RX tórax",
+        "Procalcitonina se disponível"
+      ],
+      "recommendedExams": [
+        "RX de tórax",
+        "Hemograma",
+        "Oximetria",
+        "Score CURB-65"
+      ],
+      "durationProfile": [
+        "agudo",
+        "subagudo"
+      ]
+    },
+    {
+      "id": "asma-agudizada",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Asma Agudizada",
+      "icd10": "J45",
+      "category": "respiratorio",
+      "commonSymptoms": [
+        "dispneia",
+        "sibilos",
+        "tosse seca",
+        "opressão torácica"
+      ],
+      "riskFactors": [
+        "história pessoal/familiar",
+        "alergens",
+        "infecções respiratórias"
+      ],
+      "ageGroups": [
+        "crianca",
+        "adolescente",
+        "adulto"
+      ],
+      "urgencyLevel": "moderada",
+      "treatments": [
+        "Broncodilatador de resgate conforme protocolo",
+        "Corticoterapia conforme gravidade",
+        "Monitorização de resposta clínica"
+      ],
+      "differentials": [
+        "DPOC",
+        "Pneumonia",
+        "Pneumotórax"
+      ],
+      "redFlags": [
+        "uso de musculatura acessória",
+        "cianose",
+        "silêncio auscultatório"
+      ],
+      "clinicalPearls": [
+        "Peak flow",
+        "Saturação O2",
+        "Resposta ao broncodilatador"
+      ],
+      "recommendedExams": [
+        "Oximetria",
+        "Peak flow",
+        "Avaliação clínica seriada"
+      ],
+      "durationProfile": [
+        "hiperagudo",
+        "agudo"
+      ]
+    },
+    {
+      "id": "apendicite-aguda",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Apendicite Aguda",
+      "icd10": "K35",
+      "category": "gastrointestinal",
+      "commonSymptoms": [
+        "dor abdominal",
+        "náusea",
+        "vômito",
+        "febre"
+      ],
+      "riskFactors": [
+        "idade 10-30 anos",
+        "sexo masculino"
+      ],
+      "ageGroups": [
+        "crianca",
+        "adolescente",
+        "adulto"
+      ],
+      "urgencyLevel": "alta",
+      "treatments": [
+        "Analgesia e hidratação conforme protocolo",
+        "Antibioticoprofilaxia perioperatória conforme protocolo",
+        "Avaliação cirúrgica imediata"
+      ],
+      "differentials": [
+        "Gastroenterite",
+        "DIP",
+        "Litíase urinária",
+        "Gravidez ectópica"
+      ],
+      "redFlags": [
+        "sinal de Blumberg",
+        "migração da dor",
+        "leucocitose com desvio"
+      ],
+      "clinicalPearls": [
+        "Score de Alvarado",
+        "TC abdome se dúvida",
+        "Cirurgia urgente"
+      ],
+      "recommendedExams": [
+        "Hemograma",
+        "PCR",
+        "USG/TC de abdome",
+        "Score de Alvarado"
+      ],
+      "durationProfile": [
+        "agudo"
+      ]
+    },
+    {
+      "id": "gastroenterite-aguda",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Gastroenterite Aguda",
+      "icd10": "K59.1",
+      "category": "gastrointestinal",
+      "commonSymptoms": [
+        "diarreia",
+        "vômito",
+        "dor abdominal",
+        "febre"
+      ],
+      "riskFactors": [
+        "alimentos contaminados",
+        "viagens",
+        "contato com doentes"
+      ],
+      "ageGroups": [
+        "crianca",
+        "adulto"
+      ],
+      "urgencyLevel": "baixa",
+      "treatments": [
+        "Soro de reidratação oral",
+        "Probióticos",
+        "Sintomáticos"
+      ],
+      "differentials": [
+        "Apendicite",
+        "DII",
+        "Intoxicação alimentar"
+      ],
+      "redFlags": [
+        "desidratação severa",
+        "sangue nas fezes",
+        "febre alta"
+      ],
+      "clinicalPearls": [
+        "Hidratação é fundamental",
+        "Evitar antidiarreicos se febre"
+      ],
+      "recommendedExams": [
+        "Avaliação de hidratação",
+        "Eletrólitos se grave",
+        "Coprocultura se indicado"
+      ],
+      "durationProfile": [
+        "agudo"
+      ]
+    },
+    {
+      "id": "cefaleia-tensional",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Cefaleia Tensional",
+      "icd10": "G44.2",
+      "category": "neurologico",
+      "commonSymptoms": [
+        "cefaleia",
+        "dor de cabeça",
+        "tensão cervical"
+      ],
+      "riskFactors": [
+        "estresse",
+        "ansiedade",
+        "má postura",
+        "sono inadequado"
+      ],
+      "ageGroups": [
+        "adolescente",
+        "adulto"
+      ],
+      "urgencyLevel": "baixa",
+      "treatments": [
+        "Analgésico simples conforme protocolo",
+        "Medidas não farmacológicas (sono, postura, manejo de estresse)",
+        "Acompanhamento ambulatorial"
+      ],
+      "differentials": [
+        "Enxaqueca",
+        "Cefaleia em salvas",
+        "Hipertensão intracraniana"
+      ],
+      "redFlags": [
+        "início súbito",
+        "febre + rigidez nucal",
+        "alterações neurológicas"
+      ],
+      "clinicalPearls": [
+        "História é fundamental",
+        "Sinais de alarme",
+        "Diário da cefaleia"
+      ],
+      "recommendedExams": [
+        "Exame neurológico",
+        "Neuroimagem se sinais de alarme"
+      ],
+      "durationProfile": [
+        "subagudo",
+        "cronico"
+      ]
+    },
+    {
+      "id": "enxaqueca-com-aura",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Enxaqueca com Aura",
+      "icd10": "G43.1",
+      "category": "neurologico",
+      "commonSymptoms": [
+        "enxaqueca",
+        "cefaleia",
+        "dor de cabeça",
+        "aura",
+        "fotofobia",
+        "náusea"
+      ],
+      "riskFactors": [
+        "história pessoal/familiar",
+        "gatilhos alimentares",
+        "privação de sono",
+        "estresse"
+      ],
+      "ageGroups": [
+        "adolescente",
+        "adulto"
+      ],
+      "urgencyLevel": "moderada",
+      "treatments": [
+        "Analgésicos e antieméticos conforme protocolo institucional",
+        "Hidratação e ambiente com menor estímulo luminoso",
+        "Reavaliação clínica e prevenção de gatilhos"
+      ],
+      "differentials": [
+        "Cefaleia tensional",
+        "Cefaleia secundária",
+        "AVC (quando sinais focais)"
+      ],
+      "redFlags": [
+        "déficit neurológico persistente",
+        "cefaleia súbita em thunderclap",
+        "alteração do nível de consciência"
+      ],
+      "clinicalPearls": [
+        "Aura visual transitória e fotofobia favorecem enxaqueca com aura",
+        "Sempre excluir causas secundárias quando houver red flags"
+      ],
+      "recommendedExams": [
+        "Exame neurológico",
+        "Neuroimagem se sinais de alarme"
+      ],
+      "durationProfile": [
+        "agudo",
+        "subagudo",
+        "cronico"
+      ]
+    },
+    {
+      "id": "acidente-vascular-cerebral",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Acidente Vascular Cerebral",
+      "icd10": "I64",
+      "category": "neurologico",
+      "commonSymptoms": [
+        "hemiparesia",
+        "afasia",
+        "alteração consciência",
+        "cefaleia súbita"
+      ],
+      "riskFactors": [
+        "hipertensão",
+        "diabetes",
+        "FA",
+        "idade > 55",
+        "tabagismo"
+      ],
+      "ageGroups": [
+        "adulto",
+        "idoso"
+      ],
+      "urgencyLevel": "emergencia",
+      "treatments": [
+        "Protocolo AVC agudo e monitorização neurológica",
+        "Terapia antitrombótica conforme imagem e protocolo",
+        "Avaliação para reperfusão em janela terapêutica"
+      ],
+      "differentials": [
+        "Hipoglicemia",
+        "Enxaqueca com aura",
+        "Convulsão"
+      ],
+      "redFlags": [
+        "déficit focal súbito",
+        "NIHSS > 4",
+        "< 4,5h de início"
+      ],
+      "clinicalPearls": [
+        "Janela terapêutica",
+        "TC crânio urgente",
+        "Scale NIHSS/ABCD2"
+      ],
+      "recommendedExams": [
+        "TC de crânio",
+        "Glicemia capilar",
+        "NIHSS",
+        "ECG"
+      ],
+      "durationProfile": [
+        "hiperagudo",
+        "agudo"
+      ]
+    },
+    {
+      "id": "infeccao-do-trato-urinario",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "Infecção do Trato Urinário",
+      "icd10": "N39.0",
+      "category": "genitourinario",
+      "commonSymptoms": [
+        "disúria",
+        "polaciúria",
+        "urgência miccional",
+        "dor suprapúbica"
+      ],
+      "riskFactors": [
+        "sexo feminino",
+        "atividade sexual",
+        "diabetes",
+        "gravidez"
+      ],
+      "ageGroups": [
+        "adulto"
+      ],
+      "genderPreference": "feminino",
+      "urgencyLevel": "baixa",
+      "treatments": [
+        "Antibiótico de primeira linha conforme diretriz local",
+        "Hidratação e analgesia conforme necessidade",
+        "Reavaliação com cultura quando indicado"
+      ],
+      "differentials": [
+        "Vaginite",
+        "Uretrite",
+        "Pielonefrite"
+      ],
+      "redFlags": [
+        "febre + dor lombar",
+        "náuseas/vômitos",
+        "hematúria macroscópica"
+      ],
+      "clinicalPearls": [
+        "EAS + urocultura",
+        "Tratamento empírico inicial",
+        "Seguimento clínico"
+      ],
+      "recommendedExams": [
+        "EAS",
+        "Urocultura",
+        "Função renal se grave"
+      ],
+      "durationProfile": [
+        "agudo",
+        "subagudo"
+      ]
+    },
+    {
+      "id": "covid-19",
+      "version": 1,
+      "status": "published",
+      "lastReviewedAt": "2026-06-01",
+      "name": "COVID-19",
+      "icd10": "U07.1",
+      "category": "infeccioso",
+      "commonSymptoms": [
+        "febre",
+        "tosse seca",
+        "fadiga",
+        "anosmia",
+        "dispneia"
+      ],
+      "riskFactors": [
+        "idade > 60",
+        "comorbidades",
+        "imunossupressão",
+        "obesidade"
+      ],
+      "ageGroups": [
+        "adulto",
+        "idoso"
+      ],
+      "urgencyLevel": "moderada",
+      "treatments": [
+        "Sintomáticos",
+        "Corticóides se O2 < 94%",
+        "Anticoagulação"
+      ],
+      "differentials": [
+        "Influenza",
+        "Pneumonia bacteriana",
+        "Outras viroses"
+      ],
+      "redFlags": [
+        "sat O2 < 94%",
+        "dispneia progressiva",
+        "confusão mental"
+      ],
+      "clinicalPearls": [
+        "RT-PCR",
+        "D-dímero elevado",
+        "Isolamento necessário"
+      ],
+      "recommendedExams": [
+        "Teste antigênico/RT-PCR",
+        "Oximetria",
+        "RX/TC se grave"
+      ],
+      "durationProfile": [
+        "agudo"
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { getRequiredExamsForSymptoms } from './clinicalKnowledgeRepository';
 import { loadPublishedMedicalConditions } from './clinicalKnowledgeSchema';
 
 export interface MedicalCondition {
@@ -626,7 +627,11 @@ export function buildLocalAssessment(patientData: PatientData): ClinicalAssessme
     ? '🚨 Atenção: o quadro contém sinais compatíveis com possível emergência médica. Recomenda-se avaliação presencial IMEDIATA. Em situação real, procure pronto-socorro ou acione o SAMU (192).'
     : undefined;
 
-  const suggestedExams = [...new Set(selectedMatches.flatMap(({ condition }) => condition.recommendedExams))].slice(0, 6);
+  const structuredRequiredExams = getRequiredExamsForSymptoms([patientData.symptoms], 0.8);
+  const suggestedExams = [...new Set([
+    ...structuredRequiredExams,
+    ...selectedMatches.flatMap(({ condition }) => condition.recommendedExams),
+  ])].slice(0, 6);
   const immediateActions = [
     derivedUrgency === 'emergencia' ? 'Encaminhar para avaliação imediata e monitorização.' : 'Conferir sinais vitais e gravidade atual.',
     'Revisar fatores de risco, medicações em uso e comorbidades.',

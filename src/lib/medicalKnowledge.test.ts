@@ -140,4 +140,18 @@ describe('buildLocalAssessment', () => {
     expect(medicationText).toContain('antiemético');
     expect(assessment.hypotheses[0]?.recommendedExams.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('incorpora exames obrigatórios da camada de assertions estruturadas', () => {
+    const assessment = buildLocalAssessment({
+      name: 'Paciente I',
+      age: 58,
+      gender: 'Masculino',
+      duration: '< 6h',
+      symptoms: 'dor no peito em aperto com sudorese',
+    });
+
+    expect(assessment.suggestedExams).toContain('ECG');
+    expect(assessment.suggestedExams).toContain('Troponina seriada');
+  });
+
 });

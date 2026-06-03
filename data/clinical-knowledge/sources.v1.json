@@ -3,6 +3,16 @@
   "generatedAt": "2026-06-01",
   "sources": [
     {
+      "id": "local-safe-core-v1",
+      "sourceType": "local_core",
+      "title": "Base local segura do simulador clínico",
+      "url": "src/lib/medicalKnowledge.ts",
+      "license": "internal educational fallback; review before clinical production use",
+      "publisher": "Clinic Intuition AI",
+      "year": 2026,
+      "retrievedAt": "2026-06-03"
+    },
+    {
       "id": "ncbi-eutilities",
       "sourceType": "pubmed",
       "title": "NCBI E-utilities API",

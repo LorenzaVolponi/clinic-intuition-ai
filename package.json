@@ -33,7 +33,9 @@
     "safety:coherence:guard": "tsx scripts/clinical-coherence-guard.ts",
     "safety:generate:10k": "tsx scripts/generate-disease-possibilities.ts",
     "preview": "vite preview",
-    "start:server": "npx tsx backend/server.ts"
+    "start:server": "npx tsx backend/server.ts",
+    "knowledge:validate": "tsx scripts/validate-clinical-knowledge.ts",
+    "knowledge:export:sql": "tsx scripts/export-clinical-knowledge-sql.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

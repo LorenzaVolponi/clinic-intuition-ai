@@ -14,8 +14,10 @@ A primeira etapa implementada é a separação dos dados clínicos carregáveis:
 
 - `data/clinical-knowledge/conditions.v1.json`: condições clínicas publicadas/revisadas.
 - `data/clinical-knowledge/sources.v1.json`: catálogo inicial de fontes permitidas para enriquecimento futuro.
-- `src/lib/clinicalKnowledgeSchema.ts`: schema Zod rígido para validar condições, status, versão e revisão.
-- `scripts/validate-clinical-knowledge.ts`: validação CLI para CI/local.
+- `data/clinical-knowledge/assertions.v1.json`: fatos clínicos estruturados (`subject`, `predicate`, `object`) derivados da base local e rastreados por fonte.
+- `src/lib/clinicalKnowledgeSchema.ts`: schemas Zod rígidos para validar condições, fontes, assertions, status, versão e revisão.
+- `src/lib/clinicalKnowledgeRepository.ts`: busca estruturada local para consultas objetivas como exames obrigatórios, red flags e diferenciais.
+- `scripts/validate-clinical-knowledge.ts`: validação CLI para CI/local, incluindo referências cruzadas de condition/source/assertion.
 
 Status aceitos para condições:
 
@@ -29,7 +31,7 @@ Status aceitos para condições:
 A evolução recomendada continua sendo incremental:
 
 1. Criar tabelas Postgres para `clinical_conditions`, sintomas, red flags, diferenciais, exames, fontes e assertions clínicas.
-2. Semear o banco a partir de `conditions.v1.json`.
+2. Semear o banco a partir de `conditions.v1.json`, `sources.v1.json` e `assertions.v1.json`.
 3. Manter carregamento em cascata: banco publicado → JSON versionado → fallback TypeScript.
 4. Adicionar busca estruturada em SQL antes de qualquer busca vetorial.
 5. Adicionar pgvector apenas para explicações e trechos curtos com fonte, não para decisão clínica crítica.

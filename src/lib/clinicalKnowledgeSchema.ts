@@ -6,6 +6,44 @@ import type { MedicalCondition } from './medicalKnowledge';
 const urgencyLevelSchema = z.enum(['baixa', 'moderada', 'alta', 'emergencia']);
 const reviewStatusSchema = z.enum(['draft', 'reviewed', 'published', 'deprecated']);
 const durationProfileSchema = z.enum(['hiperagudo', 'agudo', 'subagudo', 'cronico']);
+const bundleStatusSchema = z.enum(['draft', 'reviewed', 'published']);
+
+export const clinicalSourceSchema = z.object({
+  id: z.string().min(1),
+  sourceType: z.enum(['guideline', 'book', 'article', 'icd', 'pubmed', 'local_core', 'institutional']),
+  title: z.string().min(1),
+  url: z.string().min(1),
+  license: z.string().min(1),
+  publisher: z.string().min(1),
+  year: z.number().int().min(1900),
+  retrievedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export const clinicalSourcesBundleSchema = z.object({
+  version: z.string().min(1),
+  generatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  sources: z.array(clinicalSourceSchema).min(1),
+});
+
+export const clinicalAssertionSchema = z.object({
+  id: z.string().min(1),
+  subject: z.string().min(1),
+  predicate: z.enum(['supports_condition', 'has_red_flag', 'has_differential', 'requires_exam', 'suggests_action']),
+  object: z.string().min(1),
+  conditionId: z.string().min(1).optional(),
+  sourceId: z.string().min(1),
+  confidence: z.number().min(0).max(1),
+  evidenceLevel: z.enum(['local_core', 'expert_review', 'guideline', 'systematic_review', 'primary_study', 'metadata_only']),
+  reviewStatus: reviewStatusSchema,
+});
+
+export const clinicalAssertionsBundleSchema = z.object({
+  version: z.string().min(1),
+  status: bundleStatusSchema,
+  generatedFrom: z.string().min(1).optional(),
+  generatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  assertions: z.array(clinicalAssertionSchema).min(1),
+});
 
 export const clinicalConditionSchema = z.object({
   id: z.string().min(1),
@@ -31,7 +69,7 @@ export const clinicalConditionSchema = z.object({
 
 export const clinicalKnowledgeBundleSchema = z.object({
   version: z.string().min(1),
-  status: z.enum(['draft', 'reviewed', 'published']),
+  status: bundleStatusSchema,
   generatedFrom: z.string().min(1).optional(),
   generatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   conditions: z.array(clinicalConditionSchema).min(1),
@@ -39,6 +77,8 @@ export const clinicalKnowledgeBundleSchema = z.object({
 
 export type ClinicalKnowledgeCondition = z.infer<typeof clinicalConditionSchema>;
 export type ClinicalKnowledgeBundle = z.infer<typeof clinicalKnowledgeBundleSchema>;
+export type ClinicalSource = z.infer<typeof clinicalSourceSchema>;
+export type ClinicalAssertion = z.infer<typeof clinicalAssertionSchema>;
 
 export interface ClinicalKnowledgeLoadResult {
   conditions: MedicalCondition[];

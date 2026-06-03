@@ -11,6 +11,7 @@ import { mergeClinicalWithFallback } from '../shared/clinicalResponse.js';
 import { buildMedbotLocalContent } from '../shared/medbotLocal.js';
 import { getTopicReferences } from '../shared/clinicalReferences.js';
 import { isMedbotAnswerSafe } from '../shared/medbotSafety.js';
+import { getEvidenceBrief, getEvidenceCaseContext, getEvidenceCatalog, getEvidenceCoverage, getEvidenceStatus, refreshEvidenceFromSources, searchEvidence } from './evidenceAgent';
 
 dotenv.config();
 
@@ -81,6 +82,15 @@ const studyPackRequestSchema = z.object({
   objective: z.string().max(500).optional(),
   focus: z.enum(['all', 'flashcards', 'quiz', 'lessons']).optional(),
   nonce: z.string().max(100).optional(),
+});
+
+const evidenceCaseContextSchema = z.object({
+  symptoms: z.string().min(3).max(2000),
+  age: z.number().min(0).max(130).optional(),
+  duration: z.string().max(100).optional(),
+  triageLevel: z.string().max(100).optional(),
+  hypotheses: z.array(z.string().max(160)).max(8).optional(),
+  limit: z.number().min(1).max(12).optional(),
 });
 
 type LocalAssessment = z.infer<typeof localAssessmentSchema>;
@@ -765,6 +775,74 @@ export function createApp() {
       sessionCacheSize: sessionCache.size,
       timestamp: new Date().toISOString(),
     });
+  });
+
+
+  app.get('/api/evidence/status', async (_req, res) => {
+    res.json(await getEvidenceStatus());
+  });
+
+  app.get('/api/evidence/catalog', async (_req, res) => {
+    res.json(await getEvidenceCatalog());
+  });
+
+  app.get('/api/evidence/search', async (req, res) => {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const topic = typeof req.query.topic === 'string' ? req.query.topic : '';
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    const domain = typeof req.query.domain === 'string' ? req.query.domain : '';
+    const context = typeof req.query.context === 'string' ? req.query.context : '';
+    const dimension = typeof req.query.dimension === 'string' ? req.query.dimension : '';
+    const results = await searchEvidence({ query, topic, domain, context, dimension, limit });
+
+    res.json({
+      query,
+      topic,
+      domain,
+      context,
+      dimension,
+      count: results.length,
+      results,
+      educationalWarning: 'Resultados para estudo e contexto educacional; valide em diretrizes locais e fontes oficiais antes de qualquer decisão clínica real.',
+    });
+  });
+
+
+  app.get('/api/evidence/brief', async (req, res) => {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const topic = typeof req.query.topic === 'string' ? req.query.topic : '';
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    const domain = typeof req.query.domain === 'string' ? req.query.domain : '';
+    const context = typeof req.query.context === 'string' ? req.query.context : '';
+    const dimension = typeof req.query.dimension === 'string' ? req.query.dimension : '';
+
+    res.json(await getEvidenceBrief({ query, topic, domain, context, dimension, limit }));
+  });
+
+
+  app.get('/api/evidence/coverage', async (req, res) => {
+    const query = typeof req.query.q === 'string' ? req.query.q : '';
+    const topic = typeof req.query.topic === 'string' ? req.query.topic : '';
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    const domain = typeof req.query.domain === 'string' ? req.query.domain : '';
+    const context = typeof req.query.context === 'string' ? req.query.context : '';
+    const dimension = typeof req.query.dimension === 'string' ? req.query.dimension : '';
+
+    res.json(await getEvidenceCoverage({ query, topic, domain, context, dimension, limit }));
+  });
+
+
+  app.post('/api/evidence/case-context', async (req, res) => {
+    const parsed = evidenceCaseContextSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Payload inválido.', details: parsed.error.flatten() });
+    }
+
+    res.json(await getEvidenceCaseContext(parsed.data));
+  });
+
+  app.post('/api/evidence/refresh', async (_req, res) => {
+    res.json(await refreshEvidenceFromSources());
   });
 
   app.post('/api/clinical-analysis', async (req, res) => {

@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-06-01",
+  "sources": [
+    {
+      "id": "ncbi-eutilities",
+      "sourceType": "pubmed",
+      "title": "NCBI E-utilities API",
+      "url": "https://www.ncbi.nlm.nih.gov/books/NBK25501/",
+      "license": "metadata/API reference; verify each linked record license before ingesting text",
+      "publisher": "National Center for Biotechnology Information",
+      "year": 2026,
+      "retrievedAt": "2026-06-01"
+    },
+    {
+      "id": "who-icd11-api",
+      "sourceType": "icd",
+      "title": "WHO ICD-11 API",
+      "url": "https://icd.who.int/icdapi",
+      "license": "WHO API terms; use for identifiers and permitted metadata only",
+      "publisher": "World Health Organization",
+      "year": 2026,
+      "retrievedAt": "2026-06-01"
+    }
+  ]
+}
